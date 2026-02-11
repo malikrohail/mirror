@@ -1,0 +1,382 @@
+[
+  {
+    "name": "Tech-Savvy College Student",
+    "emoji": "🎓",
+    "category": "General",
+    "short_description": "A 21-year-old digital native who breezes through apps but has zero patience for slow UX",
+    "default_profile": {
+      "name": "Jordan",
+      "age": 21,
+      "occupation": "Computer Science Student",
+      "tech_literacy": "high",
+      "patience_level": "low",
+      "reading_speed": "skims",
+      "trust_level": "moderate",
+      "device_preference": "mobile",
+      "accessibility_needs": [],
+      "frustration_triggers": ["slow loading", "too many steps", "unclear navigation"],
+      "personality": {"openness": 0.8, "conscientiousness": 0.4, "extraversion": 0.7, "agreeableness": 0.5, "neuroticism": 0.3}
+    }
+  },
+  {
+    "name": "Busy Working Parent",
+    "emoji": "👩‍💼",
+    "category": "General",
+    "short_description": "A 38-year-old multitasking parent who needs things done quickly between meetings and school pickups",
+    "default_profile": {
+      "name": "Sarah",
+      "age": 38,
+      "occupation": "Marketing Manager",
+      "tech_literacy": "moderate",
+      "patience_level": "low",
+      "reading_speed": "skims",
+      "trust_level": "moderate",
+      "device_preference": "desktop",
+      "accessibility_needs": [],
+      "frustration_triggers": ["lengthy forms", "unclear pricing", "no search function"],
+      "personality": {"openness": 0.5, "conscientiousness": 0.8, "extraversion": 0.6, "agreeableness": 0.7, "neuroticism": 0.5}
+    }
+  },
+  {
+    "name": "Retired Grandparent",
+    "emoji": "👴",
+    "category": "General",
+    "short_description": "A 72-year-old retiree who reads everything carefully and gets confused by modern UI patterns",
+    "default_profile": {
+      "name": "Robert",
+      "age": 72,
+      "occupation": "Retired Teacher",
+      "tech_literacy": "low",
+      "patience_level": "high",
+      "reading_speed": "thorough",
+      "trust_level": "skeptical",
+      "device_preference": "desktop",
+      "accessibility_needs": ["large text", "high contrast"],
+      "frustration_triggers": ["small text", "icons without labels", "jargon", "popup dialogs"],
+      "personality": {"openness": 0.3, "conscientiousness": 0.9, "extraversion": 0.3, "agreeableness": 0.8, "neuroticism": 0.6}
+    }
+  },
+  {
+    "name": "Non-Native English Speaker",
+    "emoji": "🌍",
+    "category": "General",
+    "short_description": "A 30-year-old professional whose first language isn't English — struggles with idioms and jargon",
+    "default_profile": {
+      "name": "Yuki",
+      "age": 30,
+      "occupation": "Software Engineer",
+      "tech_literacy": "high",
+      "patience_level": "moderate",
+      "reading_speed": "thorough",
+      "trust_level": "moderate",
+      "device_preference": "desktop",
+      "accessibility_needs": [],
+      "frustration_triggers": ["idiomatic expressions", "culturally specific references", "ambiguous labels"],
+      "personality": {"openness": 0.7, "conscientiousness": 0.7, "extraversion": 0.4, "agreeableness": 0.6, "neuroticism": 0.4}
+    }
+  },
+  {
+    "name": "Impatient Executive",
+    "emoji": "💼",
+    "category": "General",
+    "short_description": "A 45-year-old C-suite executive who wants to see value immediately and has no tolerance for friction",
+    "default_profile": {
+      "name": "Michael",
+      "age": 45,
+      "occupation": "VP of Operations",
+      "tech_literacy": "moderate",
+      "patience_level": "very_low",
+      "reading_speed": "skims",
+      "trust_level": "skeptical",
+      "device_preference": "desktop",
+      "accessibility_needs": [],
+      "frustration_triggers": ["mandatory signup before value", "no clear pricing", "too much text", "no demo"],
+      "personality": {"openness": 0.4, "conscientiousness": 0.9, "extraversion": 0.8, "agreeableness": 0.3, "neuroticism": 0.5}
+    }
+  },
+  {
+    "name": "First-Time Internet User",
+    "emoji": "🆕",
+    "category": "General",
+    "short_description": "A 55-year-old who just got their first smartphone and is learning to navigate the web",
+    "default_profile": {
+      "name": "Dorothy",
+      "age": 55,
+      "occupation": "Small Business Owner",
+      "tech_literacy": "very_low",
+      "patience_level": "high",
+      "reading_speed": "thorough",
+      "trust_level": "very_skeptical",
+      "device_preference": "mobile",
+      "accessibility_needs": ["large text"],
+      "frustration_triggers": ["anything unexpected", "too many options", "no clear instructions", "technical terms"],
+      "personality": {"openness": 0.2, "conscientiousness": 0.7, "extraversion": 0.4, "agreeableness": 0.8, "neuroticism": 0.7}
+    }
+  },
+  {
+    "name": "Power User Developer",
+    "emoji": "👨‍💻",
+    "category": "General",
+    "short_description": "A 28-year-old developer who expects keyboard shortcuts, hates unnecessary clicks, and notices every inconsistency",
+    "default_profile": {
+      "name": "Alex",
+      "age": 28,
+      "occupation": "Full-Stack Developer",
+      "tech_literacy": "very_high",
+      "patience_level": "low",
+      "reading_speed": "skims",
+      "trust_level": "skeptical",
+      "device_preference": "desktop",
+      "accessibility_needs": [],
+      "frustration_triggers": ["no keyboard navigation", "inconsistent design", "unnecessary confirmations", "no dark mode"],
+      "personality": {"openness": 0.9, "conscientiousness": 0.6, "extraversion": 0.3, "agreeableness": 0.4, "neuroticism": 0.3}
+    }
+  },
+  {
+    "name": "Anxious First-Time Buyer",
+    "emoji": "😰",
+    "category": "General",
+    "short_description": "A 25-year-old making their first major online purchase and worried about scams and hidden costs",
+    "default_profile": {
+      "name": "Emma",
+      "age": 25,
+      "occupation": "Graduate Student",
+      "tech_literacy": "moderate",
+      "patience_level": "moderate",
+      "reading_speed": "thorough",
+      "trust_level": "very_skeptical",
+      "device_preference": "mobile",
+      "accessibility_needs": [],
+      "frustration_triggers": ["hidden fees", "no return policy visible", "too many required fields", "no security badges"],
+      "personality": {"openness": 0.5, "conscientiousness": 0.8, "extraversion": 0.3, "agreeableness": 0.7, "neuroticism": 0.8}
+    }
+  },
+  {
+    "name": "Screen Reader User",
+    "emoji": "🔊",
+    "category": "Accessibility",
+    "short_description": "A 35-year-old who is blind and navigates entirely with a screen reader and keyboard",
+    "default_profile": {
+      "name": "David",
+      "age": 35,
+      "occupation": "Accessibility Consultant",
+      "tech_literacy": "high",
+      "patience_level": "moderate",
+      "reading_speed": "thorough",
+      "trust_level": "moderate",
+      "device_preference": "desktop",
+      "accessibility_needs": ["screen_reader", "keyboard_only", "no_images"],
+      "frustration_triggers": ["missing alt text", "no ARIA labels", "focus traps", "auto-playing media", "mouse-only interactions"],
+      "personality": {"openness": 0.6, "conscientiousness": 0.8, "extraversion": 0.5, "agreeableness": 0.6, "neuroticism": 0.4}
+    }
+  },
+  {
+    "name": "Low Vision User",
+    "emoji": "👓",
+    "category": "Accessibility",
+    "short_description": "A 60-year-old with macular degeneration who uses high zoom and needs strong contrast",
+    "default_profile": {
+      "name": "Margaret",
+      "age": 60,
+      "occupation": "Librarian",
+      "tech_literacy": "moderate",
+      "patience_level": "high",
+      "reading_speed": "thorough",
+      "trust_level": "moderate",
+      "device_preference": "desktop",
+      "accessibility_needs": ["high_contrast", "large_text", "zoom_200"],
+      "frustration_triggers": ["low contrast text", "small click targets", "text in images", "horizontal scrolling at zoom"],
+      "personality": {"openness": 0.5, "conscientiousness": 0.8, "extraversion": 0.4, "agreeableness": 0.8, "neuroticism": 0.5}
+    }
+  },
+  {
+    "name": "Color Blind User",
+    "emoji": "🎨",
+    "category": "Accessibility",
+    "short_description": "A 40-year-old with deuteranopia (red-green color blindness) who relies on patterns, not color alone",
+    "default_profile": {
+      "name": "James",
+      "age": 40,
+      "occupation": "Accountant",
+      "tech_literacy": "moderate",
+      "patience_level": "moderate",
+      "reading_speed": "normal",
+      "trust_level": "moderate",
+      "device_preference": "desktop",
+      "accessibility_needs": ["color_blind_deuteranopia"],
+      "frustration_triggers": ["color-only indicators", "red/green status without labels", "poor contrast ratios"],
+      "personality": {"openness": 0.5, "conscientiousness": 0.7, "extraversion": 0.5, "agreeableness": 0.6, "neuroticism": 0.4}
+    }
+  },
+  {
+    "name": "Motor Impairment User",
+    "emoji": "🖱️",
+    "category": "Accessibility",
+    "short_description": "A 50-year-old with limited fine motor control who uses keyboard and voice commands",
+    "default_profile": {
+      "name": "Patricia",
+      "age": 50,
+      "occupation": "Writer",
+      "tech_literacy": "moderate",
+      "patience_level": "high",
+      "reading_speed": "normal",
+      "trust_level": "moderate",
+      "device_preference": "desktop",
+      "accessibility_needs": ["keyboard_only", "large_click_targets", "no_drag_drop"],
+      "frustration_triggers": ["small buttons", "hover-only menus", "drag and drop required", "timed interactions"],
+      "personality": {"openness": 0.6, "conscientiousness": 0.7, "extraversion": 0.4, "agreeableness": 0.7, "neuroticism": 0.5}
+    }
+  },
+  {
+    "name": "Cognitive Disability User",
+    "emoji": "🧠",
+    "category": "Accessibility",
+    "short_description": "A 28-year-old with ADHD who needs clear structure, minimal distractions, and forgiving interfaces",
+    "default_profile": {
+      "name": "Chris",
+      "age": 28,
+      "occupation": "Graphic Designer",
+      "tech_literacy": "moderate",
+      "patience_level": "low",
+      "reading_speed": "skims",
+      "trust_level": "moderate",
+      "device_preference": "desktop",
+      "accessibility_needs": ["reduced_motion", "minimal_distractions", "clear_structure"],
+      "frustration_triggers": ["animations", "autoplay", "wall of text", "multi-step processes", "no progress indicator"],
+      "personality": {"openness": 0.8, "conscientiousness": 0.3, "extraversion": 0.6, "agreeableness": 0.6, "neuroticism": 0.6}
+    }
+  },
+  {
+    "name": "E-commerce Power Shopper",
+    "emoji": "🛒",
+    "category": "Industry",
+    "short_description": "A 33-year-old online shopping veteran who compares prices, reads reviews, and expects seamless checkout",
+    "default_profile": {
+      "name": "Lisa",
+      "age": 33,
+      "occupation": "Interior Designer",
+      "tech_literacy": "high",
+      "patience_level": "low",
+      "reading_speed": "skims",
+      "trust_level": "moderate",
+      "device_preference": "mobile",
+      "accessibility_needs": [],
+      "frustration_triggers": ["mandatory account creation", "no guest checkout", "hidden shipping costs", "complicated returns"],
+      "personality": {"openness": 0.6, "conscientiousness": 0.5, "extraversion": 0.7, "agreeableness": 0.5, "neuroticism": 0.4}
+    }
+  },
+  {
+    "name": "SaaS Evaluator",
+    "emoji": "📊",
+    "category": "Industry",
+    "short_description": "A 35-year-old who evaluates SaaS tools for their company — needs clear pricing, features, and comparison",
+    "default_profile": {
+      "name": "Ryan",
+      "age": 35,
+      "occupation": "IT Manager",
+      "tech_literacy": "high",
+      "patience_level": "moderate",
+      "reading_speed": "thorough",
+      "trust_level": "skeptical",
+      "device_preference": "desktop",
+      "accessibility_needs": [],
+      "frustration_triggers": ["no pricing page", "contact sales only", "no free trial", "feature comparison unclear"],
+      "personality": {"openness": 0.5, "conscientiousness": 0.9, "extraversion": 0.5, "agreeableness": 0.4, "neuroticism": 0.3}
+    }
+  },
+  {
+    "name": "Healthcare Patient",
+    "emoji": "🏥",
+    "category": "Industry",
+    "short_description": "A 65-year-old patient trying to use a healthcare portal to book appointments and view results",
+    "default_profile": {
+      "name": "Helen",
+      "age": 65,
+      "occupation": "Retired Nurse",
+      "tech_literacy": "low",
+      "patience_level": "high",
+      "reading_speed": "thorough",
+      "trust_level": "moderate",
+      "device_preference": "desktop",
+      "accessibility_needs": ["large text"],
+      "frustration_triggers": ["medical jargon", "complex navigation", "no phone number visible", "confusing date pickers"],
+      "personality": {"openness": 0.3, "conscientiousness": 0.8, "extraversion": 0.4, "agreeableness": 0.8, "neuroticism": 0.6}
+    }
+  },
+  {
+    "name": "Fintech First-Timer",
+    "emoji": "💰",
+    "category": "Industry",
+    "short_description": "A 22-year-old opening their first investment account — nervous about money and confused by financial terms",
+    "default_profile": {
+      "name": "Zoe",
+      "age": 22,
+      "occupation": "Marketing Coordinator",
+      "tech_literacy": "moderate",
+      "patience_level": "moderate",
+      "reading_speed": "thorough",
+      "trust_level": "very_skeptical",
+      "device_preference": "mobile",
+      "accessibility_needs": [],
+      "frustration_triggers": ["financial jargon", "no tooltips", "unclear risk warnings", "no human support option"],
+      "personality": {"openness": 0.6, "conscientiousness": 0.5, "extraversion": 0.6, "agreeableness": 0.7, "neuroticism": 0.7}
+    }
+  },
+  {
+    "name": "Mobile-Only User",
+    "emoji": "📱",
+    "category": "General",
+    "short_description": "A 19-year-old who does everything on their phone and has never used the desktop version",
+    "default_profile": {
+      "name": "Kai",
+      "age": 19,
+      "occupation": "College Freshman",
+      "tech_literacy": "high",
+      "patience_level": "very_low",
+      "reading_speed": "skims",
+      "trust_level": "moderate",
+      "device_preference": "mobile",
+      "accessibility_needs": [],
+      "frustration_triggers": ["not mobile responsive", "tiny tap targets", "no swipe gestures", "desktop-only features"],
+      "personality": {"openness": 0.8, "conscientiousness": 0.3, "extraversion": 0.8, "agreeableness": 0.5, "neuroticism": 0.3}
+    }
+  },
+  {
+    "name": "Privacy-Conscious User",
+    "emoji": "🔒",
+    "category": "General",
+    "short_description": "A 42-year-old who blocks cookies, uses VPN, and scrutinizes every permission request",
+    "default_profile": {
+      "name": "Sam",
+      "age": 42,
+      "occupation": "Cybersecurity Analyst",
+      "tech_literacy": "very_high",
+      "patience_level": "moderate",
+      "reading_speed": "thorough",
+      "trust_level": "very_skeptical",
+      "device_preference": "desktop",
+      "accessibility_needs": [],
+      "frustration_triggers": ["excessive data collection", "no privacy policy", "third-party trackers", "required phone number"],
+      "personality": {"openness": 0.4, "conscientiousness": 0.9, "extraversion": 0.2, "agreeableness": 0.3, "neuroticism": 0.5}
+    }
+  },
+  {
+    "name": "Distracted Commuter",
+    "emoji": "🚇",
+    "category": "General",
+    "short_description": "A 29-year-old browsing on their phone during a bumpy train ride with intermittent signal",
+    "default_profile": {
+      "name": "Priya",
+      "age": 29,
+      "occupation": "Data Analyst",
+      "tech_literacy": "high",
+      "patience_level": "low",
+      "reading_speed": "skims",
+      "trust_level": "moderate",
+      "device_preference": "mobile",
+      "accessibility_needs": [],
+      "frustration_triggers": ["large page sizes", "no offline support", "lost form data on back", "auto-logout"],
+      "personality": {"openness": 0.6, "conscientiousness": 0.5, "extraversion": 0.5, "agreeableness": 0.6, "neuroticism": 0.4}
+    }
+  }
+]

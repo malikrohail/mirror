@@ -1,0 +1,90 @@
+import uuid
+
+import redis.asyncio as aioredis
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.dependencies import get_db, get_redis
+from app.schemas.study import (
+    StudyCreate,
+    StudyList,
+    StudyOut,
+    StudyRunResponse,
+    StudyStatusResponse,
+    StudySummary,
+)
+from app.services.study_service import StudyService
+
+router = APIRouter()
+
+
+@router.post("", response_model=StudyOut, status_code=201)
+async def create_study(
+    data: StudyCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new study with tasks and personas."""
+    svc = StudyService(db)
+    study = await svc.create_study(data)
+    return study
+
+
+@router.get("", response_model=StudyList)
+async def list_studies(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    status: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """List studies with pagination."""
+    svc = StudyService(db)
+    studies, total = await svc.list_studies(page=page, limit=limit, status=status)
+    return StudyList(
+        items=[StudySummary.model_validate(s) for s in studies],
+        total=total,
+        page=page,
+        limit=limit,
+    )
+
+
+@router.get("/{study_id}", response_model=StudyOut)
+async def get_study(
+    study_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get study with summary results."""
+    svc = StudyService(db)
+    return await svc.get_study(study_id)
+
+
+@router.delete("/{study_id}", status_code=204)
+async def delete_study(
+    study_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a study and all associated data."""
+    svc = StudyService(db)
+    await svc.delete_study(study_id)
+
+
+@router.post("/{study_id}/run", response_model=StudyRunResponse)
+async def run_study(
+    study_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """Start running a study — dispatches to worker queue."""
+    svc = StudyService(db, redis=redis)
+    job_id = await svc.run_study(study_id)
+    return StudyRunResponse(study_id=study_id, job_id=job_id)
+
+
+@router.get("/{study_id}/status", response_model=StudyStatusResponse)
+async def get_study_status(
+    study_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """Poll study progress."""
+    svc = StudyService(db, redis=redis)
+    return await svc.get_study_status(study_id)
