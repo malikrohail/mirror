@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}FlowSync{% endblock %}
+
+{% block body %}
+<!-- Planted Issue #6: Hamburger menu with no label on desktop -->
+<header class="header">
+    <a href="/" class="logo">FlowSync</a>
+    <button class="menu-toggle" id="menuToggle" aria-label="Menu">&#9776;</button>
+    <nav class="nav-links" id="navLinks">
+        <a href="/pricing">Pricing</a>
+        <a href="/signup">Sign Up</a>
+        <a href="#">Features</a>
+        <a href="#">Blog</a>
+    </nav>
+</header>
+
+<!-- Planted Issue #7: Jargon-heavy hero -->
+<section class="hero">
+    <h1>Supercharge Your Content Pipeline</h1>
+    <p class="subtitle">FlowSync leverages AI-driven synergy to orchestrate cross-functional deliverables
+    and streamline your GTM velocity with zero-friction collaboration workflows.</p>
+    <a href="/signup" class="cta-primary">Start Your Free Trial</a>
+</section>
+
+<!-- Filler content to push social login below fold -->
+<section class="features">
+    <div class="feature-card">
+        <div style="font-size:36px">&#9889;</div>
+        <h3>Real-Time Sync</h3>
+        <p>Keep your team aligned with instant updates across all workspaces and channels.</p>
+    </div>
+    <div class="feature-card">
+        <div style="font-size:36px">&#128202;</div>
+        <h3>Analytics Dashboard</h3>
+        <p>Track performance metrics and KPIs with our powerful reporting engine.</p>
+    </div>
+    <div class="feature-card">
+        <div style="font-size:36px">&#128274;</div>
+        <h3>Enterprise Security</h3>
+        <p>SOC 2 compliant with end-to-end encryption and role-based access control.</p>
+    </div>
+</section>
+
+<section style="padding: 60px 40px; text-align: center;">
+    <h2 style="font-size: 32px; margin-bottom: 16px;">Trusted by 10,000+ Teams</h2>
+    <p style="color: #666; max-width: 500px; margin: 0 auto;">
+        From startups to Fortune 500, teams rely on FlowSync to ship faster and collaborate better.
+    </p>
+</section>
+
+<section style="padding: 60px 40px; background: #f8f9fa;">
+    <div style="max-width: 800px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <div style="padding: 24px; background: #fff; border-radius: 12px; border: 1px solid #eee;">
+            <p style="font-style: italic; color: #666;">"FlowSync transformed how our team works. We shipped 3x faster in Q4."</p>
+            <p style="margin-top: 12px; font-weight: 600;">— Sarah K., VP Engineering</p>
+        </div>
+        <div style="padding: 24px; background: #fff; border-radius: 12px; border: 1px solid #eee;">
+            <p style="font-style: italic; color: #666;">"The analytics alone are worth the subscription. Game changer."</p>
+            <p style="margin-top: 12px; font-weight: 600;">— Mike T., Product Lead</p>
+        </div>
+    </div>
+</section>
+
+<section style="padding: 60px 40px; text-align: center;">
+    <h2 style="font-size: 32px; margin-bottom: 16px;">How It Works</h2>
+    <div style="max-width: 700px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 32px;">
+        <div>
+            <div style="font-size: 36px; background: #f5f0ff; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">1</div>
+            <h4>Create Workspace</h4>
+            <p style="font-size: 14px; color: #666;">Set up your team's collaborative environment in seconds.</p>
+        </div>
+        <div>
+            <div style="font-size: 36px; background: #f5f0ff; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">2</div>
+            <h4>Invite Team</h4>
+            <p style="font-size: 14px; color: #666;">Add your colleagues and assign roles and permissions.</p>
+        </div>
+        <div>
+            <div style="font-size: 36px; background: #f5f0ff; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">3</div>
+            <h4>Start Shipping</h4>
+            <p style="font-size: 14px; color: #666;">Use boards, docs, and automations to ship faster.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Planted Issue #2: Social login buttons far below the fold -->
+<section class="social-login-section">
+    <h3>Or sign up instantly with</h3>
+    <a href="/signup" class="social-btn">&#x1F310; Sign up with Google</a>
+    <a href="/signup" class="social-btn">&#x1F4E7; Sign up with GitHub</a>
+    <a href="/signup" class="social-btn">&#x1F4AC; Sign up with Slack</a>
+</section>
+
+<footer style="padding: 40px; text-align: center; border-top: 1px solid #eee; color: #999; font-size: 14px;">
+    <p>&copy; 2025 FlowSync Inc. All rights reserved.</p>
+</footer>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Toggle hamburger menu
+    document.getElementById('menuToggle').addEventListener('click', function() {
+        document.getElementById('navLinks').classList.toggle('open');
+    });
+</script>
+{% endblock %}

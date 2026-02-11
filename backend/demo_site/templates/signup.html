@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Sign Up{% endblock %}
+
+{% block body %}
+<div class="signup-page">
+    <div class="signup-card">
+        <h2>Create Your Account</h2>
+
+        {% if errors %}
+        <!-- Planted Issue #10: Form data is NOT preserved on validation error -->
+        <ul class="error-list">
+            {% for error in errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <form method="POST" action="/signup" id="signupForm">
+            <div class="form-group">
+                <label for="name">Full Name <span class="required-star">*</span></label>
+                <input type="text" id="name" name="name" placeholder="John Doe" required>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address <span class="required-star">*</span></label>
+                <input type="email" id="email" name="email" placeholder="john@company.com" required>
+            </div>
+
+            <!-- Planted Issue #8: Required phone number -->
+            <div class="form-group">
+                <label for="phone">Phone Number <span class="required-star">*</span></label>
+                <input type="tel" id="phone" name="phone" placeholder="+1 (555) 000-0000" required>
+                <div class="hint">We'll send you a verification code via SMS</div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password <span class="required-star">*</span></label>
+                <input type="password" id="password" name="password" placeholder="Min 8 characters" required minlength="8">
+            </div>
+
+            <!-- Planted Issue #1: "Workspace" instead of "Team Name" — confusing for non-tech -->
+            <div class="form-group">
+                <label for="workspace">Workspace Name <span class="required-star">*</span></label>
+                <input type="text" id="workspace" name="workspace" placeholder="e.g., acme-corp-prod">
+                <div class="hint">This will be your workspace URL: flowsync.io/your-workspace</div>
+            </div>
+
+            <button type="submit" class="submit-btn">Create Workspace</button>
+        </form>
+
+        <p style="text-align: center; margin-top: 16px; font-size: 14px; color: #666;">
+            Already have an account? <a href="#" style="color: #6c3ce9;">Log in</a>
+        </p>
+    </div>
+</div>
+
+<!-- Planted Issue #9: Modal with tiny close button -->
+<div class="modal-overlay active" id="cookieModal">
+    <div class="modal">
+        <button class="modal-close" id="closeModal" aria-label="Close">&times;</button>
+        <h3 style="margin-bottom: 12px;">We value your privacy</h3>
+        <p style="color: #666; font-size: 14px; margin-bottom: 16px;">
+            We use cookies to enhance your browsing experience, serve personalized ads or content,
+            and analyze our traffic. By clicking "Accept All", you consent to our use of cookies.
+        </p>
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+            <button class="btn-secondary" onclick="document.getElementById('cookieModal').classList.remove('active')">Manage Preferences</button>
+            <button class="btn-primary" onclick="document.getElementById('cookieModal').classList.remove('active')">Accept All</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('closeModal').addEventListener('click', function() {
+        document.getElementById('cookieModal').classList.remove('active');
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,532 @@
+/* Demo site CSS with intentional UX issues */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: #fff;
+}
+
+/* ======== HEADER ======== */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 40px;
+    border-bottom: 1px solid #eee;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 100;
+}
+
+.logo {
+    font-size: 24px;
+    font-weight: 700;
+    color: #6c3ce9;
+    text-decoration: none;
+}
+
+/* Planted Issue #6: Hamburger menu icon with no label on desktop */
+.menu-toggle {
+    display: block; /* Shown on desktop — confusing */
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 8px;
+}
+
+.nav-links {
+    display: none; /* Hidden behind hamburger — bad on desktop */
+}
+
+.nav-links.open {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 60px;
+    right: 20px;
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    gap: 8px;
+}
+
+.nav-links a {
+    color: #333;
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+}
+
+.nav-links a:hover {
+    background: #f5f0ff;
+}
+
+/* ======== HERO ======== */
+.hero {
+    text-align: center;
+    padding: 80px 40px;
+    background: linear-gradient(135deg, #f5f0ff 0%, #e8f4ff 100%);
+}
+
+.hero h1 {
+    font-size: 48px;
+    font-weight: 800;
+    margin-bottom: 16px;
+    color: #1a1a2e;
+}
+
+/* Planted Issue #7: Jargon headline */
+.hero .subtitle {
+    font-size: 20px;
+    color: #666;
+    max-width: 600px;
+    margin: 0 auto 32px;
+}
+
+.hero .cta-primary {
+    display: inline-block;
+    background: #6c3ce9;
+    color: #fff;
+    padding: 14px 32px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.hero .cta-primary:hover {
+    background: #5a2dd1;
+}
+
+/* Planted Issue #2: Social login WAY below the fold */
+.social-login-section {
+    padding: 40px;
+    margin-top: 800px; /* Far below fold */
+    text-align: center;
+    border-top: 1px solid #eee;
+}
+
+.social-login-section h3 {
+    font-size: 16px;
+    color: #999;
+    margin-bottom: 16px;
+}
+
+.social-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    margin: 4px;
+    font-size: 14px;
+    color: #333;
+    text-decoration: none;
+}
+
+/* ======== FEATURES (filler) ======== */
+.features {
+    padding: 60px 40px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.feature-card {
+    padding: 24px;
+    border-radius: 12px;
+    border: 1px solid #eee;
+    text-align: center;
+}
+
+.feature-card h3 {
+    margin: 12px 0 8px;
+    font-size: 18px;
+}
+
+.feature-card p {
+    color: #666;
+    font-size: 14px;
+}
+
+/* ======== PRICING ======== */
+.pricing-section {
+    padding: 60px 40px;
+    text-align: center;
+}
+
+.pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    max-width: 900px;
+    margin: 32px auto 0;
+}
+
+.pricing-card {
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 32px 24px;
+    position: relative;
+}
+
+.pricing-card.popular {
+    border-color: #6c3ce9;
+    box-shadow: 0 4px 16px rgba(108, 60, 233, 0.15);
+}
+
+.pricing-card .badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #6c3ce9;
+    color: #fff;
+    padding: 4px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.pricing-card h3 {
+    font-size: 20px;
+    margin-bottom: 8px;
+}
+
+.pricing-card .price {
+    font-size: 36px;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+.pricing-card .price span {
+    font-size: 16px;
+    font-weight: 400;
+    color: #666;
+}
+
+/* Planted Issue #4: Low-contrast text on pricing features */
+.pricing-card .feature-list {
+    list-style: none;
+    padding: 16px 0;
+    text-align: left;
+}
+
+.pricing-card .feature-list li {
+    padding: 6px 0;
+    color: #999; /* LOW CONTRAST on white — fails WCAG AA */
+    font-size: 14px;
+}
+
+.pricing-card .select-btn {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #6c3ce9;
+    background: transparent;
+    color: #6c3ce9;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    text-decoration: none;
+    text-align: center;
+}
+
+.pricing-card.popular .select-btn {
+    background: #6c3ce9;
+    color: #fff;
+}
+
+/* ======== SIGNUP FORM ======== */
+.signup-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    padding: 40px;
+}
+
+.signup-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 40px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    position: relative;
+}
+
+.signup-card h2 {
+    font-size: 24px;
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: #333;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #6c3ce9;
+    box-shadow: 0 0 0 3px rgba(108, 60, 233, 0.1);
+}
+
+/* Planted Issue #8: Required phone number with asterisk */
+.required-star {
+    color: #e53935;
+}
+
+.form-group .hint {
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+}
+
+.submit-btn {
+    width: 100%;
+    padding: 12px;
+    background: #6c3ce9;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+}
+
+.error-list {
+    background: #fff3f3;
+    border: 1px solid #ffcdd2;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    list-style: none;
+}
+
+.error-list li {
+    color: #c62828;
+    font-size: 14px;
+    padding: 2px 0;
+}
+
+/* Planted Issue #9: Tiny close button on modal */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 32px;
+    max-width: 400px;
+    width: 90%;
+    position: relative;
+}
+
+.modal-close {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 12px;  /* TINY — planted issue #9 */
+    height: 12px;
+    font-size: 8px;
+    line-height: 12px;
+    text-align: center;
+    background: #eee;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #999;
+    padding: 0;
+}
+
+/* ======== VERIFY EMAIL ======== */
+/* Planted Issue #5: No confirmation — blank page with just a spinner */
+.verify-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+}
+
+.verify-card {
+    text-align: center;
+    padding: 40px;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #eee;
+    border-top: 4px solid #6c3ce9;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 16px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ======== ONBOARDING ======== */
+/* Planted Issue #3: 7-step wizard */
+.onboarding-page {
+    min-height: 100vh;
+    background: #f8f9fa;
+    padding: 40px;
+}
+
+.onboarding-card {
+    max-width: 600px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+
+.step-indicator {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    justify-content: center;
+}
+
+.step-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #eee;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #999;
+}
+
+.step-dot.active {
+    background: #6c3ce9;
+    color: #fff;
+}
+
+.step-dot.done {
+    background: #4caf50;
+    color: #fff;
+}
+
+.onboarding-card h3 {
+    font-size: 20px;
+    margin-bottom: 16px;
+}
+
+.onboarding-card p {
+    color: #666;
+    margin-bottom: 24px;
+}
+
+.step-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 24px;
+}
+
+.btn-secondary {
+    padding: 10px 24px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+    text-decoration: none;
+}
+
+.btn-primary {
+    padding: 10px 24px;
+    background: #6c3ce9;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+/* ======== DASHBOARD ======== */
+.dashboard-page {
+    min-height: 100vh;
+    background: #f8f9fa;
+}
+
+.dashboard-header {
+    background: #fff;
+    padding: 20px 40px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dashboard-content {
+    padding: 40px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.dashboard-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+    border: 1px solid #eee;
+}

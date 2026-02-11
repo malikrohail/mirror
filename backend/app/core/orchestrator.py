@@ -23,16 +23,22 @@ from app.browser.pool import BrowserPool
 from app.browser.screenshots import ScreenshotService
 from app.config import settings
 from app.core.analyzer import Analyzer
+from app.core.deduplicator import IssueDeduplicator
+from app.core.firecrawl_client import FirecrawlClient, SiteMap
 from app.core.heatmap import HeatmapGenerator
 from app.core.navigator import Navigator, NavigationResult
 from app.core.persona_engine import PersonaEngine
+from app.core.prioritizer import IssuePrioritizer
 from app.core.report_builder import ReportBuilder
+from app.core.step_recorder import DatabaseStepRecorder
 from app.core.synthesizer import Synthesizer
 from app.db.repositories.session_repo import SessionRepository
 from app.db.repositories.study_repo import StudyRepository
 from app.llm.client import LLMClient
+from app.models.insight import Insight, InsightType
 from app.models.session import SessionStatus
 from app.models.study import StudyStatus
+from app.storage.file_storage import FileStorage
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +67,7 @@ class StudyOrchestrator:
         self._synthesizer = Synthesizer(self._llm)
         self._heatmap_gen = HeatmapGenerator()
         self._report_builder = ReportBuilder(self._llm)
+        self._firecrawl = FirecrawlClient()
 
         # Browser pool (initialized lazily)
         self._pool: BrowserPool | None = None
@@ -99,6 +106,10 @@ class StudyOrchestrator:
             persona_profiles = await self._generate_persona_profiles(study)
             await self._publish_progress(study_id, 10, "personas_ready")
 
+            # --- Phase 2.5: Pre-crawl site with Firecrawl ---
+            sitemap = await self._precrawl_site(study_url)
+            await self._publish_progress(study_id, 15, "sitemap_ready")
+
             # --- Phase 3: Parallel navigation ---
             nav_results = await self._run_navigation_sessions(
                 study_id=study_id,
@@ -135,6 +146,19 @@ class StudyOrchestrator:
                 session_summaries=session_summaries,
                 all_issues=all_issues,
             )
+
+            # --- Persist insights to database ---
+            await self._save_insights(study_id, synthesis)
+
+            # --- Issue deduplication & prioritization ---
+            try:
+                deduplicator = IssueDeduplicator(self.db)
+                await deduplicator.deduplicate_study_issues(study_id, study_url)
+                prioritizer = IssuePrioritizer(self.db)
+                await prioritizer.prioritize_study_issues(study_id)
+            except Exception as e:
+                logger.warning("Issue dedup/prioritization failed (non-fatal): %s", e)
+
             await self._publish_progress(study_id, 85, "synthesis_complete")
 
             # --- Phase 6: Heatmaps ---
@@ -232,6 +256,27 @@ class StudyOrchestrator:
         return profiles
 
     # ------------------------------------------------------------------
+    # Site Pre-Crawling
+    # ------------------------------------------------------------------
+
+    async def _precrawl_site(self, url: str) -> SiteMap:
+        """Pre-crawl the target site to discover pages and build a sitemap."""
+        if not self._firecrawl.is_configured:
+            logger.info("Firecrawl not configured, skipping pre-crawl")
+            return SiteMap(base_url=url, total_pages=0)
+
+        try:
+            sitemap = await self._firecrawl.crawl_site(url)
+            logger.info(
+                "Pre-crawl complete: %d pages discovered for %s",
+                sitemap.total_pages, url,
+            )
+            return sitemap
+        except Exception as e:
+            logger.warning("Pre-crawl failed (non-fatal): %s", e)
+            return SiteMap(base_url=url, total_pages=0)
+
+    # ------------------------------------------------------------------
     # AI Engine: Navigation
     # ------------------------------------------------------------------
 
@@ -253,6 +298,15 @@ class StudyOrchestrator:
         semaphore = asyncio.Semaphore(max_concurrent)
         timeout = int(os.getenv("STUDY_TIMEOUT_SECONDS", "600"))
 
+        # Create StepRecorder for persisting navigation data
+        storage = FileStorage(base_path=os.getenv("STORAGE_PATH", "./data"))
+        recorder = DatabaseStepRecorder(
+            db=self.db,
+            redis=self.redis,
+            storage=storage,
+            study_id=study_id,
+        )
+
         async def run_one(
             session: Any, persona_dict: dict[str, Any], task_desc: str
         ) -> NavigationResult:
@@ -271,6 +325,7 @@ class StudyOrchestrator:
                         behavioral_notes=persona_dict.get("behavioral_notes", ""),
                         start_url=start_url,
                         browser_context=ctx,
+                        recorder=recorder,
                     )
 
                     # Update session with results
@@ -439,6 +494,85 @@ class StudyOrchestrator:
 
         except Exception as e:
             logger.error("Report generation failed: %s", e)
+
+    # ------------------------------------------------------------------
+    # Insight Persistence
+    # ------------------------------------------------------------------
+
+    async def _save_insights(
+        self,
+        study_id: uuid.UUID,
+        synthesis: Any,
+    ) -> None:
+        """Save all synthesis insights to the insights table."""
+        rank = 0
+
+        # Universal issues
+        for item in synthesis.universal_issues:
+            rank += 1
+            insight = Insight(
+                study_id=study_id,
+                type=InsightType.UNIVERSAL,
+                title=item.title,
+                description=item.description,
+                severity=item.severity.value if hasattr(item.severity, "value") else str(item.severity),
+                personas_affected=item.personas_affected,
+                evidence=item.evidence,
+                rank=rank,
+            )
+            self.db.add(insight)
+
+        # Persona-specific issues
+        for item in synthesis.persona_specific_issues:
+            rank += 1
+            insight = Insight(
+                study_id=study_id,
+                type=InsightType.PERSONA_SPECIFIC,
+                title=item.title,
+                description=item.description,
+                severity=item.severity.value if hasattr(item.severity, "value") else str(item.severity),
+                personas_affected=item.personas_affected,
+                evidence=item.evidence,
+                rank=rank,
+            )
+            self.db.add(insight)
+
+        # Comparative insights
+        for item in synthesis.comparative_insights:
+            rank += 1
+            insight = Insight(
+                study_id=study_id,
+                type=InsightType.COMPARATIVE,
+                title=item.title,
+                description=item.description,
+                severity=item.severity.value if hasattr(item.severity, "value") else str(item.severity),
+                personas_affected=item.personas_affected,
+                evidence=item.evidence,
+                rank=rank,
+            )
+            self.db.add(insight)
+
+        # Recommendations
+        for rec in synthesis.recommendations:
+            insight = Insight(
+                study_id=study_id,
+                type=InsightType.RECOMMENDATION,
+                title=rec.title,
+                description=rec.description,
+                impact=rec.impact,
+                effort=rec.effort,
+                personas_affected=rec.personas_helped,
+                evidence=rec.evidence,
+                rank=rec.rank,
+            )
+            self.db.add(insight)
+
+        await self.db.flush()
+        logger.info(
+            "Saved %d insights for study %s",
+            rank + len(synthesis.recommendations),
+            study_id,
+        )
 
     # ------------------------------------------------------------------
     # Helpers

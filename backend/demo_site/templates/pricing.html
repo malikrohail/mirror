@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Pricing{% endblock %}
+
+{% block body %}
+<header class="header">
+    <a href="/" class="logo">FlowSync</a>
+    <button class="menu-toggle" id="menuToggle" aria-label="Menu">&#9776;</button>
+    <nav class="nav-links" id="navLinks">
+        <a href="/">Home</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/signup">Sign Up</a>
+    </nav>
+</header>
+
+<section class="pricing-section">
+    <h2 style="font-size: 36px; margin-bottom: 8px;">Simple, Transparent Pricing</h2>
+    <p style="color: #666;">No hidden fees. Cancel anytime.</p>
+
+    <div class="pricing-grid">
+        <!-- Free tier -->
+        <div class="pricing-card">
+            <h3>Starter</h3>
+            <div class="price">$0<span>/mo</span></div>
+            <!-- Planted Issue #4: Low contrast feature list -->
+            <ul class="feature-list">
+                <li>Up to 5 team members</li>
+                <li>3 workspaces</li>
+                <li>Basic analytics</li>
+                <li>Community support</li>
+                <li>1GB storage</li>
+            </ul>
+            <a href="/signup" class="select-btn">Get Started</a>
+        </div>
+
+        <!-- Pro tier -->
+        <div class="pricing-card popular">
+            <div class="badge">Most Popular</div>
+            <h3>Professional</h3>
+            <div class="price">$29<span>/mo</span></div>
+            <!-- Planted Issue #4: Low contrast feature list -->
+            <ul class="feature-list">
+                <li>Unlimited team members</li>
+                <li>Unlimited workspaces</li>
+                <li>Advanced analytics & reports</li>
+                <li>Priority email support</li>
+                <li>50GB storage</li>
+                <li>Custom integrations</li>
+                <li>API access</li>
+            </ul>
+            <a href="/signup" class="select-btn">Start Free Trial</a>
+        </div>
+
+        <!-- Enterprise -->
+        <div class="pricing-card">
+            <h3>Enterprise</h3>
+            <div class="price">Custom</div>
+            <!-- Planted Issue #4: Low contrast feature list -->
+            <ul class="feature-list">
+                <li>Everything in Professional</li>
+                <li>SSO & SAML</li>
+                <li>Dedicated account manager</li>
+                <li>99.99% SLA</li>
+                <li>Unlimited storage</li>
+                <li>Custom contracts</li>
+                <li>On-premise deployment</li>
+            </ul>
+            <a href="/signup" class="select-btn">Contact Sales</a>
+        </div>
+    </div>
+</section>
+
+<footer style="padding: 40px; text-align: center; border-top: 1px solid #eee; color: #999; font-size: 14px;">
+    <p>&copy; 2025 FlowSync Inc. All rights reserved.</p>
+</footer>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('menuToggle').addEventListener('click', function() {
+        document.getElementById('navLinks').classList.toggle('open');
+    });
+</script>
+{% endblock %}

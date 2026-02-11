@@ -14,6 +14,8 @@ from typing import Any, Protocol
 from playwright.async_api import BrowserContext
 
 from app.browser.actions import BrowserActions
+from app.browser.cookie_consent import dismiss_cookie_consent
+from app.browser.detection import PageDetection
 from app.browser.screenshots import ScreenshotService
 from app.llm.client import LLMClient
 from app.llm.schemas import ActionType, NavigationDecision
@@ -122,6 +124,31 @@ class Navigator:
             await page.goto(start_url, wait_until="domcontentloaded", timeout=30_000)
             # Brief wait for JS frameworks to hydrate
             await page.wait_for_timeout(1500)
+
+            # Auto-dismiss cookie consent banners
+            try:
+                await dismiss_cookie_consent(page)
+            except Exception as e:
+                logger.debug("Cookie consent dismissal failed: %s", e)
+
+            # Check for auth walls and CAPTCHAs
+            blockers = await PageDetection.detect_blockers(page, start_url)
+            if blockers:
+                for blocker in blockers:
+                    logger.warning(
+                        "Blocker detected: %s — %s",
+                        blocker["type"], blocker["message"],
+                    )
+                    if blocker["type"] == "captcha":
+                        error = f"CAPTCHA detected at {page.url}"
+                        return NavigationResult(
+                            session_id=session_id,
+                            persona_name=persona_name,
+                            task_completed=False,
+                            total_steps=0,
+                            gave_up=False,
+                            error=error,
+                        )
 
             for step_number in range(1, self._max_steps + 1):
                 try:

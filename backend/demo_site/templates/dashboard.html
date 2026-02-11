@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block body %}
+<div class="dashboard-page">
+    <div class="dashboard-header">
+        <a href="/" class="logo">FlowSync</a>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 14px; color: #666;">Welcome, John</span>
+            <div style="width: 32px; height: 32px; background: #6c3ce9; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 14px;">J</div>
+        </div>
+    </div>
+
+    <div class="dashboard-content">
+        <h2 style="margin-bottom: 24px;">Your Dashboard</h2>
+
+        <div class="dashboard-card">
+            <h3 style="font-size: 16px; margin-bottom: 8px;">Sprint Board</h3>
+            <p style="color: #666; font-size: 14px;">3 tasks in progress, 7 completed this week</p>
+        </div>
+
+        <div class="dashboard-card">
+            <h3 style="font-size: 16px; margin-bottom: 8px;">Team Activity</h3>
+            <p style="color: #666; font-size: 14px;">12 updates from your team today</p>
+        </div>
+
+        <div class="dashboard-card">
+            <h3 style="font-size: 16px; margin-bottom: 8px;">Notifications</h3>
+            <p style="color: #666; font-size: 14px;">2 unread messages, 1 mention</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

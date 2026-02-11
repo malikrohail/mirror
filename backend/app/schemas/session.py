@@ -22,6 +22,10 @@ class StepOut(BaseModel):
     click_y: int | None = None
     viewport_width: int | None = None
     viewport_height: int | None = None
+    scroll_y: int | None = None
+    max_scroll_y: int | None = None
+    load_time_ms: int | None = None
+    first_paint_ms: int | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -39,6 +43,10 @@ class IssueOut(BaseModel):
     wcag_criterion: str | None = None
     recommendation: str | None = None
     page_url: str | None = None
+    first_seen_study_id: uuid.UUID | None = None
+    times_seen: int = 1
+    is_regression: bool = False
+    priority_score: float | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
