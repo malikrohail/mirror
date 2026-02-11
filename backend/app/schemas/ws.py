@@ -20,6 +20,12 @@ class WSStudyProgress(BaseModel):
     phase: str
 
 
+class WSActionDetail(BaseModel):
+    type: str
+    description: str
+    selector: str | None = None
+
+
 class WSSessionStep(BaseModel):
     type: str = "session:step"
     session_id: str
@@ -28,8 +34,22 @@ class WSSessionStep(BaseModel):
     think_aloud: str
     screenshot_url: str
     emotional_state: str
-    action: str
+    action: WSActionDetail | str
     task_progress: float
+    confidence: float = 0.0
+    ux_issues_found: int = 0
+    page_url: str | None = None
+
+
+class WSEmotionalShift(BaseModel):
+    type: str = "session:emotional_shift"
+    session_id: str
+    persona_name: str
+    step_number: int
+    from_emotion: str
+    to_emotion: str
+    intensity_delta: int
+    think_aloud: str
 
 
 class WSSessionComplete(BaseModel):

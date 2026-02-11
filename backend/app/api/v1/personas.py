@@ -35,14 +35,12 @@ async def generate_persona(
     data: PersonaGenerateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Generate a custom persona from a natural language description.
+    """Generate a custom persona from a natural language description using Opus."""
+    from app.llm.client import LLMClient
 
-    This is a stub — Agent 2 will implement the LLM-based generation.
-    """
-    return {
-        "message": "Custom persona generation not yet implemented (Agent 2 scope)",
-        "description": data.description,
-    }
+    llm = LLMClient()
+    profile = await llm.generate_persona_from_description(data.description)
+    return profile.model_dump()
 
 
 @router.get("/{persona_id}")

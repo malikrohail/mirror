@@ -17,11 +17,23 @@ class Settings(BaseSettings):
 
     # Storage
     STORAGE_PATH: str = "./data"
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET_NAME: str = "mirror-screenshots"
+    R2_ENDPOINT_URL: str = ""
 
     # Study limits
     MAX_CONCURRENT_SESSIONS: int = 5
     MAX_STEPS_PER_SESSION: int = 30
     STUDY_TIMEOUT_SECONDS: int = 600
+
+    # Firecrawl
+    FIRECRAWL_API_KEY: str = ""
+
+    # Langfuse
+    LANGFUSE_PUBLIC_KEY: str = ""
+    LANGFUSE_SECRET_KEY: str = ""
+    LANGFUSE_HOST: str = "https://cloud.langfuse.com"
 
     # Auth (optional for dev)
     CLERK_SECRET_KEY: str = ""

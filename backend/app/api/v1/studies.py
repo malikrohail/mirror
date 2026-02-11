@@ -88,3 +88,14 @@ async def get_study_status(
     """Poll study progress."""
     svc = StudyService(db, redis=redis)
     return await svc.get_study_status(study_id)
+
+
+@router.get("/{study_id}/estimate")
+async def estimate_study_cost(
+    study_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Estimate the cost of running a study before execution."""
+    from app.services.cost_estimator import CostEstimator
+    estimator = CostEstimator(db)
+    return await estimator.estimate(study_id)

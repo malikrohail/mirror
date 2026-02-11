@@ -31,6 +31,14 @@ class Step(Base, UUIDMixin, TimestampMixin):
     viewport_width: Mapped[int | None] = mapped_column(Integer, nullable=True)
     viewport_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Scroll depth tracking
+    scroll_y: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_scroll_y: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Page load performance tracking
+    load_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    first_paint_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     # Relationships
     session: Mapped["Session"] = relationship("Session", back_populates="steps")  # noqa: F821
     issues: Mapped[list["Issue"]] = relationship(  # noqa: F821

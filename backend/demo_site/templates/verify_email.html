@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Verify Email{% endblock %}
+
+{% block body %}
+<!-- Planted Issue #5: No confirmation message after email verification action.
+     The page just shows a spinner with no explanation of what's happening. -->
+<div class="verify-page">
+    <div class="verify-card">
+        <div class="spinner"></div>
+        <p style="color: #999; font-size: 14px;">Loading...</p>
+    </div>
+</div>
+{% endblock %}

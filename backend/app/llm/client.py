@@ -1,4 +1,4 @@
-"""Anthropic API client with model routing, retries, vision, and structured output."""
+"""Anthropic API client with model routing, retries, vision, structured output, and Langfuse tracing."""
 
 from __future__ import annotations
 
@@ -80,19 +80,41 @@ class TokenUsage:
         }
 
 
+def _init_langfuse():
+    """Initialize Langfuse client if configured."""
+    try:
+        public_key = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+        secret_key = os.getenv("LANGFUSE_SECRET_KEY", "")
+        if public_key and secret_key:
+            from langfuse import Langfuse
+            return Langfuse(
+                public_key=public_key,
+                secret_key=secret_key,
+                host=os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+            )
+    except ImportError:
+        logger.debug("langfuse not installed, tracing disabled")
+    except Exception as e:
+        logger.warning("Failed to initialize Langfuse: %s", e)
+    return None
+
+
 class LLMClient:
-    """Wrapper around the Anthropic API with model routing and structured output."""
+    """Wrapper around the Anthropic API with model routing, structured output, and Langfuse tracing."""
 
     def __init__(
         self,
         api_key: str | None = None,
         stage_model_overrides: dict[str, str] | None = None,
+        study_id: str | None = None,
     ) -> None:
         self._client = anthropic.AsyncAnthropic(
             api_key=api_key or os.getenv("ANTHROPIC_API_KEY"),
         )
         self._model_map = {**STAGE_MODEL_MAP, **(stage_model_overrides or {})}
         self.usage = TokenUsage()
+        self._study_id = study_id
+        self._langfuse = _init_langfuse()
 
     def _get_model(self, stage: str) -> str:
         return self._model_map.get(stage, SONNET_MODEL)
@@ -104,9 +126,27 @@ class LLMClient:
         messages: list[dict[str, Any]],
         max_tokens: int = 4096,
     ) -> str:
-        """Make an API call with retries and exponential backoff."""
+        """Make an API call with retries, exponential backoff, and Langfuse tracing."""
         model = self._get_model(stage)
         last_error: Exception | None = None
+
+        # Start Langfuse trace if available
+        trace = None
+        generation = None
+        if self._langfuse:
+            try:
+                trace = self._langfuse.trace(
+                    name=f"mirror-{stage}",
+                    metadata={"study_id": self._study_id, "stage": stage},
+                )
+                generation = trace.generation(
+                    name=stage,
+                    model=model,
+                    input={"system": system[:500], "messages_count": len(messages)},
+                    metadata={"max_tokens": max_tokens},
+                )
+            except Exception as e:
+                logger.debug("Langfuse trace creation failed: %s", e)
 
         for attempt in range(MAX_RETRIES):
             try:
@@ -126,6 +166,20 @@ class LLMClient:
                 for block in response.content:
                     if block.type == "text":
                         text += block.text
+
+                # End Langfuse generation
+                if generation:
+                    try:
+                        generation.end(
+                            output=text[:1000],
+                            usage={
+                                "input": response.usage.input_tokens,
+                                "output": response.usage.output_tokens,
+                            },
+                        )
+                    except Exception:
+                        pass
+
                 return text
 
             except anthropic.RateLimitError as e:
@@ -147,7 +201,18 @@ class LLMClient:
                     )
                     time.sleep(delay)
                 else:
+                    if generation:
+                        try:
+                            generation.end(output=str(e), level="ERROR")
+                        except Exception:
+                            pass
                     raise
+
+        if generation:
+            try:
+                generation.end(output=str(last_error), level="ERROR")
+            except Exception:
+                pass
 
         raise RuntimeError(
             f"LLM call failed after {MAX_RETRIES} retries for stage '{stage}': {last_error}"
@@ -161,9 +226,28 @@ class LLMClient:
         response_model: type[T],
         max_tokens: int = 4096,
     ) -> T:
-        """Make an API call and parse the response into a Pydantic model."""
+        """Make an API call and parse the response into a Pydantic model.
+
+        Retries once with a clarifying prompt if JSON parsing fails.
+        """
         raw = await self._call(stage, system, messages, max_tokens)
-        return _parse_json_response(raw, response_model)
+        try:
+            return _parse_json_response(raw, response_model)
+        except ValueError:
+            # Retry with explicit JSON instruction
+            logger.warning("JSON parse failed for %s, retrying with clarification", stage)
+            retry_messages = messages + [
+                {"role": "assistant", "content": raw},
+                {
+                    "role": "user",
+                    "content": (
+                        "Your response was not valid JSON. Please respond with ONLY "
+                        "a valid JSON object, no markdown fences, no explanation."
+                    ),
+                },
+            ]
+            raw_retry = await self._call(stage, system, retry_messages, max_tokens)
+            return _parse_json_response(raw_retry, response_model)
 
     # ------------------------------------------------------------------
     # Stage 1: Persona Generation

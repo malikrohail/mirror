@@ -1,0 +1,71 @@
+name: "Mirror UX Test"
+description: "Run AI-powered usability testing with Mirror on every PR"
+author: "Mirror"
+
+inputs:
+  url:
+    description: "URL of the site to test"
+    required: true
+  tasks:
+    description: "Semicolon-separated list of tasks for personas to perform"
+    required: true
+  api-url:
+    description: "Mirror API URL"
+    required: false
+    default: "http://localhost:8000"
+  personas:
+    description: "Number of AI personas to generate"
+    required: false
+    default: "3"
+  fail-below-score:
+    description: "Fail the check if UX score is below this threshold (0-100)"
+    required: false
+    default: "0"
+  timeout:
+    description: "Maximum seconds to wait for study completion"
+    required: false
+    default: "600"
+
+outputs:
+  score:
+    description: "Overall UX score (0-100)"
+  issues-count:
+    description: "Total number of UX issues found"
+  study-id:
+    description: "Study ID for full results"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Mirror CLI
+      shell: bash
+      run: pip install click httpx
+
+    - name: Run Mirror UX Test
+      shell: bash
+      id: mirror-test
+      env:
+        MIRROR_API_URL: ${{ inputs.api-url }}
+      run: |
+        # Convert semicolon-separated tasks to --task flags
+        IFS=';' read -ra TASKS <<< "${{ inputs.tasks }}"
+        TASK_FLAGS=""
+        for task in "${TASKS[@]}"; do
+          task=$(echo "$task" | xargs)  # trim whitespace
+          if [ -n "$task" ]; then
+            TASK_FLAGS="$TASK_FLAGS --task \"$task\""
+          fi
+        done
+
+        # Run the CLI
+        python ${{ github.action_path }}/../../backend/cli/mirror_cli.py \
+          --api-url "${{ inputs.api-url }}" \
+          test "${{ inputs.url }}" \
+          $TASK_FLAGS \
+          --personas ${{ inputs.personas }} \
+          --fail-below ${{ inputs.fail-below-score }} \
+          --timeout ${{ inputs.timeout }}
+
+branding:
+  icon: "search"
+  color: "purple"

@@ -180,13 +180,20 @@ def navigation_user_prompt(
     page_title: str,
     a11y_tree: str,
     history_summary: str,
+    sitemap_context: str = "",
 ) -> str:
+    sitemap_section = ""
+    if sitemap_context:
+        sitemap_section = f"""
+{sitemap_context}
+
+"""
     return f"""\
 STEP {step_number}
 
 Current page: {page_title}
 URL: {page_url}
-
+{sitemap_section}
 ACCESSIBILITY TREE (text representation of page elements):
 {a11y_tree[:8000]}
 

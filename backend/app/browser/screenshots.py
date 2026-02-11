@@ -179,6 +179,45 @@ class ScreenshotService:
             viewport_height=viewport["height"],
         )
 
+    async def get_scroll_position(self, page: Page) -> dict[str, int]:
+        """Get current scroll position and maximum scroll depth."""
+        try:
+            pos = await page.evaluate("""
+                () => ({
+                    scroll_y: Math.round(window.scrollY),
+                    max_scroll_y: Math.round(document.documentElement.scrollHeight - window.innerHeight),
+                    page_height: Math.round(document.documentElement.scrollHeight),
+                    viewport_height: window.innerHeight,
+                })
+            """)
+            return pos
+        except Exception:
+            return {"scroll_y": 0, "max_scroll_y": 0, "page_height": 0, "viewport_height": 0}
+
+    async def get_performance_metrics(self, page: Page) -> dict[str, int | None]:
+        """Get page load performance metrics."""
+        try:
+            perf = await page.evaluate("""
+                () => {
+                    const timing = performance.timing;
+                    const paintEntries = performance.getEntriesByType('paint');
+                    const firstPaint = paintEntries.length > 0 ? Math.round(paintEntries[0].startTime) : null;
+
+                    let loadComplete = null;
+                    if (timing.loadEventEnd > 0 && timing.navigationStart > 0) {
+                        loadComplete = timing.loadEventEnd - timing.navigationStart;
+                    }
+
+                    return {
+                        load_time_ms: loadComplete,
+                        first_paint_ms: firstPaint,
+                    };
+                }
+            """)
+            return perf
+        except Exception:
+            return {"load_time_ms": None, "first_paint_ms": None}
+
     async def get_click_position(
         self, page: Page, selector: str
     ) -> tuple[int, int] | None:

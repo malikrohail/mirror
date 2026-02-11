@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db.engine import get_session
-from app.storage.file_storage import FileStorage
+from app.storage.file_storage import FileStorage, create_storage
 
 _redis_pool: aioredis.Redis | None = None
 
@@ -25,9 +25,15 @@ async def get_redis() -> aioredis.Redis:
     return _redis_pool
 
 
+_storage_instance: FileStorage | None = None
+
+
 async def get_storage() -> FileStorage:
-    """FastAPI dependency for file storage."""
-    return FileStorage(base_path=settings.STORAGE_PATH)
+    """FastAPI dependency for file storage. Auto-selects R2 or local."""
+    global _storage_instance
+    if _storage_instance is None:
+        _storage_instance = create_storage()
+    return _storage_instance
 
 
 # Typed aliases for dependency injection
