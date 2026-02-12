@@ -3,14 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { LayoutDashboard, Plus, Users, Moon, Sun, X, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Users, Moon, Sun, X, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useUiStore } from '@/stores/ui-store';
 import { BackendStatus } from '@/components/common/backend-status';
 
 const navItems = [
-  { href: '/', label: 'New Test', icon: Plus },
   { href: '/tests', label: 'My Tests', icon: LayoutDashboard },
   { href: '/personas', label: 'Testers', icon: Users },
 ];
