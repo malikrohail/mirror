@@ -16,7 +16,7 @@ import uuid
 from typing import Any
 
 import redis.asyncio as aioredis
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.browser.actions import BrowserActions
 from app.browser.pool import BrowserPool
@@ -50,9 +50,15 @@ class StudyOrchestrator:
     Agent 2's AI engine (navigation, analysis, synthesis, reporting).
     """
 
-    def __init__(self, db: AsyncSession, redis: aioredis.Redis):
+    def __init__(
+        self,
+        db: AsyncSession,
+        redis: aioredis.Redis,
+        db_factory: async_sessionmaker[AsyncSession] | None = None,
+    ):
         self.db = db
         self.redis = redis
+        self.db_factory = db_factory
         self.study_repo = StudyRepository(db)
         self.session_repo = SessionRepository(db)
 
@@ -298,14 +304,7 @@ class StudyOrchestrator:
         semaphore = asyncio.Semaphore(max_concurrent)
         timeout = int(os.getenv("STUDY_TIMEOUT_SECONDS", "600"))
 
-        # Create StepRecorder for persisting navigation data
         storage = FileStorage(base_path=os.getenv("STORAGE_PATH", "./data"))
-        recorder = DatabaseStepRecorder(
-            db=self.db,
-            redis=self.redis,
-            storage=storage,
-            study_id=study_id,
-        )
 
         async def run_one(
             session: Any, persona_dict: dict[str, Any], task_desc: str
@@ -314,32 +313,48 @@ class StudyOrchestrator:
                 viewport = persona_dict.get("device_preference", "desktop")
                 ctx = await pool.acquire(viewport=viewport)
                 try:
-                    # Update session status
-                    session.status = SessionStatus.RUNNING
-                    await self.db.commit()
+                    # Each persona gets its own DB session to avoid
+                    # concurrent transaction corruption in asyncio.gather()
+                    async with self.db_factory() as persona_db:
+                        recorder = DatabaseStepRecorder(
+                            db=persona_db,
+                            redis=self.redis,
+                            storage=storage,
+                            study_id=study_id,
+                        )
 
-                    result = await self._navigator.navigate_session(
-                        session_id=str(session.id),
-                        persona=persona_dict,
-                        task_description=task_desc,
-                        behavioral_notes=persona_dict.get("behavioral_notes", ""),
-                        start_url=start_url,
-                        browser_context=ctx,
-                        recorder=recorder,
-                    )
+                        # Update session status
+                        db_session = await persona_db.get(
+                            type(session), session.id
+                        )
+                        db_session.status = SessionStatus.RUNNING
+                        await persona_db.commit()
 
-                    # Update session with results
-                    if result.error:
-                        session.status = SessionStatus.FAILED
-                    elif result.gave_up:
-                        session.status = SessionStatus.GAVE_UP
-                    else:
-                        session.status = SessionStatus.COMPLETE
-                    session.total_steps = result.total_steps
-                    session.task_completed = result.task_completed
-                    await self.db.commit()
+                        result = await self._navigator.navigate_session(
+                            session_id=str(session.id),
+                            persona=persona_dict,
+                            task_description=task_desc,
+                            behavioral_notes=persona_dict.get("behavioral_notes", ""),
+                            start_url=start_url,
+                            browser_context=ctx,
+                            recorder=recorder,
+                        )
 
-                    return result
+                        # Update session with results
+                        db_session = await persona_db.get(
+                            type(session), session.id
+                        )
+                        if result.error:
+                            db_session.status = SessionStatus.FAILED
+                        elif result.gave_up:
+                            db_session.status = SessionStatus.GAVE_UP
+                        else:
+                            db_session.status = SessionStatus.COMPLETE
+                        db_session.total_steps = result.total_steps
+                        db_session.task_completed = result.task_completed
+                        await persona_db.commit()
+
+                        return result
                 finally:
                     await pool.release(ctx)
 

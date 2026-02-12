@@ -28,7 +28,7 @@ async def run_study_task(ctx: dict, study_id: str):
         try:
             from app.core.orchestrator import StudyOrchestrator
 
-            orchestrator = StudyOrchestrator(db, redis)
+            orchestrator = StudyOrchestrator(db, redis, db_factory=db_factory)
             await orchestrator.run_study(uuid.UUID(study_id))
             await db.commit()
         except Exception as e:
