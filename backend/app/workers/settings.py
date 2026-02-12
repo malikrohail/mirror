@@ -1,4 +1,8 @@
-"""arq worker settings."""
+"""arq worker settings.
+
+NOTE: arq workers do NOT auto-reload on code changes.
+For development, use: python scripts/dev_worker.py
+"""
 
 from arq.connections import RedisSettings
 

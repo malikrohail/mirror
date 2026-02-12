@@ -89,16 +89,28 @@ class SessionRepository:
         severity: str | None = None,
         persona_id: uuid.UUID | None = None,
         page_url: str | None = None,
-    ) -> list[Issue]:
-        query = select(Issue).where(Issue.study_id == study_id)
+    ) -> list[dict]:
+        query = (
+            select(Issue, Step.step_number)
+            .outerjoin(Step, Issue.step_id == Step.id)
+            .where(Issue.study_id == study_id)
+        )
 
         if severity:
             query = query.where(Issue.severity == severity)
         if page_url:
             query = query.where(Issue.page_url == page_url)
         if persona_id:
-            query = query.join(Session).where(Session.persona_id == persona_id)
+            query = query.join(Session, Issue.session_id == Session.id).where(
+                Session.persona_id == persona_id
+            )
 
         query = query.order_by(Issue.created_at)
         result = await self.session.execute(query)
-        return list(result.scalars().all())
+        rows = result.all()
+
+        issues = []
+        for issue, step_number in rows:
+            issue.step_number = step_number
+            issues.append(issue)
+        return issues

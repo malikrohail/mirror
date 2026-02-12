@@ -16,12 +16,13 @@ import type { EmotionalState } from '@/types';
 
 interface SessionReplayProps {
   sessionId: string;
+  initialStepNumber?: number;
 }
 
-export function SessionReplay({ sessionId }: SessionReplayProps) {
+export function SessionReplay({ sessionId, initialStepNumber }: SessionReplayProps) {
   const { data: session, isLoading, isError, error } = useSessionDetail(sessionId);
   const { data: templates } = usePersonaTemplates();
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(initialStepNumber ?? 1);
   const [isPlaying, setIsPlaying] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 

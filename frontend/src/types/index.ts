@@ -136,6 +136,7 @@ export interface IssueOut {
   wcag_criterion: string | null;
   recommendation: string | null;
   page_url: string | null;
+  step_number: number | null;
   created_at: string;
 }
 

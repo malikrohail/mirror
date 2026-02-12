@@ -57,11 +57,12 @@ class SessionService:
         """Aggregate click data for heatmap generation."""
         from sqlalchemy import select
 
+        from app.models.persona import Persona
         from app.models.session import Session
         from app.models.step import Step
 
         query = (
-            select(Step)
+            select(Step, Session.persona_id)
             .join(Session)
             .where(
                 Session.study_id == study_id,
@@ -74,16 +75,28 @@ class SessionService:
             query = query.where(Step.page_url == page_url)
 
         result = await self.db.execute(query)
-        steps = result.scalars().all()
+        rows = result.all()
+
+        # Batch-load persona names
+        persona_ids = {row[1] for row in rows}
+        persona_names: dict[uuid.UUID, str] = {}
+        if persona_ids:
+            p_result = await self.db.execute(
+                select(Persona).where(Persona.id.in_(persona_ids))
+            )
+            for persona in p_result.scalars().all():
+                profile = persona.profile or {}
+                persona_names[persona.id] = profile.get("name", "Unknown")
 
         data_points = []
-        for step in steps:
+        for step, persona_id in rows:
             data_points.append({
                 "page_url": step.page_url or "",
                 "click_x": step.click_x,
                 "click_y": step.click_y,
                 "viewport_width": step.viewport_width or 1920,
                 "viewport_height": step.viewport_height or 1080,
+                "persona_name": persona_names.get(persona_id),
             })
 
         return {

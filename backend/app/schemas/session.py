@@ -47,6 +47,7 @@ class IssueOut(BaseModel):
     times_seen: int = 1
     is_regression: bool = False
     priority_score: float | None = None
+    step_number: int | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

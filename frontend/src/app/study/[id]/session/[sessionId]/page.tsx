@@ -1,6 +1,7 @@
 'use client';
 
 import { use } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,8 @@ export default function SessionReplayPage({
   params: Promise<{ id: string; sessionId: string }>;
 }) {
   const { id, sessionId } = use(params);
+  const searchParams = useSearchParams();
+  const initialStep = searchParams.get('step');
 
   return (
     <div className="space-y-6 p-6">
@@ -23,7 +26,7 @@ export default function SessionReplayPage({
         </Button>
         <h1 className="text-lg font-semibold">Session Replay</h1>
       </div>
-      <SessionReplay sessionId={sessionId} />
+      <SessionReplay sessionId={sessionId} initialStepNumber={initialStep ? Number(initialStep) : undefined} />
     </div>
   );
 }

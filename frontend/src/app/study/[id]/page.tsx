@@ -64,12 +64,14 @@ export default function StudyResultsPage({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/study/${id}/session/${sessions?.[0]?.id ?? ''}`}>
-              <Eye className="mr-2 h-4 w-4" />
-              Replay
-            </Link>
-          </Button>
+          {sessions && sessions.length > 0 && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/study/${id}/session/${sessions[0].id}`}>
+                <Eye className="mr-2 h-4 w-4" />
+                Replay
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" size="sm" asChild>
             <Link href={`/study/${id}/heatmap`}>
               <Flame className="mr-2 h-4 w-4" />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { getScreenshotUrl } from '@/lib/api-client';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,11 @@ interface ScreenshotViewerProps {
 export function ScreenshotViewer({ screenshotPath, alt = 'Step screenshot' }: ScreenshotViewerProps) {
   const [loaded, setLoaded] = useState(false);
   const prefersReducedMotion = useReducedMotion();
+
+  // Reset loaded state when screenshot path changes
+  useEffect(() => {
+    setLoaded(false);
+  }, [screenshotPath]);
 
   const handleLoad = useCallback(() => setLoaded(true), []);
 

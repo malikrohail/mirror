@@ -1,4 +1,4 @@
-.PHONY: dev test lint migrate worker docker-up docker-down
+.PHONY: dev test lint migrate worker dev-worker docker-up docker-down
 
 # Development
 dev:
@@ -6,6 +6,9 @@ dev:
 
 worker:
 	cd backend && arq app.workers.settings.WorkerSettings
+
+dev-worker:
+	cd backend && python scripts/dev_worker.py
 
 # Database
 migrate:

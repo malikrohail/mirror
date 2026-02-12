@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     MAX_STEPS_PER_SESSION: int = 30
     STUDY_TIMEOUT_SECONDS: int = 600
 
+    # Browserbase
+    BROWSERBASE_API_KEY: str = ""
+    BROWSERBASE_PROJECT_ID: str = ""
+
     # Firecrawl
     FIRECRAWL_API_KEY: str = ""
 

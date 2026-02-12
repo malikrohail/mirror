@@ -271,10 +271,21 @@ class Navigator:
             decision.emotional_state.value,
         )
 
-        # 3. ACT
+        # 3. GET CLICK POSITION (before acting — element may disappear after click)
         click_x: int | None = None
         click_y: int | None = None
 
+        if (
+            decision.action.type == ActionType.click
+            and decision.action.selector
+        ):
+            pos = await self._screenshots.get_click_position(
+                page, decision.action.selector
+            )
+            if pos:
+                click_x, click_y = pos
+
+        # 4. ACT
         if decision.action.type not in (ActionType.done, ActionType.give_up):
             action_kwargs: dict[str, Any] = {}
             if decision.action.selector:
@@ -291,18 +302,7 @@ class Navigator:
                     "Action failed at step %d: %s", step_number, action_result.error,
                 )
 
-            # Get click position for heatmap data
-            if (
-                decision.action.type == ActionType.click
-                and decision.action.selector
-            ):
-                pos = await self._screenshots.get_click_position(
-                    page, decision.action.selector
-                )
-                if pos:
-                    click_x, click_y = pos
-
-        # 4. RECORD
+        # 5. RECORD
         if recorder:
             await recorder.save_step(
                 session_id=session_id,

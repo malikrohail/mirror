@@ -52,7 +52,7 @@ export function IssuesTab({ studyId }: IssuesTabProps) {
           {filtered.length} issue{filtered.length !== 1 ? 's' : ''}
         </span>
       </div>
-      <IssueList issues={filtered} />
+      <IssueList issues={filtered} studyId={studyId} />
     </div>
   );
 }
