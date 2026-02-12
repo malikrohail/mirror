@@ -63,6 +63,10 @@ class StepRecord:
     think_aloud: str
     task_progress: int
     emotional_state: str
+    click_x: int | None = None
+    click_y: int | None = None
+    screenshot_path: str | None = None
+    page_title: str = ""
 
 
 @dataclass

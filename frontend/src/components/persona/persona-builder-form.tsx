@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -11,6 +12,7 @@ import { useGeneratePersona } from '@/hooks/use-personas';
 export function PersonaBuilderForm() {
   const [description, setDescription] = useState('');
   const generatePersona = useGeneratePersona();
+  const queryClient = useQueryClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,8 +22,12 @@ export function PersonaBuilderForm() {
     }
     try {
       const result = await generatePersona.mutateAsync(description.trim());
-      toast.success(result.message || 'Persona generated');
+      toast.success(`Persona "${result.name}" created`, {
+        description: result.short_description,
+      });
       setDescription('');
+      // Refresh the templates list so the new persona shows up everywhere
+      queryClient.invalidateQueries({ queryKey: ['persona-templates'] });
     } catch (err) {
       toast.error('Failed to generate persona', {
         description: err instanceof Error ? err.message : 'Unknown error',

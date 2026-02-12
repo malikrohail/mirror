@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import logging
 import os
-import time
 from typing import Any, TypeVar
 
 import anthropic
@@ -108,8 +108,10 @@ class LLMClient:
         stage_model_overrides: dict[str, str] | None = None,
         study_id: str | None = None,
     ) -> None:
+        from app.config import settings
+
         self._client = anthropic.AsyncAnthropic(
-            api_key=api_key or os.getenv("ANTHROPIC_API_KEY"),
+            api_key=api_key or settings.ANTHROPIC_API_KEY or os.getenv("ANTHROPIC_API_KEY"),
         )
         self._model_map = {**STAGE_MODEL_MAP, **(stage_model_overrides or {})}
         self.usage = TokenUsage()
@@ -189,7 +191,7 @@ class LLMClient:
                     "Rate limited on %s (attempt %d/%d), retrying in %.1fs",
                     stage, attempt + 1, MAX_RETRIES, delay,
                 )
-                time.sleep(delay)
+                await asyncio.sleep(delay)
 
             except anthropic.APIStatusError as e:
                 last_error = e
@@ -199,7 +201,7 @@ class LLMClient:
                         "Server error %d on %s (attempt %d/%d), retrying in %.1fs",
                         e.status_code, stage, attempt + 1, MAX_RETRIES, delay,
                     )
-                    time.sleep(delay)
+                    await asyncio.sleep(delay)
                 else:
                     if generation:
                         try:

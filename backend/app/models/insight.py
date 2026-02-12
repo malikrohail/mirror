@@ -22,7 +22,7 @@ class Insight(Base, UUIDMixin, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("studies.id", ondelete="CASCADE"), nullable=False
     )
     type: Mapped[InsightType] = mapped_column(
-        ENUM(InsightType, name="insight_type", create_type=True),
+        ENUM(InsightType, name="insight_type", create_type=False, values_callable=lambda e: [x.value for x in e]),
         nullable=False,
     )
     title: Mapped[str] = mapped_column(String(512), nullable=False)

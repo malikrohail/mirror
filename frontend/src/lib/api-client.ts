@@ -149,7 +149,7 @@ export function getPersonaTemplate(id: string): Promise<PersonaTemplateOut> {
   return request(`/personas/templates/${id}`);
 }
 
-export function generatePersona(description: string): Promise<{ message: string; description: string }> {
+export function generatePersona(description: string): Promise<PersonaTemplateOut> {
   return request('/personas/generate', {
     method: 'POST',
     body: JSON.stringify({ description }),

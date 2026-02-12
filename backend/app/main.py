@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
@@ -7,12 +8,31 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage application startup and shutdown."""
     # Startup
     app.state.redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+
+    # Auto-seed persona templates if DB is available
+    try:
+        from app.db.engine import async_session_factory
+        from app.services.persona_service import PersonaService
+
+        async with async_session_factory() as db:
+            svc = PersonaService(db)
+            count = await svc.seed_templates()
+            await db.commit()
+            if count > 0:
+                logger.info("Seeded %d persona templates into database", count)
+            else:
+                logger.debug("Persona templates already seeded")
+    except Exception as e:
+        logger.warning("Could not seed persona templates (DB may not be ready): %s", e)
+
     yield
     # Shutdown
     await app.state.redis.close()

@@ -29,7 +29,7 @@ class Session(Base, UUIDMixin, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False
     )
     status: Mapped[SessionStatus] = mapped_column(
-        ENUM(SessionStatus, name="session_status", create_type=True),
+        ENUM(SessionStatus, name="session_status", create_type=False, values_callable=lambda e: [x.value for x in e]),
         default=SessionStatus.PENDING,
         nullable=False,
     )

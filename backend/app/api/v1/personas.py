@@ -1,11 +1,14 @@
+import logging
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db
 from app.schemas.persona import PersonaGenerateRequest, PersonaTemplateOut
 from app.services.persona_service import PersonaService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -15,9 +18,20 @@ async def list_templates(
     category: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """List pre-built persona templates."""
+    """List pre-built persona templates. Auto-seeds from JSON if DB is empty."""
     svc = PersonaService(db)
-    return await svc.list_templates(category=category)
+    templates = await svc.list_templates(category=category)
+    if not templates:
+        # Auto-seed on first access if DB is empty
+        try:
+            count = await svc.seed_templates()
+            if count > 0:
+                await db.commit()
+                logger.info("Auto-seeded %d persona templates on first access", count)
+                templates = await svc.list_templates(category=category)
+        except Exception as e:
+            logger.warning("Failed to auto-seed templates: %s", e)
+    return templates
 
 
 @router.get("/templates/{template_id}", response_model=PersonaTemplateOut)
@@ -30,17 +44,33 @@ async def get_template(
     return await svc.get_template(template_id)
 
 
-@router.post("/generate")
+@router.post("/generate", response_model=PersonaTemplateOut)
 async def generate_persona(
     data: PersonaGenerateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Generate a custom persona from a natural language description using Opus."""
+    """Generate a custom persona from a natural language description using Opus.
+
+    Saves the generated persona as a custom template so it can be selected in studies.
+    """
     from app.llm.client import LLMClient
 
-    llm = LLMClient()
-    profile = await llm.generate_persona_from_description(data.description)
-    return profile.model_dump()
+    try:
+        llm = LLMClient()
+        profile = await llm.generate_persona_from_description(data.description)
+    except Exception as e:
+        logger.error("Persona generation failed: %s", e)
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI persona generation failed: {e}",
+        )
+
+    # Save as a custom template so it appears in the template list
+    svc = PersonaService(db)
+    template = await svc.create_custom_template(profile)
+    await db.commit()
+    await db.refresh(template)
+    return template
 
 
 @router.get("/{persona_id}")

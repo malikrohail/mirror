@@ -23,8 +23,13 @@ class StudyService:
 
     async def create_study(self, data: StudyCreate):
         """Create a study with tasks and personas."""
+        # Ensure URL has a scheme so Playwright can navigate to it
+        url = data.url.strip()
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+
         study = await self.study_repo.create(
-            url=data.url,
+            url=url,
             starting_path=data.starting_path,
         )
 
@@ -97,13 +102,19 @@ class StudyService:
 
         # Dispatch to arq job queue
         if self.redis:
-            from arq import create_pool
-            from arq.connections import RedisSettings
+            try:
+                from arq import create_pool
+                from arq.connections import RedisSettings
+                from app.config import settings
 
-            pool = await create_pool(RedisSettings.from_dsn(str(self.redis.connection_pool.connection_kwargs.get("db", 0))))
-            job = await pool.enqueue_job("run_study_task", str(study_id))
-            await pool.close()
-            return job.job_id if job else str(study_id)
+                pool = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
+                job = await pool.enqueue_job("run_study_task", str(study_id))
+                await pool.close()
+                return job.job_id if job else str(study_id)
+            except Exception:
+                # No arq worker running — study stays in "running" state
+                # and can be picked up when worker starts
+                pass
 
         return str(study_id)
 

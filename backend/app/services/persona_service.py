@@ -1,10 +1,14 @@
 import json
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repositories.persona_repo import PersonaRepository
+
+if TYPE_CHECKING:
+    from app.llm.schemas import PersonaProfile
 
 
 class PersonaService:
@@ -32,6 +36,16 @@ class PersonaService:
 
             raise HTTPException(status_code=404, detail="Persona not found")
         return persona
+
+    async def create_custom_template(self, profile: "PersonaProfile"):
+        """Save an LLM-generated persona profile as a custom template."""
+        return await self.repo.create_template(
+            name=profile.name,
+            emoji=profile.emoji,
+            category="Custom",
+            short_description=profile.short_description,
+            default_profile=profile.model_dump(),
+        )
 
     async def seed_templates(self) -> int:
         """Load persona templates from JSON file into the database.

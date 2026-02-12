@@ -28,8 +28,8 @@ export function StudyCard({ study }: StudyCardProps) {
         <CardContent>
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>
-              {study.tasks.length} task{study.tasks.length !== 1 ? 's' : ''},{' '}
-              {study.personas.length} persona{study.personas.length !== 1 ? 's' : ''}
+              {(study.tasks?.length ?? 0)} task{(study.tasks?.length ?? 0) !== 1 ? 's' : ''},{' '}
+              {(study.personas?.length ?? 0)} persona{(study.personas?.length ?? 0) !== 1 ? 's' : ''}
             </span>
             {study.overall_score !== null && (
               <span className="tabular-nums font-medium text-foreground">

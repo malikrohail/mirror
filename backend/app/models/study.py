@@ -21,7 +21,7 @@ class Study(Base, UUIDMixin, TimestampMixin):
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
     starting_path: Mapped[str] = mapped_column(String(2048), default="/")
     status: Mapped[StudyStatus] = mapped_column(
-        ENUM(StudyStatus, name="study_status", create_type=True),
+        ENUM(StudyStatus, name="study_status", create_type=False, values_callable=lambda e: [x.value for x in e]),
         default=StudyStatus.SETUP,
         nullable=False,
     )

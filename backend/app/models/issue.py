@@ -30,7 +30,7 @@ class Issue(Base, UUIDMixin, TimestampMixin):
     element: Mapped[str | None] = mapped_column(String(512), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     severity: Mapped[IssueSeverity] = mapped_column(
-        ENUM(IssueSeverity, name="issue_severity", create_type=True),
+        ENUM(IssueSeverity, name="issue_severity", create_type=False, values_callable=lambda e: [x.value for x in e]),
         nullable=False,
     )
     heuristic: Mapped[str | None] = mapped_column(String(255), nullable=True)

@@ -81,8 +81,8 @@ class InsightOut(BaseModel):
     severity: str | None = None
     impact: str | None = None
     effort: str | None = None
-    personas_affected: dict | None = None
-    evidence: dict | None = None
+    personas_affected: list | dict | None = None
+    evidence: list | dict | None = None
     rank: int | None = None
     created_at: datetime
 
