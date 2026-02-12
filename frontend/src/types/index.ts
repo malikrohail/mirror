@@ -168,6 +168,7 @@ export interface PersonaTemplateOut {
   category: string;
   short_description: string;
   default_profile: Record<string, unknown>;
+  avatar_url: string;
   created_at: string;
 }
 

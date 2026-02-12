@@ -78,7 +78,7 @@ export function PersonaSelector({ selected, onToggle }: PersonaSelectorProps) {
   return (
     <div className="space-y-2.5">
       {/* Create persona input */}
-      <p className="text-xs font-medium uppercase text-muted-foreground/50">Create your ideal tester</p>
+      <p className="text-[14px] font-medium uppercase text-foreground/50">Create your ideal tester</p>
       <div className="relative">
         <input
           type="text"
@@ -102,7 +102,7 @@ export function PersonaSelector({ selected, onToggle }: PersonaSelectorProps) {
       </div>
 
       {/* Label */}
-      <p className="mt-6 text-xs font-medium uppercase text-muted-foreground/50">Select a tester</p>
+      <p className="mt-6 text-[14px] font-medium uppercase text-foreground/50">Select a tester</p>
 
       {/* Carousel */}
       <div className="grid grid-cols-4 gap-2">
@@ -122,18 +122,27 @@ export function PersonaSelector({ selected, onToggle }: PersonaSelectorProps) {
             >
               <div
                 className={cn(
-                  'flex items-center justify-center py-2.5',
+                  'flex items-center justify-center overflow-hidden',
+                  !t.avatar_url && 'py-2.5',
                   BG_COLORS[globalIndex % BG_COLORS.length]
                 )}
               >
-                <span className="text-2xl">{t.emoji}</span>
+                {t.avatar_url ? (
+                  <img
+                    src={t.avatar_url}
+                    alt={t.name}
+                    className="h-full w-full object-cover aspect-[4/3]"
+                  />
+                ) : (
+                  <span className="text-2xl">{t.emoji}</span>
+                )}
               </div>
               <div className="px-2.5 py-2">
                 <p className="text-xs font-medium leading-snug text-foreground/80">
                   {t.name}
                 </p>
                 {t.short_description && (
-                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
                     {t.short_description}
                   </p>
                 )}

@@ -13,6 +13,8 @@ import {
   X,
   ShieldAlert,
   Loader2,
+  Monitor,
+  Smartphone,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -67,14 +69,19 @@ type PreviewState = 'idle' | 'loading' | 'loaded' | 'failed';
 interface WebsitePreviewProps {
   url: string;
   onUrlChange?: (url: string) => void;
+  viewMode?: 'desktop' | 'mobile';
+  onViewModeChange?: (mode: 'desktop' | 'mobile') => void;
 }
 
-export function WebsitePreview({ url, onUrlChange }: WebsitePreviewProps) {
+export function WebsitePreview({ url, onUrlChange, viewMode: externalViewMode, onViewModeChange }: WebsitePreviewProps) {
   const [debouncedUrl, setDebouncedUrl] = useState('');
   const [barValue, setBarValue] = useState(url);
   const [favorites, setFavorites] = useState<string[]>(loadFavorites);
   const [iframeKey, setIframeKey] = useState(0);
   const [previewState, setPreviewState] = useState<PreviewState>('idle');
+  const [internalViewMode, setInternalViewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const viewMode = externalViewMode ?? internalViewMode;
+  const setViewMode = onViewModeChange ?? setInternalViewMode;
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
@@ -216,15 +223,9 @@ export function WebsitePreview({ url, onUrlChange }: WebsitePreviewProps) {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-lg border bg-background">
+    <div className={`flex h-full flex-col overflow-hidden rounded-lg border bg-background transition-all ${viewMode === 'mobile' ? 'max-w-[420px] mx-auto' : ''}`}>
       {/* Browser toolbar */}
-      <div className="flex items-center gap-1.5 border-b bg-muted/50 px-3 py-2">
-        <div className="mr-1.5 flex items-center gap-1.5">
-          <div className="h-3 w-3 rounded-full bg-[#ff5f57]" />
-          <div className="h-3 w-3 rounded-full bg-[#febc2e]" />
-          <div className="h-3 w-3 rounded-full bg-[#28c840]" />
-        </div>
-
+      <div className="flex h-[46px] shrink-0 items-center gap-1.5 border-b bg-muted/50 px-3">
         <button className="rounded p-1 text-muted-foreground/60 hover:bg-muted" disabled>
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -266,40 +267,23 @@ export function WebsitePreview({ url, onUrlChange }: WebsitePreviewProps) {
           </button>
         </div>
 
-        {/* Bookmarks dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-              <Bookmark className="h-3.5 w-3.5" />
-              <span>Bookmarks</span>
-              <ChevronDown className="h-3 w-3" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            {favorites.length === 0 ? (
-              <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                No bookmarks yet
-              </p>
-            ) : (
-              favorites.map((fav) => (
-                <DropdownMenuItem
-                  key={fav}
-                  className="group flex items-center justify-between"
-                  onClick={() => navigateToFavorite(fav)}
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <Globe className="h-3 w-3 shrink-0 text-muted-foreground" />
-                    <span className="truncate text-sm">{getHostname(fav)}</span>
-                  </div>
-                  <X
-                    className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
-                    onClick={(e) => removeFavorite(fav, e)}
-                  />
-                </DropdownMenuItem>
-              ))
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Viewport toggle */}
+        <div className="flex shrink-0 items-center rounded-md border bg-background p-0.5">
+          <button
+            onClick={() => setViewMode('desktop')}
+            className={`rounded p-1 transition-colors ${viewMode === 'desktop' ? 'bg-muted text-foreground' : 'text-muted-foreground/60 hover:text-muted-foreground'}`}
+            title="Desktop view"
+          >
+            <Monitor className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => setViewMode('mobile')}
+            className={`rounded p-1 transition-colors ${viewMode === 'mobile' ? 'bg-muted text-foreground' : 'text-muted-foreground/60 hover:text-muted-foreground'}`}
+            title="Mobile view"
+          >
+            <Smartphone className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Content area */}

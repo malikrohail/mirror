@@ -3,7 +3,14 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { ChevronDown, Monitor, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useCreateStudy, useRunStudy } from '@/hooks/use-study';
 import { WizardStepPersonas } from './wizard-step-personas';
 import { WebsitePreview } from './website-preview';
@@ -17,6 +24,19 @@ export function StudySetupWizard() {
     tasks: [''],
     personaIds: [] as string[],
   });
+
+  const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
+
+  const [bookmarks, setBookmarks] = useState<string[]>([]);
+
+  const refreshBookmarks = () => {
+    try {
+      const stored = localStorage.getItem('mirror-browser-favorites');
+      setBookmarks(stored ? JSON.parse(stored) : []);
+    } catch {
+      setBookmarks([]);
+    }
+  };
 
   const createStudy = useCreateStudy();
   const runStudy = useRunStudy();
@@ -47,51 +67,108 @@ export function StudySetupWizard() {
   };
 
   return (
-    <div className="grid h-full grid-cols-1 lg:grid-cols-[minmax(380px,1fr)_1.5fr]">
-      {/* Left panel — config */}
-      <div className="flex flex-col overflow-y-auto scrollbar-hide">
-        <div className="space-y-6 flex-1 px-10 pt-10 pb-6">
-        <div>
-          <h1 className="text-[32px] font-semibold leading-tight">Find UX issues before your users do</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Hire AI testers with real personalities to try your site and flag every point of confusion.
-          </p>
+    <div className="grid h-full grid-cols-1 lg:grid-cols-[minmax(380px,1fr)_1.5fr] gap-4 p-6">
+      {/* Left column — config + testers + run button */}
+      <div className="flex flex-col gap-4 overflow-y-auto scrollbar-hide">
+        {/* Panel 1 — Configure test */}
+        <div className="flex flex-col overflow-hidden rounded-lg border bg-background min-h-0">
+          <div className="flex h-[46px] shrink-0 items-center border-b bg-blue-50 px-3 dark:bg-blue-950/30">
+            <span className="text-[16px] font-medium text-foreground/90">Configure your test</span>
+          </div>
+          <div className="space-y-4 px-6 pt-3 pb-6 overflow-y-auto">
+            <div>
+              <label className="block text-[14px] font-medium uppercase text-foreground/50">
+                Your website
+              </label>
+              <div className="mt-2 flex w-full items-center rounded-md border bg-background focus-within:ring-1 focus-within:ring-ring">
+                <input
+                  type="text"
+                  value={data.url.replace(/^https?:\/\/(www\.)?/, '')}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/^https?:\/\/(www\.)?/, '');
+                    setData((d) => ({ ...d, url: raw ? `https://${raw}` : '' }));
+                  }}
+                  placeholder="e.g. https://claude.ai"
+                  className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-foreground/30"
+                />
+                <DropdownMenu onOpenChange={(open) => { if (open) refreshBookmarks(); }}>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex shrink-0 items-center gap-1 px-3 py-2 text-xs text-muted-foreground hover:text-foreground">
+                      Bookmarks
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    {bookmarks.length === 0 ? (
+                      <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                        No bookmarks yet
+                      </p>
+                    ) : (
+                      bookmarks.map((bm) => (
+                        <DropdownMenuItem
+                          key={bm}
+                          onClick={() => setData((d) => ({ ...d, url: bm }))}
+                        >
+                          <span className="truncate text-sm">
+                            {(() => { try { return new URL(bm).hostname; } catch { return bm; } })()}
+                          </span>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+            <div>
+              <label className="block text-[14px] font-medium uppercase text-foreground/50">
+                What should the testers achieve on your site?
+              </label>
+              <input
+                type="text"
+                value={data.tasks[0] ?? ''}
+                onChange={(e) => setData((d) => ({ ...d, tasks: [e.target.value] }))}
+                placeholder="e.g. Ask Claude to write a cover letter"
+                className="mt-2 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none placeholder:text-foreground/30 focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            <div>
+              <label className="block text-[14px] font-medium uppercase text-foreground/50">
+                What device should they use?
+              </label>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => setViewMode('desktop')}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                    viewMode === 'desktop'
+                      ? 'border-primary bg-primary/5 text-foreground'
+                      : 'border-border text-muted-foreground hover:border-foreground/20'
+                  }`}
+                >
+                  <Monitor className="h-4 w-4" />
+                  Desktop
+                </button>
+                <button
+                  onClick={() => setViewMode('mobile')}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                    viewMode === 'mobile'
+                      ? 'border-primary bg-primary/5 text-foreground'
+                      : 'border-border text-muted-foreground hover:border-foreground/20'
+                  }`}
+                >
+                  <Smartphone className="h-4 w-4" />
+                  Mobile
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="rounded-lg border p-4">
-          <label className="block text-[18px] font-medium text-foreground/70">
-            What&apos;s your website URL?
-          </label>
-          <input
-            type="text"
-            value={data.url.replace(/^https?:\/\/(www\.)?/, '')}
-            onChange={(e) => {
-              const raw = e.target.value.replace(/^https?:\/\/(www\.)?/, '');
-              setData((d) => ({ ...d, url: raw ? `https://${raw}` : '' }));
-            }}
-            placeholder="e.g. https://claude.ai"
-            className="mt-2 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none placeholder:text-foreground/30 focus:ring-1 focus:ring-ring"
-          />
-        </div>
-
-        <div className="rounded-lg border p-4">
-          <label className="block text-[18px] font-medium text-foreground/70">
-            What should testers try to do?
-          </label>
-          <input
-            type="text"
-            value={data.tasks[0] ?? ''}
-            onChange={(e) => setData((d) => ({ ...d, tasks: [e.target.value] }))}
-            placeholder="e.g. Ask Claude to write a cover letter"
-            className="mt-2 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none placeholder:text-foreground/30 focus:ring-1 focus:ring-ring"
-          />
-        </div>
-
-        <div className="rounded-lg border p-4">
-          <label className="block text-[18px] font-medium text-foreground/70">
-            Who should test it?
-          </label>
-          <div className="mt-2">
+        {/* Panel 2 — Choose testers */}
+        <div className="flex flex-col overflow-hidden rounded-lg border bg-background min-h-0">
+          <div className="flex h-[46px] shrink-0 items-center border-b bg-violet-50 px-3 dark:bg-violet-950/30">
+            <span className="text-[16px] font-medium text-foreground/90">Choose your testers</span>
+          </div>
+          <div className="px-6 pt-3 pb-6 overflow-y-auto">
             <WizardStepPersonas
               selected={data.personaIds}
               onToggle={(id) =>
@@ -105,30 +182,38 @@ export function StudySetupWizard() {
                 }))
               }
             />
+            {data.personaIds.length > 0 && (
+              <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+                <span>{data.personaIds.length} tester{data.personaIds.length !== 1 ? 's' : ''} selected</span>
+                <span><span className="text-foreground/30">Est.</span> {data.personaIds.length * 2} min &middot; ${(data.personaIds.length * 0.5).toFixed(2)}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {data.personaIds.length > 0 && (
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>{data.personaIds.length} tester{data.personaIds.length !== 1 ? 's' : ''} selected</span>
-            <span><span className="text-foreground/30">Est. run time</span> {data.personaIds.length * 2} min <span className="text-foreground/30">&middot; Est. cost</span> ${(data.personaIds.length * 0.5).toFixed(2)}</span>
-          </div>
-        )}
-        </div>
-
-        <div className="sticky bottom-0 bg-background px-10 pb-6">
-          <Button onClick={handleSubmit} disabled={submitting || !canSubmit} className="h-12 w-full text-base">
-            {submitting ? 'Creating...' : 'Run Test'}
-          </Button>
-        </div>
       </div>
 
-      {/* Right panel — website preview */}
-      <div className="hidden p-6 pb-6 pl-0 lg:block">
+      {/* Right column — Website preview + Run Test */}
+      <div className="hidden lg:flex lg:flex-col gap-4">
         <WebsitePreview
           url={data.url}
           onUrlChange={(url) => setData((d) => ({ ...d, url }))}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
         />
+        <div className="relative" title={!canSubmit && !submitting ? (
+          !data.url.trim() ? 'Enter a website URL' :
+          !data.tasks.some((t) => t.trim()) ? 'Add a task for testers' :
+          data.personaIds.length === 0 ? 'Select at least one tester' : ''
+        ) : undefined}>
+          <Button
+            onClick={canSubmit && !submitting ? handleSubmit : undefined}
+            className="h-12 w-full text-base cursor-pointer"
+            style={!canSubmit || submitting ? { opacity: 1, pointerEvents: 'auto' } : undefined}
+          >
+            {submitting ? 'Creating...' : 'Run Test'}
+          </Button>
+        </div>
       </div>
     </div>
   );
