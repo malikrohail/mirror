@@ -9,8 +9,6 @@ import {
   Moon,
   Sun,
   BookOpen,
-  Calendar,
-  GitCompare,
   Plus,
   ClipboardList,
   ArrowLeft,
@@ -23,8 +21,6 @@ const navItems = [
   { href: '/', label: `New ${TERMS.singularCap}`, icon: Plus },
   { href: '/tests', label: TERMS.pluralCap, icon: ClipboardList },
   { href: '/personas', label: 'Testers', icon: Users },
-  { href: '/schedules', label: 'Scheduled', icon: Calendar },
-  { href: '/compare', label: 'Compare', icon: GitCompare },
 ];
 
 function useNavHistory() {
@@ -108,13 +104,13 @@ export function Sidebar() {
             </button>
           </div>
         </div>
-        <p className="mt-0.5 text-sm leading-tight text-muted-foreground">
+        <p className="mt-6 text-sm leading-tight text-muted-foreground">
           Find UX issues before your users do
         </p>
       </div>
 
       {/* Nav */}
-      <nav className="flex flex-1 flex-col gap-0.5 px-3 py-1">
+      <nav className="flex flex-1 flex-col gap-0.5 px-3 pt-4">
         {navItems.map((item) => {
           const isActive =
             item.href === '/'

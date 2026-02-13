@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { ChevronDown, ClipboardList, Users, BookOpen, Moon, Sun, User, Calendar, GitCompare, TrendingUp } from 'lucide-react';
+import { ChevronDown, ClipboardList, Users, BookOpen, Moon, Sun, User, Calendar, TrendingUp } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,12 +48,6 @@ export function Header() {
               <Link href="/schedules" className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 Scheduled Tests
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/compare" className="flex items-center gap-2">
-                <GitCompare className="h-4 w-4" />
-                Compare {TERMS.pluralCap}
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
