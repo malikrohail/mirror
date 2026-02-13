@@ -182,3 +182,124 @@ class CostEstimator:
         per_call_cost = input_cost + output_cost
 
         return per_call_cost * multiplier
+
+
+class ActualCostBreakdown(BaseModel):
+    """Breakdown of actual costs from a completed study (Iteration 4)."""
+
+    llm_input_tokens: int = 0
+    llm_output_tokens: int = 0
+    llm_total_tokens: int = 0
+    llm_api_calls: int = 0
+    llm_cost_usd: float = 0.0
+    browser_mode: str = "unknown"
+    browser_sessions: int = 0
+    browser_time_seconds: float = 0.0
+    browser_cost_usd: float = 0.0  # Only for Browserbase
+    storage_screenshots: int = 0
+    storage_size_mb: float = 0.0
+    total_cost_usd: float = 0.0
+    savings_vs_cloud_usd: float = 0.0
+
+
+class CostTracker:
+    """Tracks actual costs incurred during a study run (Iteration 4).
+
+    Aggregates LLM token usage, browser time, and storage to compute
+    real costs and savings from using local vs cloud mode.
+    """
+
+    # Browserbase pricing: $0.10 per minute of browser time (approximate)
+    BB_COST_PER_MINUTE = 0.10
+
+    def __init__(self) -> None:
+        self._llm_input_tokens = 0
+        self._llm_output_tokens = 0
+        self._llm_api_calls = 0
+        self._browser_mode = "unknown"
+        self._browser_sessions = 0
+        self._browser_start_times: dict[str, float] = {}
+        self._browser_total_seconds = 0.0
+        self._screenshot_count = 0
+        self._storage_bytes = 0
+
+    def record_llm_usage(self, input_tokens: int, output_tokens: int) -> None:
+        """Record token usage from an LLM call."""
+        self._llm_input_tokens += input_tokens
+        self._llm_output_tokens += output_tokens
+        self._llm_api_calls += 1
+
+    def set_browser_mode(self, mode: str) -> None:
+        """Set the browser mode used for this study."""
+        self._browser_mode = mode
+
+    def start_browser_session(self, session_id: str) -> None:
+        """Record start of a browser session."""
+        import time
+
+        self._browser_sessions += 1
+        self._browser_start_times[session_id] = time.monotonic()
+
+    def end_browser_session(self, session_id: str) -> None:
+        """Record end of a browser session."""
+        import time
+
+        start = self._browser_start_times.pop(session_id, None)
+        if start:
+            self._browser_total_seconds += time.monotonic() - start
+
+    def record_screenshot(self, size_bytes: int) -> None:
+        """Record a screenshot taken."""
+        self._screenshot_count += 1
+        self._storage_bytes += size_bytes
+
+    def get_breakdown(self) -> ActualCostBreakdown:
+        """Calculate the final cost breakdown."""
+        # LLM costs
+        llm_cost = 0.0
+        # Use Opus pricing for a conservative estimate
+        # (in practice, different stages use different models)
+        opus_pricing = PRICING.get("claude-opus-4-6", {"input": 15.0, "output": 75.0})
+        sonnet_pricing = PRICING.get("claude-sonnet-4-5-20250929", {"input": 3.0, "output": 15.0})
+
+        # Rough split: ~70% of calls are navigation (Sonnet), ~30% are analysis/synthesis (Opus)
+        nav_ratio = 0.7
+        opus_ratio = 0.3
+
+        input_cost = (
+            (self._llm_input_tokens * nav_ratio / 1_000_000) * sonnet_pricing["input"]
+            + (self._llm_input_tokens * opus_ratio / 1_000_000) * opus_pricing["input"]
+        )
+        output_cost = (
+            (self._llm_output_tokens * nav_ratio / 1_000_000) * sonnet_pricing["output"]
+            + (self._llm_output_tokens * opus_ratio / 1_000_000) * opus_pricing["output"]
+        )
+        llm_cost = input_cost + output_cost
+
+        # Browser costs (only Browserbase has a cost)
+        browser_cost = 0.0
+        if self._browser_mode == "cloud":
+            browser_minutes = self._browser_total_seconds / 60.0
+            browser_cost = browser_minutes * self.BB_COST_PER_MINUTE
+
+        # Savings calculation
+        cloud_browser_cost = (self._browser_total_seconds / 60.0) * self.BB_COST_PER_MINUTE
+        savings = cloud_browser_cost if self._browser_mode == "local" else 0.0
+
+        total_cost = llm_cost + browser_cost
+
+        return ActualCostBreakdown(
+            llm_input_tokens=self._llm_input_tokens,
+            llm_output_tokens=self._llm_output_tokens,
+            llm_total_tokens=self._llm_input_tokens + self._llm_output_tokens,
+            llm_api_calls=self._llm_api_calls,
+            llm_cost_usd=round(llm_cost, 4),
+            browser_mode=self._browser_mode,
+            browser_sessions=self._browser_sessions,
+            browser_time_seconds=round(self._browser_total_seconds, 1),
+            browser_cost_usd=round(browser_cost, 4),
+            storage_screenshots=self._screenshot_count,
+            storage_size_mb=round(self._storage_bytes / (1024 * 1024), 2),
+            total_cost_usd=round(total_cost, 4),
+            savings_vs_cloud_usd=round(savings, 4),
+        )

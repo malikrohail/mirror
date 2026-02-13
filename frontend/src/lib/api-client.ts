@@ -79,8 +79,14 @@ export function deleteStudy(id: string): Promise<void> {
   return request(`/studies/${id}`, { method: 'DELETE' });
 }
 
-export function runStudy(id: string): Promise<StudyRunResponse> {
-  return request(`/studies/${id}/run`, { method: 'POST' });
+export function runStudy(
+  id: string,
+  options?: { browser_mode?: string },
+): Promise<StudyRunResponse> {
+  const params = new URLSearchParams();
+  if (options?.browser_mode) params.set('browser_mode', options.browser_mode);
+  const qs = params.toString();
+  return request(`/studies/${id}/run${qs ? `?${qs}` : ''}`, { method: 'POST' });
 }
 
 export function getStudyStatus(id: string): Promise<StudyStatusResponse> {

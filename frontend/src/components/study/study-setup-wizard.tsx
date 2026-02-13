@@ -116,7 +116,8 @@ export function StudySetupWizard() {
           tasks,
           persona_template_ids: data.personaIds,
         });
-        await runStudy.mutateAsync(study.id);
+        const browserMode = localStorage.getItem('mirror-browser-mode') || 'local';
+        await runStudy.mutateAsync({ studyId: study.id, browserMode });
         router.push(`/study/${study.id}/running`);
       }
     } catch (err) {

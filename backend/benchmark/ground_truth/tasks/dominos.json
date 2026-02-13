@@ -1,0 +1,10 @@
+{
+  "site_slug": "dominos",
+  "site_url": "https://www.dominos.com",
+  "description": "Domino's Pizza website was the subject of Robles v. Domino's Pizza LLC, a landmark accessibility lawsuit. Court documents identified critical WCAG violations that prevented blind users from ordering food online. Benchmark tasks focus on the core ordering workflow.",
+  "tier": 2,
+  "tasks": [
+    "Order a large pepperoni pizza for delivery to your address using the Domino's website.",
+    "Browse the full menu and customize a pizza with at least three toppings, then add it to your cart."
+  ]
+}

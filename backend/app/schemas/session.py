@@ -108,3 +108,4 @@ class HeatmapResponse(BaseModel):
     page_url: str
     data_points: list[HeatmapDataPoint]
     total_clicks: int
+    page_screenshots: dict[str, str] = {}

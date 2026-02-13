@@ -1,0 +1,11 @@
+{
+  "site_slug": "edx",
+  "site_url": "https://www.edx.org",
+  "description": "edX is a massive open online course platform. The Smashing Magazine audit (2021) highlighted issues with course discovery, registration friction, and performance on search results pages. Benchmark tasks cover the primary learner journey.",
+  "tier": 2,
+  "tasks": [
+    "Search for a beginner-level Python programming course and enroll in it.",
+    "Create a new account on edX using an email address and complete the registration form.",
+    "Find and compare three data science courses from different universities, noting price and duration."
+  ]
+}

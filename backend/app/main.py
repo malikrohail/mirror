@@ -35,6 +35,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
     # Shutdown
+    from app.browser.screencast import close_binary_redis
+
+    await close_binary_redis()
     await app.state.redis.close()
 
 
@@ -59,9 +62,11 @@ def create_app() -> FastAPI:
     # Mount routers
     from app.api.router import api_router
     from app.api.ws.progress import router as ws_router
+    from app.api.ws.screencast import router as screencast_ws_router
 
     app.include_router(api_router, prefix="/api/v1")
     app.include_router(ws_router)
+    app.include_router(screencast_ws_router)
 
     return app
 

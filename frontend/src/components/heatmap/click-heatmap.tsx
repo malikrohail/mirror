@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useHeatmap } from '@/hooks/use-heatmap';
 import { HeatmapOverlay } from './heatmap-overlay';
 import { HeatmapLegend } from './heatmap-legend';
 import { PageSelector } from './page-selector';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/common/empty-state';
-import { MousePointer } from 'lucide-react';
+import { MousePointer, ImageOff } from 'lucide-react';
+import { getScreenshotUrl } from '@/lib/api-client';
 
 interface ClickHeatmapProps {
   studyId: string;
@@ -15,6 +16,8 @@ interface ClickHeatmapProps {
 
 export function ClickHeatmap({ studyId }: ClickHeatmapProps) {
   const [selectedPage, setSelectedPage] = useState('');
+  const [containerWidth, setContainerWidth] = useState(800);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { data, isLoading } = useHeatmap(studyId, selectedPage || undefined);
 
@@ -28,6 +31,24 @@ export function ClickHeatmap({ studyId }: ClickHeatmapProps) {
   if (pages.length > 0 && !selectedPage) {
     setSelectedPage(pages[0]);
   }
+
+  // Track container width for responsive overlay sizing
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  // Reset image loaded state when page changes
+  useEffect(() => {
+    setImgLoaded(false);
+  }, [selectedPage]);
 
   if (isLoading) {
     return <Skeleton className="h-96" />;
@@ -47,6 +68,8 @@ export function ClickHeatmap({ studyId }: ClickHeatmapProps) {
     (p) => !selectedPage || p.page_url === selectedPage,
   );
 
+  const screenshotPath = selectedPage ? data.page_screenshots?.[selectedPage] : undefined;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -59,14 +82,34 @@ export function ClickHeatmap({ studyId }: ClickHeatmapProps) {
         </div>
       </div>
 
-      <div ref={containerRef} className="relative overflow-hidden rounded-lg border bg-muted" style={{ minHeight: 480 }}>
-        <div className="flex items-center justify-center p-8 text-sm text-muted-foreground" style={{ height: 480 }}>
-          Page preview area
-        </div>
+      <div ref={containerRef} className="relative overflow-hidden rounded-lg border bg-muted">
+        {screenshotPath ? (
+          <>
+            {!imgLoaded && (
+              <div className="flex items-center justify-center bg-muted" style={{ height: 480 }}>
+                <Skeleton className="h-full w-full" style={{ height: 480 }} />
+              </div>
+            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={getScreenshotUrl(screenshotPath)}
+              alt={`Screenshot of ${selectedPage}`}
+              className={`w-full object-contain ${imgLoaded ? 'block' : 'hidden'}`}
+              onLoad={() => setImgLoaded(true)}
+              onError={() => setImgLoaded(true)}
+              draggable={false}
+            />
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground" style={{ height: 480 }}>
+            <ImageOff className="h-8 w-8" />
+            <span>No page screenshot available</span>
+          </div>
+        )}
         <HeatmapOverlay
           dataPoints={filteredPoints}
-          width={containerRef.current?.clientWidth ?? 800}
-          height={480}
+          width={containerWidth}
+          height={containerRef.current?.clientHeight ?? 480}
         />
       </div>
     </div>

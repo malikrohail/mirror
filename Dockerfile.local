@@ -1,0 +1,98 @@
+# Dockerfile.local — Optimized for local Playwright mode
+# Includes Chromium pre-installed, proper sandbox settings,
+# and shared memory sizing for headless browser operation.
+#
+# Usage:
+#   docker compose --profile local up --build
+#
+# Or standalone:
+#   docker build -f Dockerfile.local -t mirror-local .
+#   docker run --shm-size=2g -p 8000:8000 mirror-local
+
+FROM python:3.12-slim
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies for Playwright Chromium
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Chromium dependencies
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libasound2 \
+    libatspi2.0-0 \
+    libwayland-client0 \
+    # Font support
+    fonts-liberation \
+    fonts-noto-color-emoji \
+    # Utilities
+    dumb-init \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for security
+RUN groupadd -r mirror && useradd -r -g mirror -G audio,video mirror \
+    && mkdir -p /home/mirror/app /home/mirror/data \
+    && chown -R mirror:mirror /home/mirror
+
+WORKDIR /home/mirror/app
+
+# Install Python dependencies first (cache layer)
+COPY backend/pyproject.toml backend/setup.py* backend/setup.cfg* ./
+RUN pip install --no-cache-dir -e ".[dev]" 2>/dev/null || pip install --no-cache-dir .
+
+# Install Playwright and Chromium
+RUN pip install --no-cache-dir playwright \
+    && playwright install chromium \
+    && playwright install-deps chromium
+
+# Copy application code
+COPY backend/ .
+
+# Environment defaults for local mode
+ENV DEFAULT_BROWSER_MODE=local \
+    PARALLEL_BROWSER_INSTANCES=1 \
+    MAX_CONCURRENT_SESSIONS=3 \
+    STORAGE_PATH=/home/mirror/data \
+    LOG_LEVEL=INFO \
+    # Chromium needs --no-sandbox in Docker
+    PLAYWRIGHT_CHROMIUM_SANDBOX=false \
+    # Screencast settings
+    ENABLE_SCREENCAST=false \
+    SCREENCAST_QUALITY=60 \
+    SCREENCAST_MAX_WIDTH=1280 \
+    # Performance settings
+    SCREENSHOT_FORMAT=jpeg \
+    SCREENSHOT_JPEG_QUALITY=85
+
+# Shared memory sizing for Chromium (critical!)
+# Docker default is 64MB which causes Chromium crashes
+# Override with --shm-size=2g when running
+VOLUME ["/dev/shm"]
+
+# Data volume for screenshots, reports, recordings
+VOLUME ["/home/mirror/data"]
+
+# Switch to non-root user
+USER mirror
+
+# Expose API port
+EXPOSE 8000
+
+# Use dumb-init to properly handle signals (important for Chromium cleanup)
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the FastAPI server
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

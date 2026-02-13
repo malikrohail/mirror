@@ -76,12 +76,13 @@ async def delete_study(
 @router.post("/{study_id}/run", response_model=StudyRunResponse)
 async def run_study(
     study_id: uuid.UUID,
+    browser_mode: str | None = Query(None, pattern="^(local|cloud)$"),
     db: AsyncSession = Depends(get_db),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """Start running a study — dispatches to worker queue."""
     svc = StudyService(db, redis=redis)
-    job_id = await svc.run_study(study_id)
+    job_id = await svc.run_study(study_id, browser_mode=browser_mode)
     return StudyRunResponse(study_id=study_id, job_id=job_id)
 
 

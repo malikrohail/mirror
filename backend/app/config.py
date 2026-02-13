@@ -42,6 +42,37 @@ class Settings(BaseSettings):
     # Auth (optional for dev)
     CLERK_SECRET_KEY: str = ""
 
+    # Screencast (CDP Page.startScreencast for local mode)
+    ENABLE_SCREENCAST: bool = False
+    SCREENCAST_QUALITY: int = 60
+    SCREENCAST_MAX_WIDTH: int = 1280
+    SCREENCAST_MAX_HEIGHT: int = 720
+    SCREENCAST_FPS: int = 10
+    SCREENCAST_RECORD_TO_DISK: bool = False
+
+    # Browser robustness (Iteration 2)
+    SESSION_TIMEOUT_SECONDS: int = 120  # Per-session timeout in local mode
+    MAX_PAGES_PER_CONTEXT: int = 50  # Pages before context recreation
+    BROWSER_WARMUP_CONTEXTS: int = 0  # Pre-create contexts at pool init
+    BROWSER_ACTION_RETRIES: int = 1  # Retries for Playwright action failures
+    BROWSER_DEBUG_CDP: bool = False  # Expose CDP WebSocket URL in logs
+
+    # Screenshot diff (Iteration 3)
+    SCREENSHOT_DIFF_ENABLED: bool = False
+
+    # Performance & cost (Iteration 4)
+    PARALLEL_BROWSER_INSTANCES: int = 1  # Separate Chromium processes (local mode)
+    SCREENSHOT_FORMAT: str = "png"  # "png" or "jpeg"
+    SCREENSHOT_JPEG_QUALITY: int = 85
+    LLM_BATCH_ANALYSIS: bool = False  # Batch screenshots in analysis pass
+    BROWSER_PROFILE_PATH: str = ""  # Persistent browser profile dir
+
+    # Hybrid mode & production (Iteration 5)
+    DEFAULT_BROWSER_MODE: str = "local"  # Default browser mode
+    HYBRID_FAILOVER_ENABLED: bool = True
+    HYBRID_CRASH_THRESHOLD: int = 2  # Local crashes before failover to cloud
+    MEMORY_MIN_FREE_MB: int = 500  # Minimum free memory for new sessions
+
     # Server
     LOG_LEVEL: str = "INFO"
 

@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ProgressBar } from '@/components/common/progress-bar';
 import { ThinkAloudBubble } from '@/components/common/think-aloud-bubble';
 import { LiveBrowserView } from './live-browser-view';
+import { ScreencastViewer } from './screencast-viewer';
 import { EMOTION_ICONS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import type { EmotionalState } from '@/types';
@@ -20,6 +21,8 @@ interface PersonaProgressCardProps {
   completed: boolean;
   liveViewUrl?: string | null;
   browserActive?: boolean;
+  screencastAvailable?: boolean;
+  sessionId?: string;
 }
 
 export function PersonaProgressCard({
@@ -33,8 +36,50 @@ export function PersonaProgressCard({
   completed,
   liveViewUrl,
   browserActive,
+  screencastAvailable,
+  sessionId,
 }: PersonaProgressCardProps) {
   const hasLiveView = liveViewUrl !== undefined && liveViewUrl !== null;
+  const hasScreencast = screencastAvailable && sessionId;
+
+  // View priority: screencast > live view (Browserbase) > static screenshot
+  const renderBrowserView = () => {
+    if (hasScreencast && (browserActive || !hasLiveView)) {
+      return (
+        <ScreencastViewer
+          sessionId={sessionId}
+          browserActive={browserActive ?? false}
+          personaName={personaName}
+          screenshotUrl={screenshotUrl}
+        />
+      );
+    }
+
+    if (hasLiveView) {
+      return (
+        <LiveBrowserView
+          liveViewUrl={liveViewUrl}
+          browserActive={browserActive ?? false}
+          personaName={personaName}
+          screenshotUrl={screenshotUrl}
+        />
+      );
+    }
+
+    if (screenshotUrl) {
+      return (
+        <div className="overflow-hidden rounded-md border">
+          <img
+            src={screenshotUrl}
+            alt={`${personaName} – step ${stepNumber}`}
+            className="aspect-video w-full object-cover object-top"
+          />
+        </div>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <Card className={completed ? 'opacity-75' : ''}>
@@ -56,24 +101,7 @@ export function PersonaProgressCard({
           </div>
         </div>
 
-        {hasLiveView ? (
-          <LiveBrowserView
-            liveViewUrl={liveViewUrl}
-            browserActive={browserActive ?? false}
-            personaName={personaName}
-            screenshotUrl={screenshotUrl}
-          />
-        ) : (
-          screenshotUrl && (
-            <div className="overflow-hidden rounded-md border">
-              <img
-                src={screenshotUrl}
-                alt={`${personaName} – step ${stepNumber}`}
-                className="aspect-video w-full object-cover object-top"
-              />
-            </div>
-          )
-        )}
+        {renderBrowserView()}
 
         <ProgressBar value={taskProgress} showLabel />
 

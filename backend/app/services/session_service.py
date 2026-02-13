@@ -132,8 +132,28 @@ class SessionService:
                 "persona_name": persona_names.get(persona_id),
             })
 
+        # Find a representative screenshot for each unique page URL
+        page_urls = {dp["page_url"] for dp in data_points if dp["page_url"]}
+        page_screenshots: dict[str, str] = {}
+        if page_urls:
+            ss_query = (
+                select(Step.page_url, Step.screenshot_path)
+                .join(Session)
+                .where(
+                    Session.study_id == study_id,
+                    Step.page_url.in_(page_urls),
+                    Step.screenshot_path.is_not(None),
+                )
+                .order_by(Step.step_number.desc())
+            )
+            ss_result = await self.db.execute(ss_query)
+            for url, path in ss_result.all():
+                if url and path and url not in page_screenshots:
+                    page_screenshots[url] = path
+
         return {
             "page_url": page_url or "all",
             "data_points": data_points,
             "total_clicks": len(data_points),
+            "page_screenshots": page_screenshots,
         }

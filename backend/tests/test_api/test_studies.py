@@ -130,3 +130,64 @@ async def test_create_study_validation(client: AsyncClient):
         },
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_run_study_with_local_browser_mode(client: AsyncClient, db_session: AsyncSession):
+    """Running a study with browser_mode=local returns 200."""
+    template_id = await _seed_template(db_session)
+
+    create_resp = await client.post(
+        "/api/v1/studies",
+        json={
+            "url": "https://example.com",
+            "tasks": [{"description": "Test task"}],
+            "persona_template_ids": [template_id],
+        },
+    )
+    study_id = create_resp.json()["id"]
+
+    response = await client.post(f"/api/v1/studies/{study_id}/run?browser_mode=local")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["study_id"] == study_id
+
+
+@pytest.mark.asyncio
+async def test_run_study_with_cloud_browser_mode(client: AsyncClient, db_session: AsyncSession):
+    """Running a study with browser_mode=cloud returns 200."""
+    template_id = await _seed_template(db_session)
+
+    create_resp = await client.post(
+        "/api/v1/studies",
+        json={
+            "url": "https://example.com",
+            "tasks": [{"description": "Test task"}],
+            "persona_template_ids": [template_id],
+        },
+    )
+    study_id = create_resp.json()["id"]
+
+    response = await client.post(f"/api/v1/studies/{study_id}/run?browser_mode=cloud")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["study_id"] == study_id
+
+
+@pytest.mark.asyncio
+async def test_run_study_with_invalid_browser_mode(client: AsyncClient, db_session: AsyncSession):
+    """Running a study with an invalid browser_mode returns 422."""
+    template_id = await _seed_template(db_session)
+
+    create_resp = await client.post(
+        "/api/v1/studies",
+        json={
+            "url": "https://example.com",
+            "tasks": [{"description": "Test task"}],
+            "persona_template_ids": [template_id],
+        },
+    )
+    study_id = create_resp.json()["id"]
+
+    response = await client.post(f"/api/v1/studies/{study_id}/run?browser_mode=invalid")
+    assert response.status_code == 422

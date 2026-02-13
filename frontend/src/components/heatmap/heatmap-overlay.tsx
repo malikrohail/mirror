@@ -55,8 +55,7 @@ export function HeatmapOverlay({ dataPoints, width, height }: HeatmapOverlayProp
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none absolute inset-0"
-      style={{ width, height }}
+      className="pointer-events-none absolute inset-0 h-full w-full"
     />
   );
 }

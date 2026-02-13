@@ -1,0 +1,11 @@
+{
+  "site_slug": "healthcare_gov",
+  "site_url": "https://www.healthcare.gov",
+  "description": "HealthCare.gov is the federal health insurance marketplace. The NNg audit (2014) identified significant usability issues in account creation and plan browsing flows that persist in various forms. Benchmark tasks focus on the enrollment funnel.",
+  "tier": 2,
+  "tasks": [
+    "Create a new account on HealthCare.gov to begin exploring health insurance plans.",
+    "Browse available health insurance plans and compare at least two options based on monthly premium and coverage.",
+    "Find information about whether you qualify for financial help or subsidies for health insurance coverage."
+  ]
+}

@@ -120,6 +120,32 @@ class TestBrowserPool:
             mock_pw.chromium.launch.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_force_local_overrides_browserbase(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """When force_local=True, local Chromium is used even if Browserbase credentials are set."""
+        from app.config import settings as app_settings
+
+        monkeypatch.setattr(app_settings, "BROWSERBASE_API_KEY", "bb_test_key")
+        monkeypatch.setattr(app_settings, "BROWSERBASE_PROJECT_ID", "proj_test")
+
+        mock_pw = AsyncMock()
+        mock_browser = AsyncMock()
+        mock_pw.chromium.launch = AsyncMock(return_value=mock_browser)
+
+        with patch("app.browser.pool.async_playwright") as mock_apw, \
+             patch.dict("os.environ", {
+                 "BROWSERBASE_API_KEY": "bb_test_key",
+                 "BROWSERBASE_PROJECT_ID": "proj_test",
+             }):
+            mock_apw.return_value.start = AsyncMock(return_value=mock_pw)
+
+            pool = BrowserPool(max_contexts=2, force_local=True)
+            await pool.initialize()
+
+            assert pool.is_initialized is True
+            assert pool.is_cloud is False
+            mock_pw.chromium.launch.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_acquire_and_release(self) -> None:
         """Test acquiring and releasing a browser session."""
         mock_pw = AsyncMock()
@@ -331,3 +357,137 @@ class TestBrowserPool:
         assert live_view_url is None
         assert get_mock.await_count == 6
         assert sleep_mock.await_count == 5
+
+
+class TestBrowserPoolIteration2:
+    """Tests for Iteration 2 features: health checks, memory mgmt, warm-up."""
+
+    @pytest.mark.asyncio
+    async def test_health_check_passes_for_healthy_browser(self) -> None:
+        """Health check returns True for a responsive browser."""
+        mock_browser = AsyncMock()
+        mock_ctx = AsyncMock()
+        mock_page = AsyncMock()
+        mock_browser.new_context = AsyncMock(return_value=mock_ctx)
+        mock_ctx.new_page = AsyncMock(return_value=mock_page)
+
+        pool = BrowserPool()
+        result = await pool._check_browser_health(mock_browser)
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_health_check_fails_for_crashed_browser(self) -> None:
+        """Health check returns False when browser can't create a context."""
+        mock_browser = AsyncMock()
+        mock_browser.new_context = AsyncMock(
+            side_effect=Exception("Browser process crashed")
+        )
+
+        pool = BrowserPool()
+        result = await pool._check_browser_health(mock_browser)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_restart_browser_increments_crash_count(self) -> None:
+        """Restarting a browser increments the crash counter."""
+        mock_pw = AsyncMock()
+        mock_new_browser = AsyncMock()
+        mock_pw.chromium.launch = AsyncMock(return_value=mock_new_browser)
+
+        pool = BrowserPool()
+        pool._playwright = mock_pw
+        pool._local_browsers = [AsyncMock()]
+
+        await pool._restart_browser(0)
+
+        assert pool._stats.crash_count == 1
+        assert pool._local_browsers[0] is mock_new_browser
+
+    def test_page_count_tracking(self) -> None:
+        """increment_page_count tracks pages and signals recycling."""
+        pool = BrowserPool()
+        session = BrowserSession(context=AsyncMock(), page_count=0)
+
+        # Under limit
+        with patch("app.config.settings") as mock_settings:
+            mock_settings.MAX_PAGES_PER_CONTEXT = 5
+            for _ in range(4):
+                assert pool.increment_page_count(session) is False
+            # At limit
+            assert pool.increment_page_count(session) is True
+
+    def test_pool_stats_to_dict(self) -> None:
+        """PoolStats serializes correctly."""
+        from app.browser.pool import PoolStats
+
+        stats = PoolStats(
+            mode="local",
+            active_sessions=2,
+            crash_count=1,
+            uptime_seconds=123.456,
+        )
+        d = stats.to_dict()
+        assert d["mode"] == "local"
+        assert d["active_sessions"] == 2
+        assert d["crash_count"] == 1
+        assert d["uptime_seconds"] == 123.5
+
+
+class TestBrowserPoolIteration5:
+    """Tests for Iteration 5 features: failover, resource monitoring."""
+
+    def test_failover_not_triggered_below_threshold(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Failover should not activate when crash count is below threshold."""
+        from app.config import settings as app_settings
+
+        monkeypatch.setattr(app_settings, "HYBRID_FAILOVER_ENABLED", True)
+        monkeypatch.setattr(app_settings, "HYBRID_CRASH_THRESHOLD", 3)
+
+        pool = BrowserPool()
+        pool._bb_api_key = "bb_test"
+        pool._bb_project_id = "proj_test"
+        pool._stats.crash_count = 2
+
+        assert pool._should_failover() is False
+
+    def test_failover_triggered_at_threshold(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Failover should activate when crash count reaches threshold."""
+        from app.config import settings as app_settings
+
+        monkeypatch.setattr(app_settings, "HYBRID_FAILOVER_ENABLED", True)
+        monkeypatch.setattr(app_settings, "HYBRID_CRASH_THRESHOLD", 2)
+
+        pool = BrowserPool()
+        pool._bb_api_key = "bb_test"
+        pool._bb_project_id = "proj_test"
+        pool._stats.crash_count = 2
+
+        assert pool._should_failover() is True
+        assert pool._failover_active is True
+
+    def test_failover_requires_cloud_credentials(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Failover should not activate without Browserbase credentials."""
+        from app.config import settings as app_settings
+
+        monkeypatch.setattr(app_settings, "HYBRID_FAILOVER_ENABLED", True)
+        monkeypatch.setattr(app_settings, "HYBRID_CRASH_THRESHOLD", 1)
+
+        pool = BrowserPool()
+        pool._bb_api_key = None  # No credentials
+        pool._bb_project_id = None
+        pool._stats.crash_count = 5
+
+        assert pool._should_failover() is False
+
+    def test_failover_disabled_by_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Failover should not activate when disabled in config."""
+        from app.config import settings as app_settings
+
+        monkeypatch.setattr(app_settings, "HYBRID_FAILOVER_ENABLED", False)
+
+        pool = BrowserPool()
+        pool._bb_api_key = "bb_test"
+        pool._bb_project_id = "proj_test"
+        pool._stats.crash_count = 10
+
+        assert pool._should_failover() is False

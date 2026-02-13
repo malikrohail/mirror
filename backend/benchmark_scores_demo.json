@@ -1,0 +1,80 @@
+{
+  "precision": 1.0,
+  "recall": 0.4318181818181818,
+  "f1": 0.6031746031746031,
+  "weighted_recall": 0.11764705882352941,
+  "severity_accuracy": 0.0,
+  "recall_by_severity": {
+    "critical": 0.2222222222222222,
+    "major": 0.0,
+    "minor": 0.125
+  },
+  "recall_by_category": {
+    "unknown": 0.10714285714285714
+  },
+  "precision_by_persona": {},
+  "page_coverage": 0.0,
+  "novel_finding_rate": 1.0,
+  "total_api_cost": 0.0,
+  "cost_per_true_positive": 0.0,
+  "per_site": [
+    {
+      "site_slug": "dominos",
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.6666666666666666,
+      "true_positives": 4,
+      "false_positives": 0,
+      "false_negatives": 4,
+      "novel_findings": 4,
+      "borderline": 0,
+      "total_gt_issues": 4,
+      "total_mirror_issues": 4
+    },
+    {
+      "site_slug": "edx",
+      "precision": 1.0,
+      "recall": 0.4166666666666667,
+      "f1": 0.5882352941176471,
+      "true_positives": 5,
+      "false_positives": 0,
+      "false_negatives": 7,
+      "novel_findings": 3,
+      "borderline": 0,
+      "total_gt_issues": 9,
+      "total_mirror_issues": 5
+    },
+    {
+      "site_slug": "healthcare_gov",
+      "precision": 1.0,
+      "recall": 0.4117647058823529,
+      "f1": 0.5833333333333334,
+      "true_positives": 7,
+      "false_positives": 0,
+      "false_negatives": 10,
+      "novel_findings": 7,
+      "borderline": 0,
+      "total_gt_issues": 10,
+      "total_mirror_issues": 7
+    },
+    {
+      "site_slug": "sunuva",
+      "precision": 1.0,
+      "recall": 0.42857142857142855,
+      "f1": 0.6,
+      "true_positives": 3,
+      "false_positives": 0,
+      "false_negatives": 4,
+      "novel_findings": 2,
+      "borderline": 0,
+      "total_gt_issues": 5,
+      "total_mirror_issues": 3
+    }
+  ],
+  "total_sites": 4,
+  "total_gt_issues": 28,
+  "total_mirror_issues": 19,
+  "total_tp": 19,
+  "total_fp": 0,
+  "total_fn": 25
+}

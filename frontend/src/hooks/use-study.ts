@@ -38,7 +38,13 @@ export function useCreateStudy() {
 
 export function useRunStudy() {
   return useMutation({
-    mutationFn: (studyId: string) => api.runStudy(studyId),
+    mutationFn: ({
+      studyId,
+      browserMode,
+    }: {
+      studyId: string;
+      browserMode?: string;
+    }) => api.runStudy(studyId, { browser_mode: browserMode }),
   });
 }
 

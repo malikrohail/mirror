@@ -22,15 +22,45 @@ class PageMetadata:
 
 
 class ScreenshotService:
-    """Capture screenshots and extract page information."""
+    """Capture screenshots and extract page information.
+
+    Supports PNG (default) and JPEG (Iteration 4 optimization) formats.
+    JPEG at 85% quality saves 60-80% storage compared to PNG.
+    Heatmap base images always use PNG for lossless quality.
+    """
+
+    def __init__(
+        self,
+        screenshot_format: str | None = None,
+        jpeg_quality: int | None = None,
+    ) -> None:
+        from app.config import settings
+
+        self._format = screenshot_format or getattr(settings, "SCREENSHOT_FORMAT", "png")
+        self._jpeg_quality = jpeg_quality or getattr(settings, "SCREENSHOT_JPEG_QUALITY", 85)
 
     async def capture_screenshot(self, page: Page) -> bytes:
-        """Capture a full-viewport PNG screenshot."""
+        """Capture a full-viewport screenshot in configured format."""
+        if self._format == "jpeg":
+            return await page.screenshot(
+                type="jpeg", quality=self._jpeg_quality, full_page=False
+            )
         return await page.screenshot(type="png", full_page=False)
 
     async def capture_full_page(self, page: Page) -> bytes:
-        """Capture a full-page (scrollable) PNG screenshot."""
+        """Capture a full-page (scrollable) screenshot in configured format."""
+        if self._format == "jpeg":
+            return await page.screenshot(
+                type="jpeg", quality=self._jpeg_quality, full_page=True
+            )
         return await page.screenshot(type="png", full_page=True)
+
+    async def capture_heatmap_base(self, page: Page) -> bytes:
+        """Capture a full-viewport PNG screenshot for heatmap overlay.
+
+        Always uses PNG for lossless quality regardless of configured format.
+        """
+        return await page.screenshot(type="png", full_page=False)
 
     async def capture_with_highlight(
         self, page: Page, selector: str

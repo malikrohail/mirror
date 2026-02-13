@@ -1,8 +1,9 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { ChevronDown, ClipboardList, Users, BookOpen, Moon, Sun, User, Calendar, TrendingUp } from 'lucide-react';
+import { ChevronDown, ClipboardList, Users, BookOpen, Moon, Sun, User, Calendar, TrendingUp, Monitor, Cloud } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,8 +13,23 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { TERMS } from '@/lib/constants';
 
+type BrowserMode = 'local' | 'cloud';
+
 export function Header() {
   const { theme, setTheme } = useTheme();
+  const [browserMode, setBrowserMode] = useState<BrowserMode>('local');
+
+  useEffect(() => {
+    const stored = localStorage.getItem('mirror-browser-mode');
+    if (stored === 'local' || stored === 'cloud') {
+      setBrowserMode(stored);
+    }
+  }, []);
+
+  const toggleBrowserMode = (mode: BrowserMode) => {
+    setBrowserMode(mode);
+    localStorage.setItem('mirror-browser-mode', mode);
+  };
 
   return (
     <header className="sticky top-0 z-[var(--z-sticky)] flex h-14 items-center gap-3 border-b border-border/50 px-4 backdrop-blur-xl bg-background/60">
@@ -22,7 +38,32 @@ export function Header() {
         <span className="text-sm text-muted-foreground">Find UX issues before your users do.</span>
       </Link>
 
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-3">
+        {/* Browser engine toggle */}
+        <div className="flex rounded-md border p-0.5">
+          <button
+            onClick={() => toggleBrowserMode('local')}
+            className={`flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors ${
+              browserMode === 'local'
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Monitor className="h-3 w-3" />
+            Local
+          </button>
+          <button
+            onClick={() => toggleBrowserMode('cloud')}
+            className={`flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors ${
+              browserMode === 'cloud'
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Cloud className="h-3 w-3" />
+            Cloud
+          </button>
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">

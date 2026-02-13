@@ -7,6 +7,8 @@ executes actions, and records every step.
 
 from __future__ import annotations
 
+import asyncio
+import io
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -16,7 +18,9 @@ from playwright.async_api import BrowserContext
 from app.browser.actions import BrowserActions
 from app.browser.cookie_consent import dismiss_cookie_consent
 from app.browser.detection import PageDetection
+from app.browser.screencast import CDPScreencastManager
 from app.browser.screenshots import ScreenshotService
+from app.config import settings
 from app.llm.client import LLMClient
 from app.llm.schemas import ActionType, NavigationDecision
 
@@ -82,8 +86,44 @@ class NavigationResult:
     steps: list[StepRecord] = field(default_factory=list)
 
 
+def _compute_visual_diff_score(prev_bytes: bytes, curr_bytes: bytes) -> float:
+    """Compute a visual change score between two screenshots (0.0 = identical, 1.0 = completely different).
+
+    Uses Pillow's ImageChops to compare pixel differences.
+    Returns -1.0 if comparison fails (e.g., Pillow not available).
+    """
+    try:
+        from PIL import Image, ImageChops
+
+        prev_img = Image.open(io.BytesIO(prev_bytes)).convert("RGB")
+        curr_img = Image.open(io.BytesIO(curr_bytes)).convert("RGB")
+
+        # Resize to same dimensions if needed
+        if prev_img.size != curr_img.size:
+            curr_img = curr_img.resize(prev_img.size)
+
+        diff = ImageChops.difference(prev_img, curr_img)
+        # Sum of all pixel differences normalized to 0-1
+        import numpy as np
+
+        diff_array = np.array(diff, dtype=float)
+        score = diff_array.sum() / (diff_array.size * 255.0)
+        return float(score)
+    except ImportError:
+        return -1.0
+    except Exception as e:
+        logger.debug("Visual diff computation failed: %s", e)
+        return -1.0
+
+
 class Navigator:
-    """Drives a single persona through a single task on a website."""
+    """Drives a single persona through a single task on a website.
+
+    Features:
+    - Retry logic for Playwright action failures (Iteration 2)
+    - Screenshot diff overlay for detecting "nothing happened" clicks (Iteration 3)
+    - Per-session timeout support (Iteration 2)
+    """
 
     def __init__(
         self,
@@ -96,6 +136,8 @@ class Navigator:
         self._actions = browser_actions or BrowserActions()
         self._screenshots = screenshot_service or ScreenshotService()
         self._max_steps = max_steps
+        self._action_retries = getattr(settings, "BROWSER_ACTION_RETRIES", 1)
+        self._diff_enabled = getattr(settings, "SCREENSHOT_DIFF_ENABLED", False)
 
     async def navigate_session(
         self,
@@ -106,26 +148,84 @@ class Navigator:
         start_url: str,
         browser_context: BrowserContext,
         recorder: StepRecorder | None = None,
+        screencast: CDPScreencastManager | None = None,
+        session_timeout: int | None = None,
     ) -> NavigationResult:
         """Run the full navigation loop for one persona on one task.
 
         PERCEIVE → THINK → ACT → RECORD, repeated until done/stuck/max_steps.
+
+        Args:
+            session_timeout: Per-session timeout in seconds (Iteration 2).
+                Defaults to settings.SESSION_TIMEOUT_SECONDS.
         """
         persona_name = persona.get("name", "Unknown")
+        timeout_secs = session_timeout or getattr(settings, "SESSION_TIMEOUT_SECONDS", 120)
+
         logger.info(
-            "Starting navigation: persona=%s, task=%s, url=%s",
-            persona_name, task_description[:50], start_url,
+            "Starting navigation: persona=%s, task=%s, url=%s, timeout=%ds",
+            persona_name, task_description[:50], start_url, timeout_secs,
         )
 
+        try:
+            return await asyncio.wait_for(
+                self._navigate_session_inner(
+                    session_id=session_id,
+                    persona=persona,
+                    persona_name=persona_name,
+                    task_description=task_description,
+                    behavioral_notes=behavioral_notes,
+                    start_url=start_url,
+                    browser_context=browser_context,
+                    recorder=recorder,
+                    screencast=screencast,
+                ),
+                timeout=timeout_secs,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Session timeout (%ds) for persona %s on %s",
+                timeout_secs, persona_name, start_url,
+            )
+            return NavigationResult(
+                session_id=session_id,
+                persona_name=persona_name,
+                task_completed=False,
+                total_steps=0,
+                gave_up=True,
+                error=f"Session timed out after {timeout_secs}s",
+            )
+
+    async def _navigate_session_inner(
+        self,
+        session_id: str,
+        persona: dict[str, Any],
+        persona_name: str,
+        task_description: str,
+        behavioral_notes: str,
+        start_url: str,
+        browser_context: BrowserContext,
+        recorder: StepRecorder | None = None,
+        screencast: CDPScreencastManager | None = None,
+    ) -> NavigationResult:
+        """Inner navigation loop (wrapped by per-session timeout)."""
         page = await browser_context.new_page()
         steps: list[StepRecord] = []
         gave_up = False
         task_completed = False
         error: str | None = None
+        prev_screenshot: bytes | None = None
 
         try:
-            # Navigate to starting URL
-            await page.goto(start_url, wait_until="domcontentloaded", timeout=30_000)
+            # Start CDP screencast if provided (fire-and-forget)
+            if screencast is not None:
+                try:
+                    await screencast.start(page)
+                except Exception as e:
+                    logger.warning("Screencast start failed (non-fatal): %s", e)
+
+            # Navigate to starting URL with retry
+            await self._goto_with_retry(page, start_url)
             # Brief wait for JS frameworks to hydrate
             await page.wait_for_timeout(1500)
 
@@ -156,7 +256,7 @@ class Navigator:
 
             for step_number in range(1, self._max_steps + 1):
                 try:
-                    result = await self._execute_step(
+                    step_result, curr_screenshot = await self._execute_step(
                         page=page,
                         session_id=session_id,
                         persona=persona,
@@ -166,18 +266,20 @@ class Navigator:
                         step_number=step_number,
                         history=steps,
                         recorder=recorder,
+                        prev_screenshot=prev_screenshot,
                     )
-                    steps.append(result)
+                    steps.append(step_result)
+                    prev_screenshot = curr_screenshot
 
                     # Check termination conditions
-                    if result.action_type in ("done", "give_up"):
-                        if result.action_type == "done":
+                    if step_result.action_type in ("done", "give_up"):
+                        if step_result.action_type == "done":
                             task_completed = True
                         else:
                             gave_up = True
                         break
 
-                    if result.task_progress >= 95:
+                    if step_result.task_progress >= 95:
                         task_completed = True
                         break
 
@@ -185,7 +287,7 @@ class Navigator:
                     if self._is_stuck(steps):
                         logger.warning(
                             "Persona %s appears stuck on %s, suggesting give_up",
-                            persona_name, result.page_url,
+                            persona_name, step_result.page_url,
                         )
                         gave_up = True
                         break
@@ -211,12 +313,18 @@ class Navigator:
                 "Navigation session failed for persona %s: %s", persona_name, e,
             )
         finally:
+            # Stop screencast before closing page
+            if screencast is not None:
+                try:
+                    await screencast.stop()
+                except Exception:
+                    pass
             try:
                 await page.close()
             except Exception:
                 pass
 
-        result = NavigationResult(
+        nav_result = NavigationResult(
             session_id=session_id,
             persona_name=persona_name,
             task_completed=task_completed,
@@ -229,7 +337,21 @@ class Navigator:
             "Navigation complete: persona=%s, steps=%d, completed=%s, gave_up=%s",
             persona_name, len(steps), task_completed, gave_up,
         )
-        return result
+        return nav_result
+
+    async def _goto_with_retry(self, page: Any, url: str) -> None:
+        """Navigate to a URL with retry on TimeoutError / TargetClosedError."""
+        for attempt in range(1 + self._action_retries):
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+                return
+            except Exception as e:
+                error_name = type(e).__name__
+                if error_name in ("TimeoutError", "TargetClosedError") and attempt < self._action_retries:
+                    logger.warning("goto retry %d/%d for %s: %s", attempt + 1, self._action_retries, url, e)
+                    await asyncio.sleep(1)
+                    continue
+                raise
 
     async def _execute_step(
         self,
@@ -242,13 +364,29 @@ class Navigator:
         step_number: int,
         history: list[StepRecord],
         recorder: StepRecorder | None,
-    ) -> StepRecord:
-        """Execute a single PERCEIVE → THINK → ACT → RECORD cycle."""
+        prev_screenshot: bytes | None = None,
+    ) -> tuple[StepRecord, bytes]:
+        """Execute a single PERCEIVE → THINK → ACT → RECORD cycle.
+
+        Returns (StepRecord, screenshot_bytes) — screenshot is returned for
+        visual diff computation in the next step (Iteration 3).
+        """
 
         # 1. PERCEIVE
         screenshot = await self._screenshots.capture_screenshot(page)
         a11y_tree = await self._screenshots.get_accessibility_tree(page)
         metadata = await self._screenshots.get_page_metadata(page)
+
+        # Screenshot diff: compare with previous step (Iteration 3)
+        if self._diff_enabled and prev_screenshot is not None:
+            diff_score = _compute_visual_diff_score(prev_screenshot, screenshot)
+            if diff_score >= 0:
+                logger.debug(
+                    "Step %d visual diff score: %.4f%s",
+                    step_number,
+                    diff_score,
+                    " (no visual change!)" if diff_score < 0.001 else "",
+                )
 
         # 2. THINK (LLM call)
         history_summary = self._build_history_summary(history)
@@ -285,7 +423,7 @@ class Navigator:
             if pos:
                 click_x, click_y = pos
 
-        # 4. ACT
+        # 4. ACT (with retry logic — Iteration 2)
         if decision.action.type not in (ActionType.done, ActionType.give_up):
             action_kwargs: dict[str, Any] = {}
             if decision.action.selector:
@@ -293,7 +431,7 @@ class Navigator:
             if decision.action.value:
                 action_kwargs["value"] = decision.action.value
 
-            action_result = await self._actions.execute(
+            action_result = await self._execute_action_with_retry(
                 page, decision.action.type.value, **action_kwargs
             )
 
@@ -331,7 +469,34 @@ class Navigator:
             think_aloud=decision.think_aloud,
             task_progress=decision.task_progress,
             emotional_state=decision.emotional_state.value,
-        )
+        ), screenshot
+
+    async def _execute_action_with_retry(
+        self, page: Any, action_type: str, **kwargs: Any
+    ) -> Any:
+        """Execute a browser action with retry on transient failures.
+
+        Retries on TimeoutError and TargetClosedError up to _action_retries times.
+        """
+        last_error: Exception | None = None
+        for attempt in range(1 + self._action_retries):
+            try:
+                return await self._actions.execute(page, action_type, **kwargs)
+            except Exception as e:
+                error_name = type(e).__name__
+                if error_name in ("TimeoutError", "TargetClosedError") and attempt < self._action_retries:
+                    logger.warning(
+                        "Action retry %d/%d for %s: %s",
+                        attempt + 1, self._action_retries, action_type, e,
+                    )
+                    await asyncio.sleep(0.5)
+                    last_error = e
+                    continue
+                raise
+        # Should not reach here, but just in case
+        if last_error:
+            raise last_error
+        raise RuntimeError("Action retry exhausted unexpectedly")
 
     @staticmethod
     def _build_history_summary(history: list[StepRecord]) -> str:

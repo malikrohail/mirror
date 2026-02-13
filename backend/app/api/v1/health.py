@@ -1,5 +1,5 @@
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,3 +33,32 @@ async def health_check(
         checks["status"] = "degraded"
 
     return checks
+
+
+@router.get("/browser")
+async def browser_health(request: Request):
+    """Browser pool health endpoint (Iteration 5).
+
+    Reports pool status: mode, active sessions, uptime, crash count,
+    failover state, memory usage.
+    """
+    pool = getattr(request.app.state, "browser_pool", None)
+
+    if pool is None:
+        return {
+            "status": "not_initialized",
+            "message": "No active browser pool — studies have not been run yet",
+        }
+
+    try:
+        stats = pool.stats
+        return {
+            "status": "ok" if not pool.is_failover_active else "failover_active",
+            "pool": stats.to_dict(),
+            "failover_active": pool.is_failover_active,
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+        }

@@ -76,7 +76,7 @@ class StudyService:
         if not deleted:
             raise HTTPException(status_code=404, detail="Study not found")
 
-    async def run_study(self, study_id: uuid.UUID) -> str:
+    async def run_study(self, study_id: uuid.UUID, browser_mode: str | None = None) -> str:
         """Start running a study by dispatching to the job queue."""
         study = await self.get_study(study_id)
 
@@ -108,7 +108,7 @@ class StudyService:
                 from app.config import settings
 
                 pool = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
-                job = await pool.enqueue_job("run_study_task", str(study_id))
+                job = await pool.enqueue_job("run_study_task", str(study_id), browser_mode)
                 await pool.close()
                 return job.job_id if job else str(study_id)
             except Exception:

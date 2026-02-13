@@ -1,6 +1,10 @@
-.PHONY: dev test lint migrate worker dev-worker docker-up docker-down
+.PHONY: dev dev-all test lint migrate worker dev-worker docker-up docker-down
 
-# Development
+# Development — start everything (Docker + backend + frontend)
+dev-all:
+	./scripts/dev.sh
+
+# Development — backend only
 dev:
 	cd backend && uvicorn app.main:app --reload --port 8000
 
@@ -43,10 +47,26 @@ docker-down:
 docker-all:
 	docker compose up --build
 
+# Docker local mode (Iteration 5)
+docker-local:
+	docker compose --profile local up --build
+
+docker-local-worker:
+	docker compose --profile local up --build worker-local
+
 # Setup
 install:
 	cd backend && pip install -e ".[dev]"
 	cd backend && playwright install chromium
 
+install-local:
+	cd backend && pip install -e ".[dev]"
+	cd backend && pip install psutil
+	cd backend && playwright install chromium
+
 seed:
 	cd backend && python -m app.data.seed
+
+# Browser pool health check (Iteration 5)
+health-browser:
+	curl -s http://localhost:8000/api/v1/health/browser | python -m json.tool

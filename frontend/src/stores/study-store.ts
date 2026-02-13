@@ -47,6 +47,17 @@ interface PersonaProgress {
   total_steps: number;
   live_view_url: string | null;
   browser_active: boolean;
+  screencast_available: boolean;
+}
+
+interface StudyCost {
+  llm_cost_usd: number;
+  browser_cost_usd: number;
+  total_cost_usd: number;
+  savings_vs_cloud_usd: number;
+  browser_mode: string;
+  llm_api_calls: number;
+  llm_total_tokens: number;
 }
 
 interface StudyProgress {
@@ -58,6 +69,7 @@ interface StudyProgress {
   isComplete: boolean;
   finalScore: number | null;
   issuesCount: number | null;
+  cost: StudyCost | null;
 }
 
 interface StudyStore {
@@ -98,6 +110,7 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
         isComplete: false,
         finalScore: null,
         issuesCount: null,
+        cost: null,
       },
     });
   },
@@ -119,6 +132,7 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
         isComplete: false,
         finalScore: null,
         issuesCount: null,
+        cost: null,
       };
       set({ activeStudy: current });
     }
@@ -155,6 +169,7 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
           total_steps: step.step_number,
           live_view_url: resolveLiveViewUrl(existing?.live_view_url, step.live_view_url),
           browser_active: existing?.browser_active ?? true,
+          screencast_available: existing?.screencast_available ?? false,
         };
         set({
           activeStudy: {
@@ -200,6 +215,7 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
           total_steps: existing?.total_steps ?? 0,
           live_view_url: resolveLiveViewUrl(existing?.live_view_url, msg.live_view_url),
           browser_active: true,
+          screencast_available: existing?.screencast_available ?? false,
         };
         set({
           activeStudy: {
@@ -230,6 +246,37 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
         break;
       }
 
+      case 'session:screencast_started': {
+        log('info', `[${msg.persona_name}] Screencast started`);
+        const existing = current.personas[msg.session_id];
+        set({
+          activeStudy: {
+            ...current,
+            personas: {
+              ...current.personas,
+              [msg.session_id]: {
+                ...(existing ?? {
+                  persona_name: msg.persona_name,
+                  session_id: msg.session_id,
+                  step_number: 0,
+                  think_aloud: 'Starting navigation...',
+                  screenshot_url: '',
+                  emotional_state: 'curious',
+                  action: 'navigating',
+                  task_progress: 0,
+                  completed: false,
+                  total_steps: 0,
+                  live_view_url: null,
+                  browser_active: true,
+                }),
+                screencast_available: true,
+              },
+            },
+          },
+        });
+        break;
+      }
+
       case 'study:session_snapshot': {
         const mergedPersonas: Record<string, PersonaProgress> = { ...current.personas };
         for (const [sessionId, state] of Object.entries(msg.sessions)) {
@@ -255,6 +302,7 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
               snapshot.live_view_url,
             ),
             browser_active: snapshot.browser_active ?? existing?.browser_active ?? true,
+            screencast_available: snapshot.screencast_available ?? existing?.screencast_available ?? false,
           };
         }
         set({
@@ -266,6 +314,12 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
         break;
       }
 
+      case 'session:browser_failover': {
+        const failoverMsg = msg as { session_id: string; persona_name: string; message: string };
+        log('warn', `[${failoverMsg.persona_name}] Browser failover: ${failoverMsg.message}`);
+        break;
+      }
+
       case 'study:analyzing':
         log('info', `Analyzing: ${msg.phase}`);
         set({
@@ -273,8 +327,11 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
         });
         break;
 
-      case 'study:complete':
-        log('info', `Study complete — score: ${msg.score}/100, ${msg.issues_count} issues`);
+      case 'study:complete': {
+        const costInfo = msg.cost
+          ? ` — cost: $${msg.cost.total_cost_usd.toFixed(4)}${msg.cost.savings_vs_cloud_usd > 0 ? ` (saved $${msg.cost.savings_vs_cloud_usd.toFixed(4)})` : ''}`
+          : '';
+        log('info', `Study complete — score: ${msg.score}/100, ${msg.issues_count} issues${costInfo}`);
         set({
           activeStudy: {
             ...current,
@@ -282,9 +339,11 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
             percent: 100,
             finalScore: msg.score,
             issuesCount: msg.issues_count,
+            cost: msg.cost ?? null,
           },
         });
         break;
+      }
 
       case 'study:error':
         log('error', `Error: ${msg.error}`);

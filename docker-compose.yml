@@ -62,5 +62,64 @@ services:
       - ./backend:/app
       - ./data:/app/data
 
+  # Local Playwright mode — one-command local deployment (Iteration 5)
+  # Usage: docker compose --profile local up --build
+  backend-local:
+    profiles: ["local"]
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    ports:
+      - "8000:8000"
+    shm_size: '2g'
+    environment:
+      DATABASE_URL: postgresql+asyncpg://mirror:mirror@postgres:5432/mirror
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_PATH: /home/mirror/data
+      DEFAULT_BROWSER_MODE: local
+      PARALLEL_BROWSER_INSTANCES: 1
+      MAX_CONCURRENT_SESSIONS: 3
+      SCREENSHOT_FORMAT: jpeg
+      SCREENSHOT_JPEG_QUALITY: 85
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./data:/home/mirror/data
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+          cpus: '2.0'
+
+  worker-local:
+    profiles: ["local"]
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    command: arq app.workers.settings.WorkerSettings
+    shm_size: '2g'
+    environment:
+      DATABASE_URL: postgresql+asyncpg://mirror:mirror@postgres:5432/mirror
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_PATH: /home/mirror/data
+      DEFAULT_BROWSER_MODE: local
+      PARALLEL_BROWSER_INSTANCES: 2
+      MAX_CONCURRENT_SESSIONS: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./data:/home/mirror/data
+    deploy:
+      resources:
+        limits:
+          memory: 6g
+          cpus: '4.0'
+
 volumes:
   pgdata:

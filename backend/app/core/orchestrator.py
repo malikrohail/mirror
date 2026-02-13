@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.browser.actions import BrowserActions
 from app.browser.pool import BrowserPool
+from app.browser.screencast import CDPScreencastManager
 from app.browser.screenshots import ScreenshotService
 from app.config import settings
 from app.core.analyzer import Analyzer
@@ -39,6 +40,7 @@ from app.models.insight import Insight, InsightType
 from app.models.session import SessionStatus
 from app.models.study import StudyStatus
 from app.services.live_session_state import LiveSessionStateStore
+from app.services.cost_estimator import CostTracker
 from app.storage.file_storage import FileStorage
 
 logger = logging.getLogger(__name__)
@@ -56,10 +58,12 @@ class StudyOrchestrator:
         db: AsyncSession,
         redis: aioredis.Redis,
         db_factory: async_sessionmaker[AsyncSession] | None = None,
+        browser_mode: str | None = None,
     ):
         self.db = db
         self.redis = redis
         self.db_factory = db_factory
+        self._browser_mode = browser_mode
         self.study_repo = StudyRepository(db)
         self.session_repo = SessionRepository(db)
 
@@ -79,12 +83,25 @@ class StudyOrchestrator:
         # Browser pool (initialized lazily)
         self._pool: BrowserPool | None = None
 
+        # Cost tracking (Iteration 4)
+        self._cost_tracker = CostTracker()
+
     async def _ensure_browser_pool(self) -> BrowserPool:
         """Initialize browser pool if not already done."""
         if self._pool is None:
             max_ctx = int(os.getenv("MAX_CONCURRENT_SESSIONS", "5"))
-            self._pool = BrowserPool(max_contexts=max_ctx)
+            force_local = self._browser_mode == "local"
+            self._pool = BrowserPool(max_contexts=max_ctx, force_local=force_local)
             await self._pool.initialize()
+
+            # Log browser pool mode for observability
+            if self._pool.is_cloud:
+                logger.info("Study using cloud browser mode (Browserbase)")
+            else:
+                logger.info(
+                    "Study using local browser mode (instances=%d)",
+                    self._pool.stats.browser_instances,
+                )
         return self._pool
 
     async def run_study(self, study_id: uuid.UUID) -> dict[str, Any]:
@@ -200,16 +217,21 @@ class StudyOrchestrator:
             await self.study_repo.update_status(study_id, StudyStatus.COMPLETE)
             await self.db.commit()
 
+            # Build cost breakdown
+            cost_breakdown = self._cost_tracker.get_breakdown()
+
             await self._publish_event(study_id, {
                 "type": "study:complete",
                 "study_id": str(study_id),
                 "score": synthesis.overall_ux_score,
                 "issues_count": total_issues,
+                "cost": cost_breakdown.model_dump(),
             })
 
             logger.info(
-                "Study %s complete: score=%d, issues=%d",
+                "Study %s complete: score=%d, issues=%d, cost=$%.4f (savings=$%.4f)",
                 study_id, synthesis.overall_ux_score, total_issues,
+                cost_breakdown.total_cost_usd, cost_breakdown.savings_vs_cloud_usd,
             )
 
             return {
@@ -218,6 +240,7 @@ class StudyOrchestrator:
                 "score": synthesis.overall_ux_score,
                 "total_issues": total_issues,
                 "token_usage": self._llm.usage.to_dict(),
+                "cost": cost_breakdown.model_dump(),
             }
 
         except asyncio.TimeoutError:
@@ -309,6 +332,7 @@ class StudyOrchestrator:
         max_concurrent = int(os.getenv("MAX_CONCURRENT_SESSIONS", "5"))
         semaphore = asyncio.Semaphore(max_concurrent)
         timeout = int(os.getenv("STUDY_TIMEOUT_SECONDS", "600"))
+        session_timeout = getattr(settings, "SESSION_TIMEOUT_SECONDS", 120)
 
         storage = FileStorage(base_path=os.getenv("STORAGE_PATH", "./data"))
         state_store = LiveSessionStateStore(self.redis)
@@ -322,6 +346,7 @@ class StudyOrchestrator:
                 persona_name = persona_dict.get("name", "Unknown")
                 browser_session = await pool.acquire(viewport=viewport)
                 result: NavigationResult | None = None
+                screencast: CDPScreencastManager | None = None
                 try:
                     await state_store.upsert(
                         study_id=str(study_id),
@@ -359,6 +384,23 @@ class StudyOrchestrator:
                             session_id,
                         )
 
+                    # Start CDP screencast for local mode
+                    if (
+                        settings.ENABLE_SCREENCAST
+                        and not pool.is_cloud
+                    ):
+                        screencast = CDPScreencastManager(session_id=session_id)
+                        await self._publish_event(study_id, {
+                            "type": "session:screencast_started",
+                            "session_id": session_id,
+                            "persona_name": persona_name,
+                        })
+                        await state_store.upsert(
+                            study_id=str(study_id),
+                            session_id=session_id,
+                            updates={"screencast_available": True},
+                        )
+
                     # Each persona gets its own DB session to avoid
                     # concurrent transaction corruption in asyncio.gather()
                     async with self.db_factory() as persona_db:
@@ -386,7 +428,18 @@ class StudyOrchestrator:
                             start_url=start_url,
                             browser_context=browser_session.context,
                             recorder=recorder,
+                            screencast=screencast,
+                            session_timeout=session_timeout,
                         )
+
+                        # Notify frontend if hybrid failover is active
+                        if pool.is_failover_active:
+                            await self._publish_event(study_id, {
+                                "type": "session:browser_failover",
+                                "session_id": session_id,
+                                "persona_name": persona_name,
+                                "message": "Switched to cloud browser due to local crashes",
+                            })
 
                         # Update session with results
                         db_session = await persona_db.get(
@@ -413,6 +466,13 @@ class StudyOrchestrator:
 
                         return result
                 finally:
+                    # Stop screencast before releasing browser
+                    if screencast is not None:
+                        try:
+                            await screencast.stop()
+                        except Exception as e:
+                            logger.debug("Screencast stop error (non-fatal): %s", e)
+
                     await state_store.upsert(
                         study_id=str(study_id),
                         session_id=session_id,

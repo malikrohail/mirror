@@ -52,6 +52,15 @@ export interface WsStudyComplete {
   study_id: string;
   score: number;
   issues_count: number;
+  cost?: {
+    llm_cost_usd: number;
+    browser_cost_usd: number;
+    total_cost_usd: number;
+    savings_vs_cloud_usd: number;
+    browser_mode: string;
+    llm_api_calls: number;
+    llm_total_tokens: number;
+  };
 }
 
 export interface WsStudyError {
@@ -72,6 +81,19 @@ export interface WsSessionBrowserClosed {
   session_id: string;
 }
 
+export interface WsSessionScreencastStarted {
+  type: 'session:screencast_started';
+  session_id: string;
+  persona_name: string;
+}
+
+export interface WsSessionBrowserFailover {
+  type: 'session:browser_failover';
+  session_id: string;
+  persona_name: string;
+  message: string;
+}
+
 export interface WsSessionSnapshotState {
   session_id: string;
   persona_name?: string;
@@ -85,6 +107,7 @@ export interface WsSessionSnapshotState {
   total_steps?: number;
   live_view_url?: string | null;
   browser_active?: boolean;
+  screencast_available?: boolean;
 }
 
 export interface WsStudySessionSnapshot {
@@ -99,6 +122,8 @@ export type WsServerMessage =
   | WsSessionComplete
   | WsSessionLiveView
   | WsSessionBrowserClosed
+  | WsSessionScreencastStarted
+  | WsSessionBrowserFailover
   | WsStudySessionSnapshot
   | WsStudyAnalyzing
   | WsStudyComplete

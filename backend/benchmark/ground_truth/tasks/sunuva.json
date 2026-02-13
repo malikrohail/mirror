@@ -1,0 +1,10 @@
+{
+  "site_slug": "sunuva",
+  "site_url": "https://www.sunuva.com",
+  "description": "Sunuva is a children's swimwear and UV protective clothing e-commerce site. The Smashing Magazine case study (2021) identified navigation complexity, header clutter, and checkout friction as key conversion barriers. Benchmark tasks focus on the purchase funnel.",
+  "tier": 2,
+  "tasks": [
+    "Find and add a UV protective swimsuit for a 5-year-old boy to your shopping cart.",
+    "Complete the checkout process to purchase an item in your cart, entering shipping and payment details."
+  ]
+}

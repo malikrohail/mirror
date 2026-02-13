@@ -187,9 +187,23 @@ export function StudyProgress({ studyId }: StudyProgressProps) {
 
       {isComplete && !isFailed && study && (
         <div className="rounded-lg border bg-green-50 p-4 dark:bg-green-950">
-          <p className="text-sm font-medium text-green-700 dark:text-green-300">
-            Score: {study.overall_score != null ? Math.round(study.overall_score) : '—'}/100
-          </p>
+          <div className="flex items-baseline justify-between">
+            <p className="text-sm font-medium text-green-700 dark:text-green-300">
+              Score: {study.overall_score != null ? Math.round(study.overall_score) : '—'}/100
+            </p>
+            {/* Cost breakdown (Iteration 4) */}
+            {activeStudy?.cost && (
+              <div className="flex items-center gap-3 text-xs text-green-600 dark:text-green-400">
+                <span>Cost: ${activeStudy.cost.total_cost_usd.toFixed(4)}</span>
+                <span>({activeStudy.cost.llm_api_calls} API calls)</span>
+                {activeStudy.cost.savings_vs_cloud_usd > 0 && (
+                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700 dark:bg-green-900 dark:text-green-300">
+                    Saved ${activeStudy.cost.savings_vs_cloud_usd.toFixed(4)} vs cloud
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
           <p className="mt-1 text-xs text-green-600 dark:text-green-400">
             Redirecting to results...
           </p>
@@ -233,6 +247,8 @@ export function StudyProgress({ studyId }: StudyProgressProps) {
                   completed={ws?.completed ?? polled?.completed ?? sessionComplete}
                   liveViewUrl={ws?.live_view_url ?? polled?.live_view_url ?? session.live_view_url ?? null}
                   browserActive={ws?.browser_active ?? polled?.browser_active ?? session.browser_active ?? !sessionComplete}
+                  screencastAvailable={ws?.screencast_available ?? false}
+                  sessionId={session.id}
                 />
               );
             })}

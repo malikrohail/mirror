@@ -9,26 +9,28 @@ import uuid
 logger = logging.getLogger(__name__)
 
 
-async def run_study_task(ctx: dict, study_id: str):
+async def run_study_task(ctx: dict, study_id: str, browser_mode: str | None = None):
     """Run a complete study — navigation + analysis pipeline.
 
     This is the main arq task dispatched by the study orchestrator.
-    Agent 2 will fill in the actual implementation.
 
     Args:
         ctx: arq context with db_factory and redis connections.
         study_id: UUID string of the study to run.
+        browser_mode: Optional browser mode override ("local" or "cloud").
     """
     db_factory = ctx["db_factory"]
     redis = ctx["redis"]
 
-    logger.info(f"Starting study run: {study_id}")
+    logger.info(f"Starting study run: {study_id} (browser_mode={browser_mode})")
 
     async with db_factory() as db:
         try:
             from app.core.orchestrator import StudyOrchestrator
 
-            orchestrator = StudyOrchestrator(db, redis, db_factory=db_factory)
+            orchestrator = StudyOrchestrator(
+                db, redis, db_factory=db_factory, browser_mode=browser_mode
+            )
             await orchestrator.run_study(uuid.UUID(study_id))
             await db.commit()
         except Exception:

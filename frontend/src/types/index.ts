@@ -195,6 +195,7 @@ export interface HeatmapResponse {
   page_url: string;
   data_points: HeatmapDataPoint[];
   total_clicks: number;
+  page_screenshots: Record<string, string>;
 }
 
 // ── Report ────────────────────────────────────────────

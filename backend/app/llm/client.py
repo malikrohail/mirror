@@ -6,6 +6,7 @@ import asyncio
 import base64
 import json
 import logging
+import re
 import os
 from typing import Any, TypeVar
 
@@ -443,6 +444,87 @@ class LLMClient:
         )
 
     # ------------------------------------------------------------------
+    # Stage 3b: Batch Screenshot Analysis (Iteration 4 optimization)
+    # ------------------------------------------------------------------
+
+    async def analyze_screenshots_batch(
+        self,
+        screenshots: list[tuple[bytes, str, str, str | None]],
+    ) -> list[ScreenshotAnalysis]:
+        """Batch-analyze multiple screenshots in a single LLM call.
+
+        Each tuple is (screenshot_bytes, page_url, page_title, persona_context).
+        Sends all images in one multi-image message to reduce round-trip overhead.
+        Falls back to individual calls if batch fails.
+        """
+        if len(screenshots) <= 1:
+            # Not worth batching a single screenshot
+            results = []
+            for ss_bytes, url, title, ctx in screenshots:
+                result = await self.analyze_screenshot(ss_bytes, url, title, ctx)
+                results.append(result)
+            return results
+
+        system = screenshot_analysis_system_prompt()
+        content_blocks: list[dict[str, Any]] = []
+
+        for i, (ss_bytes, url, title, ctx) in enumerate(screenshots):
+            ss_b64 = base64.b64encode(ss_bytes).decode("utf-8")
+            content_blocks.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/png",
+                    "data": ss_b64,
+                },
+            })
+            label = f"Screenshot {i + 1}: {title} ({url})"
+            if ctx:
+                label += f" — Persona: {ctx}"
+            content_blocks.append({"type": "text", "text": label})
+
+        content_blocks.append({
+            "type": "text",
+            "text": (
+                f"Analyze all {len(screenshots)} screenshots above. Return a JSON ARRAY "
+                "of analysis objects, one per screenshot, in the same order as the images."
+            ),
+        })
+
+        messages = [{"role": "user", "content": content_blocks}]
+
+        try:
+            raw = await self._call(
+                "screenshot_analysis", system, messages, max_tokens=8192
+            )
+            # Parse as a list of ScreenshotAnalysis
+            text = raw.strip()
+            if text.startswith("```"):
+                lines = text.split("\n")[1:]
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                text = "\n".join(lines)
+
+            data = json.loads(text)
+            if isinstance(data, list):
+                return [ScreenshotAnalysis.model_validate(item) for item in data]
+            # If it returned a single object, wrap it
+            return [ScreenshotAnalysis.model_validate(data)]
+        except Exception as e:
+            logger.warning(
+                "Batch screenshot analysis failed, falling back to individual: %s", e
+            )
+            # Fallback to individual calls
+            results = []
+            for ss_bytes, url, title, ctx in screenshots:
+                try:
+                    result = await self.analyze_screenshot(ss_bytes, url, title, ctx)
+                    results.append(result)
+                except Exception as inner_e:
+                    logger.error("Individual analysis also failed: %s", inner_e)
+            return results
+
+    # ------------------------------------------------------------------
     # Stage 6: Fix Suggestion Generation
     # ------------------------------------------------------------------
 
@@ -475,10 +557,98 @@ class LLMClient:
 # JSON parsing helper
 # ---------------------------------------------------------------------------
 
+def _repair_json(text: str) -> str:
+    """Attempt to repair common JSON issues produced by LLMs.
+
+    Handles:
+    - Trailing commas before } or ]
+    - Improperly escaped quotes inside string values (e.g. \"Gerry\")
+    - Single quotes used instead of double quotes
+    - Unescaped control characters in strings
+    - Missing closing brackets
+    """
+    # Remove trailing commas before } or ]
+    text = re.sub(r",\s*([}\]])", r"\1", text)
+
+    # Fix improperly escaped Unicode smart quotes
+    text = text.replace("\u201c", '"').replace("\u201d", '"')
+    text = text.replace("\u2018", "'").replace("\u2019", "'")
+
+    # Fix double-escaped quotes: \\"Gerry\\" → \"Gerry\"
+    text = re.sub(r'\\\\"', '\\"', text)
+
+    # Fix unescaped newlines inside JSON string values
+    # Replace literal newlines between quotes with \\n
+    def _fix_string_newlines(match: re.Match) -> str:
+        content = match.group(0)
+        return content.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+
+    text = re.sub(r'"(?:[^"\\]|\\.)*"', _fix_string_newlines, text, flags=re.DOTALL)
+
+    # Balance brackets: count { vs } and [ vs ]
+    open_braces = text.count("{") - text.count("}")
+    open_brackets = text.count("[") - text.count("]")
+    if open_braces > 0:
+        text += "}" * open_braces
+    if open_brackets > 0:
+        text += "]" * open_brackets
+
+    return text
+
+
+def _extract_json_object(text: str) -> str:
+    """Extract the first complete JSON object or array from text.
+
+    Handles cases where LLMs add explanatory text before/after the JSON.
+    """
+    # Find the first { or [
+    start = -1
+    bracket = ""
+    for i, ch in enumerate(text):
+        if ch in ("{", "["):
+            start = i
+            bracket = ch
+            break
+
+    if start == -1:
+        return text
+
+    # Find the matching closing bracket
+    close = "}" if bracket == "{" else "]"
+    depth = 0
+    in_string = False
+    escape_next = False
+
+    for i in range(start, len(text)):
+        ch = text[i]
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == "\\":
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == bracket:
+            depth += 1
+        elif ch == close:
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+
+    # If we didn't find a match, return from start to end
+    return text[start:]
+
+
 def _parse_json_response(raw: str, model: type[T]) -> T:
     """Extract JSON from an LLM response and parse into a Pydantic model.
 
     The LLM may wrap JSON in markdown code fences — we handle that.
+    Falls back to a lightweight repair pass for common LLM JSON quirks
+    (trailing commas, escaped quotes, etc.) before giving up.
     """
     text = raw.strip()
 
@@ -492,10 +662,37 @@ def _parse_json_response(raw: str, model: type[T]) -> T:
             lines = lines[:-1]
         text = "\n".join(lines)
 
+    # Try parsing as-is first
     try:
         data = json.loads(text)
+        return model.model_validate(data)
+    except (json.JSONDecodeError, Exception):
+        pass
+
+    # Try extracting the JSON object from surrounding text
+    try:
+        extracted = _extract_json_object(text)
+        data = json.loads(extracted)
+        return model.model_validate(data)
+    except (json.JSONDecodeError, Exception):
+        pass
+
+    # Attempt lightweight repair and retry
+    try:
+        repaired = _repair_json(text)
+        data = json.loads(repaired)
+        logger.info("JSON repair succeeded for LLM response")
+        return model.model_validate(data)
+    except (json.JSONDecodeError, Exception):
+        pass
+
+    # Last resort: extract + repair
+    try:
+        extracted = _extract_json_object(text)
+        repaired = _repair_json(extracted)
+        data = json.loads(repaired)
+        logger.info("JSON extract+repair succeeded for LLM response")
+        return model.model_validate(data)
     except json.JSONDecodeError as e:
         logger.error("Failed to parse JSON from LLM response: %s\nRaw: %s", e, text[:500])
         raise ValueError(f"LLM returned invalid JSON: {e}") from e
-
-    return model.model_validate(data)
