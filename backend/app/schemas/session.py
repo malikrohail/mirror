@@ -48,6 +48,9 @@ class IssueOut(BaseModel):
     is_regression: bool = False
     priority_score: float | None = None
     step_number: int | None = None
+    fix_suggestion: str | None = None
+    fix_code: str | None = None
+    fix_language: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -37,3 +37,38 @@ async def run_study_task(ctx: dict, study_id: str):
             raise
 
     logger.info(f"Study run complete: {study_id}")
+
+
+async def check_schedules_task(ctx: dict):
+    """Periodic task — check for due schedules and trigger runs.
+
+    This is called by arq's cron_jobs on a 1-minute interval.
+    """
+    db_factory = ctx["db_factory"]
+    redis = ctx["redis"]
+
+    async with db_factory() as db:
+        try:
+            from app.services.schedule_service import ScheduleService
+
+            svc = ScheduleService(db, redis=redis)
+            due = await svc.get_due_schedules()
+
+            if not due:
+                return
+
+            logger.info("Found %d due schedules", len(due))
+            for schedule in due:
+                try:
+                    study, job_id = await svc.trigger_run(schedule.id)
+                    logger.info(
+                        "Triggered schedule %s → study %s (job %s)",
+                        schedule.id, study.id, job_id,
+                    )
+                except Exception:
+                    logger.exception("Failed to trigger schedule %s", schedule.id)
+
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            logger.exception("Schedule check failed")

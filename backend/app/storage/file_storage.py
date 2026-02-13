@@ -27,6 +27,21 @@ class FileStorage:
     def _session_dir(self, study_id: uuid.UUID, session_id: uuid.UUID) -> Path:
         return self._study_dir(study_id) / "sessions" / str(session_id)
 
+    # Generic read/write
+
+    async def read(self, path: str) -> bytes:
+        """Read raw bytes from a storage path."""
+        full = self.base_path / path
+        if not full.exists():
+            raise FileNotFoundError(f"File not found: {path}")
+        return full.read_bytes()
+
+    async def write(self, path: str, data: bytes) -> None:
+        """Write raw bytes to a storage path."""
+        full = self.base_path / path
+        full.parent.mkdir(parents=True, exist_ok=True)
+        full.write_bytes(data)
+
     # Screenshots
 
     def save_screenshot(

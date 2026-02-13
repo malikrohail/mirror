@@ -211,3 +211,141 @@ export interface HealthResponse {
   db: string;
   redis: string;
 }
+
+// ── Comparison ───────────────────────────────────────
+
+export interface IssueDiff {
+  element: string | null;
+  description: string;
+  severity: Severity;
+  page_url: string | null;
+  status: 'fixed' | 'new' | 'persisting' | 'improved' | 'regressed';
+}
+
+export interface ComparisonResult {
+  baseline_study_id: string;
+  comparison_study_id: string;
+  baseline_score: number | null;
+  comparison_score: number | null;
+  score_delta: number;
+  score_improved: boolean;
+  issues_fixed: IssueDiff[];
+  issues_new: IssueDiff[];
+  issues_persisting: IssueDiff[];
+  total_baseline_issues: number;
+  total_comparison_issues: number;
+  summary: string;
+}
+
+// ── Schedule ─────────────────────────────────────────
+
+export interface ScheduleCreate {
+  name: string;
+  url: string;
+  starting_path?: string;
+  tasks: TaskCreate[];
+  persona_template_ids: string[];
+  cron_expression?: string;
+}
+
+export interface ScheduleUpdate {
+  name?: string;
+  cron_expression?: string;
+  status?: 'active' | 'paused';
+}
+
+export interface ScheduleOut {
+  id: string;
+  name: string;
+  url: string;
+  starting_path: string;
+  tasks: Record<string, unknown>[];
+  persona_template_ids: string[];
+  cron_expression: string | null;
+  webhook_secret: string | null;
+  status: 'active' | 'paused' | 'deleted';
+  last_run_at: string | null;
+  next_run_at: string | null;
+  last_study_id: string | null;
+  run_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScheduleListResponse {
+  items: ScheduleOut[];
+  total: number;
+}
+
+export interface ScheduleRunResponse {
+  schedule_id: string;
+  study_id: string;
+  job_id: string;
+}
+
+// ── Score History ────────────────────────────────────
+
+export interface ScoreHistoryPoint {
+  study_id: string;
+  score: number | null;
+  status: string;
+  created_at: string;
+  schedule_id: string | null;
+}
+
+export interface ScoreHistoryResponse {
+  url: string;
+  data_points: ScoreHistoryPoint[];
+  total_studies: number;
+  average_score: number | null;
+  trend: 'improving' | 'declining' | 'stable' | null;
+  score_delta: number | null;
+}
+
+export interface TrackedUrl {
+  url: string;
+  study_count: number;
+  latest_score: number | null;
+  last_tested: string | null;
+}
+
+// ── Video ────────────────────────────────────────────
+
+export interface VideoOut {
+  id: string;
+  session_id: string;
+  video_path: string | null;
+  duration_seconds: number | null;
+  frame_count: number | null;
+  has_narration: boolean;
+  status: 'pending' | 'generating' | 'complete' | 'failed';
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VideoGenerateResponse {
+  video_id: string;
+  session_id: string;
+  status: string;
+  message: string;
+}
+
+// ── Fix Suggestions ──────────────────────────────────
+
+export interface FixSuggestionOut {
+  issue_id: string;
+  element: string | null;
+  description: string;
+  severity: Severity;
+  fix_suggestion: string | null;
+  fix_code: string | null;
+  fix_language: string | null;
+  page_url: string | null;
+}
+
+export interface FixGenerateResponse {
+  study_id: string;
+  fixes_generated: number;
+  fixes: FixSuggestionOut[];
+}

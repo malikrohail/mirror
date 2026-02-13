@@ -15,6 +15,18 @@ import type {
   PersonaTemplateOut,
   PersonaOut,
   HealthResponse,
+  ComparisonResult,
+  ScheduleCreate,
+  ScheduleUpdate,
+  ScheduleOut,
+  ScheduleListResponse,
+  ScheduleRunResponse,
+  ScoreHistoryResponse,
+  TrackedUrl,
+  VideoOut,
+  VideoGenerateResponse,
+  FixSuggestionOut,
+  FixGenerateResponse,
 } from '@/types';
 
 class ApiError extends Error {
@@ -189,6 +201,76 @@ export function getScreenshotUrl(path: string): string {
 
 export function getHealth(): Promise<HealthResponse> {
   return request('/health');
+}
+
+// ── Comparison ───────────────────────────────────────
+
+export function compareStudies(baselineId: string, comparisonId: string): Promise<ComparisonResult> {
+  return request(`/studies/${baselineId}/compare/${comparisonId}`, { method: 'POST' });
+}
+
+// ── Schedules ────────────────────────────────────────
+
+export function createSchedule(data: ScheduleCreate): Promise<ScheduleOut> {
+  return request('/schedules', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export function listSchedules(): Promise<ScheduleListResponse> {
+  return request('/schedules');
+}
+
+export function getSchedule(id: string): Promise<ScheduleOut> {
+  return request(`/schedules/${id}`);
+}
+
+export function updateSchedule(id: string, data: Partial<ScheduleUpdate>): Promise<ScheduleOut> {
+  return request(`/schedules/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+
+export function deleteSchedule(id: string): Promise<void> {
+  return request(`/schedules/${id}`, { method: 'DELETE' });
+}
+
+export function triggerSchedule(id: string): Promise<ScheduleRunResponse> {
+  return request(`/schedules/${id}/trigger`, { method: 'POST' });
+}
+
+// ── Score History ────────────────────────────────────
+
+export function listTrackedUrls(): Promise<TrackedUrl[]> {
+  return request('/history/urls');
+}
+
+export function getScoreHistory(url: string, limit = 50): Promise<ScoreHistoryResponse> {
+  return request(`/history/scores?url=${encodeURIComponent(url)}&limit=${limit}`);
+}
+
+// ── Videos ───────────────────────────────────────────
+
+export function getSessionVideo(sessionId: string): Promise<VideoOut | null> {
+  return request(`/sessions/${sessionId}/video`);
+}
+
+export function generateSessionVideo(sessionId: string, options?: { include_narration?: boolean; frame_duration_ms?: number }): Promise<VideoGenerateResponse> {
+  return request(`/sessions/${sessionId}/video/generate`, { method: 'POST', body: JSON.stringify(options ?? {}) });
+}
+
+export function getVideoDownloadUrl(sessionId: string): string {
+  return `${API_BASE}/sessions/${sessionId}/video/download`;
+}
+
+export function listStudyVideos(studyId: string): Promise<VideoOut[]> {
+  return request(`/studies/${studyId}/videos`);
+}
+
+// ── Fix Suggestions ──────────────────────────────────
+
+export function generateFixes(studyId: string, issueIds?: string[]): Promise<FixGenerateResponse> {
+  return request(`/studies/${studyId}/fixes/generate`, { method: 'POST', body: JSON.stringify(issueIds ? { issue_ids: issueIds } : {}) });
+}
+
+export function listFixes(studyId: string): Promise<FixSuggestionOut[]> {
+  return request(`/studies/${studyId}/fixes`);
 }
 
 export { ApiError };
