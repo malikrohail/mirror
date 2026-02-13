@@ -4,10 +4,14 @@ NOTE: arq workers do NOT auto-reload on code changes.
 For development, use: python scripts/dev_worker.py
 """
 
+import logging
+
 from arq.connections import RedisSettings
 
 from app.config import settings
 from app.workers.tasks import run_study_task
+
+logger = logging.getLogger(__name__)
 
 
 async def startup(ctx):
@@ -18,6 +22,17 @@ async def startup(ctx):
 
     ctx["db_factory"] = async_session_factory
     ctx["redis"] = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    logger.info(
+        (
+            "[worker] Startup complete: redis=%s max_jobs=%d timeout=%ds "
+            "browserbase_key=%s project_id=%s"
+        ),
+        settings.REDIS_URL,
+        settings.MAX_CONCURRENT_SESSIONS,
+        settings.STUDY_TIMEOUT_SECONDS,
+        bool(settings.BROWSERBASE_API_KEY),
+        bool(settings.BROWSERBASE_PROJECT_ID),
+    )
 
 
 async def shutdown(ctx):
@@ -25,6 +40,7 @@ async def shutdown(ctx):
     redis_conn = ctx.get("redis")
     if redis_conn:
         await redis_conn.close()
+    logger.info("[worker] Shutdown complete")
 
 
 def _parse_redis_url(url: str) -> RedisSettings:

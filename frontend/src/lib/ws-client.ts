@@ -37,7 +37,16 @@ export class WsClient {
     this.ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data) as WsServerMessage;
-        console.log('[WS] Message:', msg.type);
+        if (msg.type === 'study:session_snapshot') {
+          console.log(
+            '[WS] Message:',
+            msg.type,
+            'sessions=',
+            Object.keys(msg.sessions ?? {}).length,
+          );
+        } else {
+          console.log('[WS] Message:', msg.type);
+        }
         this.messageHandlers.forEach((h) => h(msg));
       } catch {
         console.log('[WS] Failed to parse message:', event.data);

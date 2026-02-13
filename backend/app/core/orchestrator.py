@@ -38,6 +38,7 @@ from app.llm.client import LLMClient
 from app.models.insight import Insight, InsightType
 from app.models.session import SessionStatus
 from app.models.study import StudyStatus
+from app.services.live_session_state import LiveSessionStateStore
 from app.storage.file_storage import FileStorage
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,7 @@ class StudyOrchestrator:
         try:
             # --- Phase 1: Setup ---
             await self.study_repo.update_status(study_id, StudyStatus.RUNNING)
+            await LiveSessionStateStore(self.redis).clear_study(str(study_id))
             await self._publish_progress(study_id, 5, "starting")
 
             pool = await self._ensure_browser_pool()
@@ -125,6 +127,10 @@ class StudyOrchestrator:
                 persona_profiles=persona_profiles,
                 pool=pool,
             )
+            if not nav_results:
+                raise RuntimeError(
+                    "No navigation sessions completed. Browserbase may be rate-limited."
+                )
             await self._publish_progress(study_id, 60, "navigation_complete")
 
             # --- Phase 4: Analysis ---
@@ -305,14 +311,54 @@ class StudyOrchestrator:
         timeout = int(os.getenv("STUDY_TIMEOUT_SECONDS", "600"))
 
         storage = FileStorage(base_path=os.getenv("STORAGE_PATH", "./data"))
+        state_store = LiveSessionStateStore(self.redis)
 
         async def run_one(
             session: Any, persona_dict: dict[str, Any], task_desc: str
         ) -> NavigationResult:
             async with semaphore:
                 viewport = persona_dict.get("device_preference", "desktop")
-                ctx = await pool.acquire(viewport=viewport)
+                session_id = str(session.id)
+                persona_name = persona_dict.get("name", "Unknown")
+                browser_session = await pool.acquire(viewport=viewport)
+                result: NavigationResult | None = None
                 try:
+                    await state_store.upsert(
+                        study_id=str(study_id),
+                        session_id=session_id,
+                        updates={
+                            "persona_name": persona_name,
+                            "live_view_url": browser_session.live_view_url,
+                            "browser_active": True,
+                            "completed": False,
+                            "step_number": 0,
+                            "total_steps": 0,
+                        },
+                    )
+
+                    # Publish live view URL if available (Browserbase mode)
+                    if browser_session.live_view_url:
+                        logger.info(
+                            "[live-view] URL available at session start: study=%s session=%s",
+                            study_id,
+                            session_id,
+                        )
+                        await self._publish_event(study_id, {
+                            "type": "session:live_view",
+                            "session_id": session_id,
+                            "persona_name": persona_name,
+                            "live_view_url": browser_session.live_view_url,
+                        })
+                    else:
+                        logger.warning(
+                            (
+                                "[live-view] URL missing at session start; "
+                                "frontend will rely on durable updates: study=%s session=%s"
+                            ),
+                            study_id,
+                            session_id,
+                        )
+
                     # Each persona gets its own DB session to avoid
                     # concurrent transaction corruption in asyncio.gather()
                     async with self.db_factory() as persona_db:
@@ -321,6 +367,8 @@ class StudyOrchestrator:
                             redis=self.redis,
                             storage=storage,
                             study_id=study_id,
+                            live_view_url=browser_session.live_view_url,
+                            state_store=state_store,
                         )
 
                         # Update session status
@@ -331,12 +379,12 @@ class StudyOrchestrator:
                         await persona_db.commit()
 
                         result = await self._navigator.navigate_session(
-                            session_id=str(session.id),
+                            session_id=session_id,
                             persona=persona_dict,
                             task_description=task_desc,
                             behavioral_notes=persona_dict.get("behavioral_notes", ""),
                             start_url=start_url,
-                            browser_context=ctx,
+                            browser_context=browser_session.context,
                             recorder=recorder,
                         )
 
@@ -354,9 +402,33 @@ class StudyOrchestrator:
                         db_session.task_completed = result.task_completed
                         await persona_db.commit()
 
+                        await state_store.upsert(
+                            study_id=str(study_id),
+                            session_id=session_id,
+                            updates={
+                                "completed": True,
+                                "total_steps": result.total_steps,
+                            },
+                        )
+
                         return result
                 finally:
-                    await pool.release(ctx)
+                    await state_store.upsert(
+                        study_id=str(study_id),
+                        session_id=session_id,
+                        updates={
+                            "browser_active": False,
+                            "completed": True if result else None,
+                            "total_steps": result.total_steps if result else None,
+                        },
+                    )
+
+                    # Notify frontend that browser is closing
+                    await self._publish_event(study_id, {
+                        "type": "session:browser_closed",
+                        "session_id": session_id,
+                    })
+                    await pool.release(browser_session)
 
         # Build persona lookup
         persona_map = {p["id"]: p for p in persona_profiles}

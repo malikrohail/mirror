@@ -31,9 +31,9 @@ async def run_study_task(ctx: dict, study_id: str):
             orchestrator = StudyOrchestrator(db, redis, db_factory=db_factory)
             await orchestrator.run_study(uuid.UUID(study_id))
             await db.commit()
-        except Exception as e:
+        except Exception:
             await db.rollback()
-            logger.error(f"Study {study_id} failed: {e}")
+            logger.exception("Study %s failed", study_id)
             raise
 
     logger.info(f"Study run complete: {study_id}")

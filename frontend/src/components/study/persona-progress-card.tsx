@@ -3,6 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { ProgressBar } from '@/components/common/progress-bar';
 import { ThinkAloudBubble } from '@/components/common/think-aloud-bubble';
+import { LiveBrowserView } from './live-browser-view';
 import { EMOTION_ICONS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import type { EmotionalState } from '@/types';
@@ -17,17 +18,24 @@ interface PersonaProgressCardProps {
   action: string;
   taskProgress: number;
   completed: boolean;
+  liveViewUrl?: string | null;
+  browserActive?: boolean;
 }
 
 export function PersonaProgressCard({
   personaName,
   stepNumber,
   thinkAloud,
+  screenshotUrl,
   emotionalState,
   action,
   taskProgress,
   completed,
+  liveViewUrl,
+  browserActive,
 }: PersonaProgressCardProps) {
+  const hasLiveView = liveViewUrl !== undefined && liveViewUrl !== null;
+
   return (
     <Card className={completed ? 'opacity-75' : ''}>
       <CardContent className="space-y-3 p-4">
@@ -47,6 +55,25 @@ export function PersonaProgressCard({
             </span>
           </div>
         </div>
+
+        {hasLiveView ? (
+          <LiveBrowserView
+            liveViewUrl={liveViewUrl}
+            browserActive={browserActive ?? false}
+            personaName={personaName}
+            screenshotUrl={screenshotUrl}
+          />
+        ) : (
+          screenshotUrl && (
+            <div className="overflow-hidden rounded-md border">
+              <img
+                src={screenshotUrl}
+                alt={`${personaName} – step ${stepNumber}`}
+                className="aspect-video w-full object-cover object-top"
+              />
+            </div>
+          )
+        )}
 
         <ProgressBar value={taskProgress} showLabel />
 

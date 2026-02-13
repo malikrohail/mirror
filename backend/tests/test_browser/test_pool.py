@@ -4,9 +4,40 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
-from app.browser.pool import BrowserPool, VIEWPORT_PRESETS
+from app.browser.pool import VIEWPORT_PRESETS, BrowserPool, BrowserSession
+
+
+def _mock_http_response(
+    status_code: int,
+    payload: dict | None = None,
+    headers: dict | None = None,
+) -> MagicMock:
+    """Build a minimal httpx-like response object for unit tests."""
+    response = MagicMock()
+    response.status_code = status_code
+    response.headers = headers or {}
+    response.json.return_value = payload or {}
+    if status_code >= 400:
+        response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            message=f"HTTP {status_code}",
+            request=MagicMock(),
+            response=response,
+        )
+    else:
+        response.raise_for_status.return_value = None
+    return response
+
+
+@pytest.fixture(autouse=True)
+def _clear_browserbase_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Prevent local .env Browserbase keys from leaking into unit tests."""
+    from app.config import settings as app_settings
+
+    monkeypatch.setattr(app_settings, "BROWSERBASE_API_KEY", "")
+    monkeypatch.setattr(app_settings, "BROWSERBASE_PROJECT_ID", "")
 
 
 class TestViewportPresets:
@@ -70,10 +101,8 @@ class TestBrowserPool:
 
     @pytest.mark.asyncio
     async def test_initialize_browserbase(self) -> None:
-        """Test Browserbase CDP connection when env vars are set."""
+        """Test Browserbase mode detection when env vars are set."""
         mock_pw = AsyncMock()
-        mock_browser = AsyncMock()
-        mock_pw.chromium.connect_over_cdp = AsyncMock(return_value=mock_browser)
 
         with patch("app.browser.pool.async_playwright") as mock_apw, \
              patch.dict("os.environ", {
@@ -87,11 +116,12 @@ class TestBrowserPool:
 
             assert pool.is_initialized is True
             assert pool.is_cloud is True
-            mock_pw.chromium.connect_over_cdp.assert_awaited_once()
+            # In per-session mode, no CDP connection at init time
+            mock_pw.chromium.launch.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_acquire_and_release(self) -> None:
-        """Test acquiring and releasing a browser context."""
+        """Test acquiring and releasing a browser session."""
         mock_pw = AsyncMock()
         mock_browser = AsyncMock()
         mock_context = AsyncMock()
@@ -105,10 +135,12 @@ class TestBrowserPool:
             pool = BrowserPool(max_contexts=2)
             await pool.initialize()
 
-            ctx = await pool.acquire(viewport="desktop")
+            session = await pool.acquire(viewport="desktop")
+            assert isinstance(session, BrowserSession)
+            assert session.live_view_url is None  # Local mode has no live view
             assert pool.active_count == 1
 
-            await pool.release(ctx)
+            await pool.release(session)
             assert pool.active_count == 0
 
     @pytest.mark.asyncio
@@ -176,3 +208,126 @@ class TestBrowserPool:
             await pool.initialize()  # Should be a no-op
 
             assert mock_pw.chromium.launch.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_browserbase_acquire_retries_on_429_then_succeeds(self) -> None:
+        """Test Browserbase session creation retries on 429 responses."""
+        mock_pw = AsyncMock()
+        mock_context = AsyncMock()
+        mock_browser = AsyncMock()
+        mock_browser.contexts = [mock_context]
+        mock_pw.chromium.connect_over_cdp = AsyncMock(return_value=mock_browser)
+
+        pool = BrowserPool()
+        pool._playwright = mock_pw
+        pool._bb_api_key = "bb_test_key"
+        pool._bb_project_id = "proj_test"
+
+        first_429 = _mock_http_response(429, headers={"Retry-After": "1"})
+        second_201 = _mock_http_response(
+            201,
+            payload={"id": "sess_1", "connectUrl": "wss://connect.example"},
+        )
+        debug_200 = _mock_http_response(
+            200, payload={"debuggerFullscreenUrl": "https://debug.example/live"}
+        )
+
+        post_mock = AsyncMock(side_effect=[first_429, second_201])
+        get_mock = AsyncMock(return_value=debug_200)
+        mock_client = AsyncMock()
+        mock_client.post = post_mock
+        mock_client.get = get_mock
+        mock_client_ctx = AsyncMock()
+        mock_client_ctx.__aenter__.return_value = mock_client
+        mock_client_ctx.__aexit__.return_value = None
+
+        with patch("app.browser.pool.httpx.AsyncClient", return_value=mock_client_ctx), \
+             patch("app.browser.pool.asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
+            session = await pool._acquire_browserbase(
+                VIEWPORT_PRESETS["desktop"],
+                {"viewport": {"width": 1920, "height": 1080}},
+            )
+
+        assert isinstance(session, BrowserSession)
+        assert session.bb_session_id == "sess_1"
+        assert session.live_view_url == "https://debug.example/live&navbar=false"
+        assert post_mock.await_count == 2
+        sleep_mock.assert_awaited_once_with(1)
+
+    @pytest.mark.asyncio
+    async def test_browserbase_acquire_raises_after_429_retries_exhausted(self) -> None:
+        """Test Browserbase session creation fails after max retry attempts."""
+        mock_pw = AsyncMock()
+        pool = BrowserPool()
+        pool._playwright = mock_pw
+        pool._bb_api_key = "bb_test_key"
+        pool._bb_project_id = "proj_test"
+
+        all_429 = _mock_http_response(429)
+        post_mock = AsyncMock(side_effect=[all_429, all_429, all_429])
+        mock_client = AsyncMock()
+        mock_client.post = post_mock
+        mock_client_ctx = AsyncMock()
+        mock_client_ctx.__aenter__.return_value = mock_client
+        mock_client_ctx.__aexit__.return_value = None
+
+        with patch("app.browser.pool.httpx.AsyncClient", return_value=mock_client_ctx), \
+             patch("app.browser.pool.asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
+            with pytest.raises(RuntimeError, match="rate limit exceeded"):
+                await pool._acquire_browserbase(
+                    VIEWPORT_PRESETS["desktop"],
+                    {"viewport": {"width": 1920, "height": 1080}},
+                )
+
+        assert post_mock.await_count == 3
+        assert sleep_mock.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_fetch_live_view_url_retries_until_available(self) -> None:
+        """Debug URL fetch should retry while Browserbase session is warming up."""
+        pool = BrowserPool()
+        pool._bb_api_key = "bb_test_key"
+
+        not_ready = _mock_http_response(404)
+        missing_url = _mock_http_response(200, payload={})
+        ready = _mock_http_response(
+            200,
+            payload={"debuggerFullscreenUrl": "https://debug.example/live"},
+        )
+
+        get_mock = AsyncMock(side_effect=[not_ready, missing_url, ready])
+        mock_client = AsyncMock()
+        mock_client.get = get_mock
+        mock_client_ctx = AsyncMock()
+        mock_client_ctx.__aenter__.return_value = mock_client
+        mock_client_ctx.__aexit__.return_value = None
+
+        with patch("app.browser.pool.httpx.AsyncClient", return_value=mock_client_ctx), \
+             patch("app.browser.pool.asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
+            live_view_url = await pool._fetch_live_view_url("sess_1")
+
+        assert live_view_url == "https://debug.example/live&navbar=false"
+        assert get_mock.await_count == 3
+        assert sleep_mock.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_fetch_live_view_url_returns_none_after_retry_limit(self) -> None:
+        """Debug URL fetch returns None when endpoint never becomes ready."""
+        pool = BrowserPool()
+        pool._bb_api_key = "bb_test_key"
+
+        not_ready = _mock_http_response(404)
+        get_mock = AsyncMock(side_effect=[not_ready] * 6)
+        mock_client = AsyncMock()
+        mock_client.get = get_mock
+        mock_client_ctx = AsyncMock()
+        mock_client_ctx.__aenter__.return_value = mock_client
+        mock_client_ctx.__aexit__.return_value = None
+
+        with patch("app.browser.pool.httpx.AsyncClient", return_value=mock_client_ctx), \
+             patch("app.browser.pool.asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
+            live_view_url = await pool._fetch_live_view_url("sess_2")
+
+        assert live_view_url is None
+        assert get_mock.await_count == 6
+        assert sleep_mock.await_count == 5

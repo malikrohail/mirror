@@ -75,6 +75,25 @@ export function getStudyStatus(id: string): Promise<StudyStatusResponse> {
   return request(`/studies/${id}/status`);
 }
 
+export function getLiveState(studyId: string): Promise<Record<string, LiveSessionState>> {
+  return request(`/studies/${studyId}/live-state`);
+}
+
+export interface LiveSessionState {
+  session_id: string;
+  persona_name?: string;
+  step_number?: number;
+  think_aloud?: string;
+  screenshot_url?: string;
+  emotional_state?: string;
+  action?: string | { type: string; description?: string; selector?: string };
+  task_progress?: number;
+  completed?: boolean;
+  total_steps?: number;
+  live_view_url?: string | null;
+  browser_active?: boolean;
+}
+
 // ── Sessions ────────────────────────────────────────
 
 export function listSessions(studyId: string): Promise<SessionOut[]> {

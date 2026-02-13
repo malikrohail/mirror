@@ -90,6 +90,23 @@ async def get_study_status(
     return await svc.get_study_status(study_id)
 
 
+@router.get("/{study_id}/live-state")
+async def get_live_state(
+    study_id: uuid.UUID,
+    redis: aioredis.Redis = Depends(get_redis),
+) -> dict:
+    """Get durable live session state for real-time progress polling.
+
+    Returns a snapshot of all active persona sessions with their current
+    step, think-aloud, screenshot URL, live view URL, and browser status.
+    Used by the running page as a reliable alternative to WebSocket.
+    """
+    from app.services.live_session_state import LiveSessionStateStore
+
+    store = LiveSessionStateStore(redis)
+    return await store.get_study_snapshot(str(study_id))
+
+
 @router.get("/{study_id}/estimate")
 async def estimate_study_cost(
     study_id: uuid.UUID,

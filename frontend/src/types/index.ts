@@ -91,6 +91,8 @@ export interface SessionOut {
   task_completed: boolean;
   summary: string | null;
   emotional_arc: Record<string, EmotionalState> | null;
+  live_view_url?: string | null;
+  browser_active?: boolean | null;
   created_at: string;
 }
 

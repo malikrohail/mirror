@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from typing import Any
 
 import redis.asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.llm.schemas import NavigationDecision
 from app.models.issue import Issue, IssueSeverity
 from app.models.step import Step
+from app.services.live_session_state import LiveSessionStateStore
 from app.storage.file_storage import FileStorage
 
 logger = logging.getLogger(__name__)
@@ -52,6 +52,8 @@ class DatabaseStepRecorder:
         storage: FileStorage,
         study_id: uuid.UUID,
         session_id_to_study_session: dict[str, uuid.UUID] | None = None,
+        live_view_url: str | None = None,
+        state_store: LiveSessionStateStore | None = None,
     ) -> None:
         self.db = db
         self.redis = redis
@@ -61,6 +63,8 @@ class DatabaseStepRecorder:
         self._session_map = session_id_to_study_session or {}
         # Track previous emotional state per session for shift detection
         self._prev_emotions: dict[str, str] = {}
+        self._live_view_url = live_view_url
+        self._state_store = state_store
 
     def _get_db_session_id(self, session_id: str) -> uuid.UUID:
         """Resolve navigator session_id string to DB UUID."""
@@ -171,7 +175,9 @@ class DatabaseStepRecorder:
             "persona_name": persona_name,
             "step_number": step_number,
             "think_aloud": decision.think_aloud,
-            "screenshot_url": f"/api/v1/screenshots/{screenshot_url}",
+            "screenshot_url": (
+                f"/api/v1/screenshots/studies/{self.study_id}/sessions/{screenshot_url}"
+            ),
             "emotional_state": decision.emotional_state.value,
             "action": {
                 "type": decision.action.type.value,
@@ -182,8 +188,38 @@ class DatabaseStepRecorder:
             "confidence": decision.confidence,
             "ux_issues_found": len(decision.ux_issues),
             "page_url": decision.action.description,
+            "live_view_url": self._live_view_url,
         }
         await self.redis.publish(channel, json.dumps(event))
+        if self._state_store:
+            await self._state_store.upsert(
+                study_id=str(self.study_id),
+                session_id=session_id,
+                updates={
+                    "persona_name": persona_name,
+                    "step_number": step_number,
+                    "think_aloud": decision.think_aloud,
+                    "screenshot_url": event["screenshot_url"],
+                    "emotional_state": decision.emotional_state.value,
+                    "action": event["action"],
+                    "task_progress": decision.task_progress,
+                    "completed": False,
+                    "total_steps": step_number,
+                    "browser_active": True,
+                    "live_view_url": event.get("live_view_url"),
+                },
+            )
+
+        logger.info(
+            (
+                "[live-view] Published step: study=%s session=%s step=%d "
+                "live_view=%s"
+            ),
+            self.study_id,
+            session_id,
+            step_number,
+            bool(event.get("live_view_url")),
+        )
 
         # Detect dramatic emotional shifts
         current_emotion = decision.emotional_state.value

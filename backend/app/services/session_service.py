@@ -1,21 +1,54 @@
+import logging
 import uuid
 
+import redis.asyncio as aioredis
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repositories.session_repo import SessionRepository
 from app.models.insight import Insight
+from app.services.live_session_state import LiveSessionStateStore
+
+logger = logging.getLogger(__name__)
 
 
 class SessionService:
     """Business logic for sessions, steps, and issues."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, redis: aioredis.Redis | None = None):
         self.db = db
         self.repo = SessionRepository(db)
+        self._state_store = LiveSessionStateStore(redis) if redis is not None else None
 
     async def list_sessions(self, study_id: uuid.UUID):
-        return await self.repo.list_sessions(study_id)
+        sessions = await self.repo.list_sessions(study_id)
+        if self._state_store is None:
+            return sessions
+
+        snapshot = await self._state_store.get_study_snapshot(str(study_id))
+        for session in sessions:
+            state = snapshot.get(str(session.id))
+            if not state:
+                continue
+
+            live_view_url = state.get("live_view_url")
+            if isinstance(live_view_url, str) and live_view_url.strip():
+                setattr(session, "live_view_url", live_view_url)
+            else:
+                setattr(session, "live_view_url", None)
+
+            browser_active = state.get("browser_active")
+            if isinstance(browser_active, bool):
+                setattr(session, "browser_active", browser_active)
+            else:
+                setattr(session, "browser_active", None)
+
+        logger.info(
+            "[live-view] Sessions API merged snapshot: study=%s sessions=%d",
+            study_id,
+            len(sessions),
+        )
+        return sessions
 
     async def get_session(self, session_id: uuid.UUID):
         session = await self.repo.get_session(session_id)

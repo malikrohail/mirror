@@ -1,9 +1,10 @@
 import uuid
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_db
+from app.dependencies import get_db, get_redis
 from app.schemas.session import (
     HeatmapResponse,
     InsightOut,
@@ -21,9 +22,10 @@ router = APIRouter()
 async def list_sessions(
     study_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
     """List all sessions for a study."""
-    svc = SessionService(db)
+    svc = SessionService(db, redis=redis)
     return await svc.list_sessions(study_id)
 
 

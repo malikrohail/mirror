@@ -63,6 +63,8 @@ class SessionOut(BaseModel):
     task_completed: bool = False
     summary: str | None = None
     emotional_arc: dict | None = None
+    live_view_url: str | None = None
+    browser_active: bool | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

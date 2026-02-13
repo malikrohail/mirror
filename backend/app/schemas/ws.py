@@ -39,6 +39,7 @@ class WSSessionStep(BaseModel):
     confidence: float = 0.0
     ux_issues_found: int = 0
     page_url: str | None = None
+    live_view_url: str | None = None
 
 
 class WSEmotionalShift(BaseModel):
@@ -76,3 +77,24 @@ class WSStudyError(BaseModel):
     type: str = "study:error"
     study_id: str
     error: str
+
+
+class WSSessionSnapshotState(BaseModel):
+    session_id: str
+    persona_name: str | None = None
+    step_number: int | None = None
+    think_aloud: str | None = None
+    screenshot_url: str | None = None
+    emotional_state: str | None = None
+    action: dict | str | None = None
+    task_progress: float | None = None
+    completed: bool | None = None
+    total_steps: int | None = None
+    live_view_url: str | None = None
+    browser_active: bool | None = None
+
+
+class WSStudySessionSnapshot(BaseModel):
+    type: str = "study:session_snapshot"
+    study_id: str
+    sessions: dict[str, WSSessionSnapshotState]
