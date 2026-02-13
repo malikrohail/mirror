@@ -51,7 +51,11 @@ class StudyRepository:
         limit: int = 20,
         status: StudyStatus | None = None,
     ) -> tuple[list[Study], int]:
-        query = select(Study).order_by(Study.created_at.desc())
+        query = (
+            select(Study)
+            .options(selectinload(Study.tasks), selectinload(Study.personas))
+            .order_by(Study.created_at.desc())
+        )
         count_query = select(func.count()).select_from(Study)
 
         if status:

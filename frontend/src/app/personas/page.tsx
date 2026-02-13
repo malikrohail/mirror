@@ -30,12 +30,7 @@ export default function PersonaLibraryPage() {
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Testers</h1>
-          <p className="text-sm text-muted-foreground">
-            Browse and select AI personas for your tests
-          </p>
-        </div>
+        <div />
         <Button asChild>
           <Link href="/personas/builder">
             <Plus className="mr-2 h-4 w-4" />

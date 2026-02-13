@@ -10,11 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useQuery } from '@tanstack/react-query';
 import { useCompareStudies } from '@/hooks/use-comparison';
 import * as api from '@/lib/api-client';
-import { SEVERITY_COLORS } from '@/lib/constants';
+import { SEVERITY_COLORS, TERMS } from '@/lib/constants';
 import type { IssueDiff } from '@/types';
 
 function IssueDiffRow({ issue }: { issue: IssueDiff }) {
-  const statusIcon = { fixed: <CheckCircle className="h-4 w-4 text-green-500" />, new: <AlertCircle className="h-4 w-4 text-red-500" />, persisting: <MinusCircle className="h-4 w-4 text-yellow-500" /> }[issue.status] ?? null;
+  const statusIcons: Record<string, React.ReactNode> = { fixed: <CheckCircle className="h-4 w-4 text-green-500" />, new: <AlertCircle className="h-4 w-4 text-red-500" />, persisting: <MinusCircle className="h-4 w-4 text-yellow-500" />, improved: <TrendingUp className="h-4 w-4 text-green-500" />, regressed: <TrendingDown className="h-4 w-4 text-red-500" /> };
+  const statusIcon = statusIcons[issue.status] ?? null;
   return (
     <div className="flex items-start gap-3 rounded-lg border p-3">
       {statusIcon}
@@ -41,28 +42,42 @@ export default function ComparePage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div><h1 className="flex items-center gap-2 text-2xl font-semibold"><GitCompare className="h-6 w-6" />Compare Studies</h1><p className="text-sm text-muted-foreground">Compare two study runs side-by-side to see what improved or regressed</p></div>
-
       <Card>
-        <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-end">
-          <div className="flex-1 space-y-2">
-            <label className="text-sm font-medium">Baseline (before)</label>
-            <Select value={baselineId} onValueChange={setBaselineId}>
-              <SelectTrigger><SelectValue placeholder="Select baseline study" /></SelectTrigger>
-              <SelectContent>{completedStudies.map(s => <SelectItem key={s.id} value={s.id}>{s.url} — {s.overall_score ?? '?'}/100 ({new Date(s.created_at).toLocaleDateString()})</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <ArrowRight className="hidden h-5 w-5 shrink-0 text-muted-foreground sm:block" />
-          <div className="flex-1 space-y-2">
-            <label className="text-sm font-medium">Comparison (after)</label>
-            <Select value={comparisonId} onValueChange={setComparisonId}>
-              <SelectTrigger><SelectValue placeholder="Select comparison study" /></SelectTrigger>
-              <SelectContent>{completedStudies.map(s => <SelectItem key={s.id} value={s.id}>{s.url} — {s.overall_score ?? '?'}/100 ({new Date(s.created_at).toLocaleDateString()})</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <Button disabled={!baselineId || !comparisonId || compare.isPending} onClick={() => compare.mutate({ baselineId, comparisonId })}>
-            {compare.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitCompare className="mr-2 h-4 w-4" />}Compare
-          </Button>
+        <CardContent className="pt-6">
+          {completedStudies.length < 2 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <GitCompare className="h-10 w-10 text-muted-foreground/40" />
+              <p className="text-sm font-medium">
+                {completedStudies.length === 0
+                  ? `No completed ${TERMS.plural} yet`
+                  : `You need at least 2 completed ${TERMS.plural} to compare`}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Run a {TERMS.singular} on your website first, then come back to compare results across runs.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+              <div className="flex-1 space-y-2">
+                <label className="text-sm font-medium">Baseline (before)</label>
+                <Select value={baselineId} onValueChange={setBaselineId}>
+                  <SelectTrigger><SelectValue placeholder={`Select baseline ${TERMS.singular}`} /></SelectTrigger>
+                  <SelectContent>{completedStudies.map(s => <SelectItem key={s.id} value={s.id}>{s.url} — {s.overall_score ?? '?'}/100 ({new Date(s.created_at).toLocaleDateString()})</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <ArrowRight className="hidden h-5 w-5 shrink-0 text-muted-foreground sm:block" />
+              <div className="flex-1 space-y-2">
+                <label className="text-sm font-medium">Comparison (after)</label>
+                <Select value={comparisonId} onValueChange={setComparisonId}>
+                  <SelectTrigger><SelectValue placeholder={`Select comparison ${TERMS.singular}`} /></SelectTrigger>
+                  <SelectContent>{completedStudies.map(s => <SelectItem key={s.id} value={s.id}>{s.url} — {s.overall_score ?? '?'}/100 ({new Date(s.created_at).toLocaleDateString()})</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <Button disabled={!baselineId || !comparisonId || compare.isPending} onClick={() => compare.mutate({ baselineId, comparisonId })}>
+                {compare.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitCompare className="mr-2 h-4 w-4" />}Compare
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

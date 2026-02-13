@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ClickHeatmap } from '@/components/heatmap/click-heatmap';
+import { TERMS } from '@/lib/constants';
 
 export default function HeatmapPage({
   params,
@@ -17,7 +18,7 @@ export default function HeatmapPage({
     <div className="space-y-6 p-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
-          <Link href={`/study/${id}`} aria-label="Back to study results">
+          <Link href={`/study/${id}`} aria-label={`Back to ${TERMS.singular} results`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>

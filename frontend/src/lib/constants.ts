@@ -29,6 +29,13 @@ export const EMOTION_ICONS: Record<string, string> = {
   stuck: '😩',
 };
 
+export const TERMS = {
+  singular: 'test',
+  plural: 'tests',
+  singularCap: 'Test',
+  pluralCap: 'Tests',
+} as const;
+
 export const AUTOPLAY_INTERVAL = 2000;
 export const WS_RECONNECT_INTERVAL = 3000;
 export const MAX_RECONNECT_ATTEMPTS = 10;

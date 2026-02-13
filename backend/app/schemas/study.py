@@ -66,6 +66,8 @@ class StudySummary(BaseModel):
     status: str
     overall_score: float | None = None
     created_at: datetime
+    task_count: int = 0
+    persona_count: int = 0
 
     model_config = {"from_attributes": True}
 

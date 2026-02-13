@@ -28,6 +28,12 @@ function normalizeAction(action: unknown, fallback = 'navigating'): string {
   return fallback;
 }
 
+export interface LogEntry {
+  timestamp: number;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+}
+
 interface PersonaProgress {
   persona_name: string;
   session_id: string;
@@ -56,6 +62,8 @@ interface StudyProgress {
 
 interface StudyStore {
   activeStudy: StudyProgress | null;
+  logs: LogEntry[];
+  addLog: (level: LogEntry['level'], message: string) => void;
   initStudy: (studyId: string) => void;
   handleWsMessage: (msg: WsServerMessage) => void;
   reset: () => void;
@@ -70,9 +78,17 @@ function inferStudyId(msg: WsServerMessage): string | null {
 
 export const useStudyStore = create<StudyStore>((set, get) => ({
   activeStudy: null,
+  logs: [],
+
+  addLog: (level, message) => {
+    set((state) => ({
+      logs: [...state.logs.slice(-199), { timestamp: Date.now(), level, message }],
+    }));
+  },
 
   initStudy: (studyId: string) => {
     set({
+      logs: [{ timestamp: Date.now(), level: 'info', message: `Initialized study ${studyId.slice(0, 8)}…` }],
       activeStudy: {
         study_id: studyId,
         percent: 0,
@@ -111,8 +127,11 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
       return;
     }
 
+    const log = get().addLog;
+
     switch (msg.type) {
       case 'study:progress':
+        log('info', `Study progress: ${msg.percent}% — phase: ${msg.phase}`);
         set({
           activeStudy: { ...current, percent: msg.percent, phase: msg.phase },
         });
@@ -121,6 +140,7 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
       case 'session:step': {
         const step = msg as WsSessionStep;
         const actionStr = normalizeAction(step.action);
+        log('info', `[${step.persona_name}] Step ${step.step_number}: ${actionStr} — ${step.think_aloud?.slice(0, 80)}…`);
         const existing = current.personas[step.session_id];
         const persona: PersonaProgress = {
           persona_name: step.persona_name,
@@ -145,7 +165,9 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
         break;
       }
 
-      case 'session:complete':
+      case 'session:complete': {
+        const completedPersona = current.personas[msg.session_id]?.persona_name ?? msg.session_id.slice(0, 8);
+        log('info', `[${completedPersona}] Session complete — ${msg.total_steps} steps`);
         if (current.personas[msg.session_id]) {
           const updated = {
             ...current.personas[msg.session_id],
@@ -160,8 +182,10 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
           });
         }
         break;
+      }
 
       case 'session:live_view': {
+        log('info', `[${msg.persona_name}] Browser live view connected`);
         const existing = current.personas[msg.session_id];
         const persona: PersonaProgress = {
           persona_name: msg.persona_name,
@@ -186,7 +210,9 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
         break;
       }
 
-      case 'session:browser_closed':
+      case 'session:browser_closed': {
+        const closedPersona = current.personas[msg.session_id]?.persona_name ?? msg.session_id.slice(0, 8);
+        log('warn', `[${closedPersona}] Browser closed`);
         if (current.personas[msg.session_id]) {
           set({
             activeStudy: {
@@ -202,6 +228,7 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
           });
         }
         break;
+      }
 
       case 'study:session_snapshot': {
         const mergedPersonas: Record<string, PersonaProgress> = { ...current.personas };
@@ -240,12 +267,14 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
       }
 
       case 'study:analyzing':
+        log('info', `Analyzing: ${msg.phase}`);
         set({
           activeStudy: { ...current, phase: msg.phase },
         });
         break;
 
       case 'study:complete':
+        log('info', `Study complete — score: ${msg.score}/100, ${msg.issues_count} issues`);
         set({
           activeStudy: {
             ...current,
@@ -258,6 +287,7 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
         break;
 
       case 'study:error':
+        log('error', `Error: ${msg.error}`);
         set({
           activeStudy: { ...current, error: msg.error },
         });
@@ -265,5 +295,5 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
     }
   },
 
-  reset: () => set({ activeStudy: null }),
+  reset: () => set({ activeStudy: null, logs: [] }),
 }));

@@ -50,9 +50,11 @@ export interface StudySummary {
   status: StudyStatus;
   overall_score: number | null;
   created_at: string;
-  updated_at: string;
-  tasks: TaskOut[];
-  personas: PersonaOut[];
+  updated_at?: string;
+  tasks?: TaskOut[];
+  personas?: PersonaOut[];
+  task_count?: number;
+  persona_count?: number;
 }
 
 export interface StudyListResponse {

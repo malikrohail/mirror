@@ -39,8 +39,14 @@ async def list_studies(
     """List studies with pagination."""
     svc = StudyService(db)
     studies, total = await svc.list_studies(page=page, limit=limit, status=status)
+    items = []
+    for s in studies:
+        summary = StudySummary.model_validate(s)
+        summary.task_count = len(s.tasks) if s.tasks else 0
+        summary.persona_count = len(s.personas) if s.personas else 0
+        items.append(summary)
     return StudyList(
-        items=[StudySummary.model_validate(s) for s in studies],
+        items=items,
         total=total,
         page=page,
         limit=limit,

@@ -1,16 +1,18 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, ChevronDown, ChevronRight, Terminal } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import * as api from '@/lib/api-client';
+import { Button } from '@/components/ui/button';
 import { ProgressBar } from '@/components/common/progress-bar';
 import { PersonaProgressCard } from './persona-progress-card';
 import { ErrorState } from '@/components/common/error-state';
 import { PageSkeleton } from '@/components/common/page-skeleton';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { useStudyStore } from '@/stores/study-store';
+import type { LogEntry } from '@/stores/study-store';
 import type { PersonaTemplateOut, SessionOut } from '@/types';
 
 interface StudyProgressProps {
@@ -29,9 +31,12 @@ type SessionProgress = SessionOut & {
 export function StudyProgress({ studyId }: StudyProgressProps) {
   const router = useRouter();
   const redirected = useRef(false);
+  const [logsOpen, setLogsOpen] = useState(false);
+  const logEndRef = useRef<HTMLDivElement>(null);
 
   const initStudy = useStudyStore((s) => s.initStudy);
   const activeStudy = useStudyStore((s) => s.activeStudy);
+  const logs = useStudyStore((s) => s.logs);
 
   useEffect(() => {
     initStudy(studyId);
@@ -78,20 +83,35 @@ export function StudyProgress({ studyId }: StudyProgressProps) {
   const isAnalyzing = study?.status === 'analyzing';
   const isRunning = study?.status === 'running';
 
-  // Calculate progress from sessions
+  // Calculate progress from sessions (factor in per-session step progress)
   const totalSessions = sessions?.length ?? 0;
   const completedSessions = sessions?.filter((s) => s.status === 'complete' || s.status === 'failed').length ?? 0;
+  const maxSteps = 30; // MAX_STEPS_PER_SESSION
+  const sessionProgress = sessions?.reduce((sum, s) => {
+    if (s.status === 'complete' || s.status === 'failed') return sum + 1;
+    const ws = activeStudy?.personas[s.id];
+    const polled = liveState?.[s.id];
+    const step = ws?.step_number ?? polled?.step_number ?? s.total_steps ?? 0;
+    return sum + Math.min(step / maxSteps, 0.95);
+  }, 0) ?? 0;
   const percent = isComplete
     ? 100
     : isAnalyzing
       ? 90
       : totalSessions > 0
-        ? Math.round((completedSessions / totalSessions) * 80)
+        ? Math.round((sessionProgress / totalSessions) * 80)
         : 0;
 
-  // Redirect on complete
+  // Auto-scroll log to bottom
   useEffect(() => {
-    if ((isComplete || isFailed) && !redirected.current) {
+    if (logsOpen && logEndRef.current) {
+      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logs.length, logsOpen]);
+
+  // Redirect on complete (not on failure — keep logs visible)
+  useEffect(() => {
+    if (isComplete && !isFailed && !redirected.current) {
       redirected.current = true;
       const timer = setTimeout(() => {
         router.push(`/study/${studyId}`);
@@ -99,6 +119,13 @@ export function StudyProgress({ studyId }: StudyProgressProps) {
       return () => clearTimeout(timer);
     }
   }, [isComplete, isFailed, studyId, router]);
+
+  // Auto-expand logs on failure
+  useEffect(() => {
+    if (isFailed) {
+      setLogsOpen(true);
+    }
+  }, [isFailed]);
 
   if (isLoading) return <PageSkeleton />;
 
@@ -117,26 +144,48 @@ export function StudyProgress({ studyId }: StudyProgressProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        {isComplete ? (
+        {isComplete && !isFailed ? (
           <CheckCircle2 className="h-5 w-5 text-green-500" />
+        ) : isFailed ? (
+          <XCircle className="h-5 w-5 text-red-500" />
         ) : (
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
         )}
         <div>
           <h2 className="text-lg font-semibold">
-            {isComplete ? 'Test Complete!' : isAnalyzing ? 'Analyzing Results...' : 'Running Test...'}
+            {isFailed ? 'Test Failed' : isComplete ? 'Test Complete!' : isAnalyzing ? 'Analyzing Results...' : 'Running Test...'}
           </h2>
-          {phase && (
+          {isFailed ? (
+            <p className="text-sm text-red-500">
+              Something went wrong — check the log below for details
+            </p>
+          ) : phase ? (
             <p className="text-sm capitalize text-muted-foreground">
               Phase: {phase}
             </p>
-          )}
+          ) : null}
         </div>
       </div>
 
       <ProgressBar value={percent} showLabel />
 
-      {isComplete && study && (
+      {isFailed && (
+        <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
+          <p className="text-sm text-red-700 dark:text-red-300">
+            {activeStudy?.error || 'The test encountered an error and could not complete.'}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto shrink-0"
+            onClick={() => router.push('/tests')}
+          >
+            Back to tests
+          </Button>
+        </div>
+      )}
+
+      {isComplete && !isFailed && study && (
         <div className="rounded-lg border bg-green-50 p-4 dark:bg-green-950">
           <p className="text-sm font-medium text-green-700 dark:text-green-300">
             Score: {study.overall_score != null ? Math.round(study.overall_score) : '—'}/100
@@ -190,6 +239,42 @@ export function StudyProgress({ studyId }: StudyProgressProps) {
           </div>
         </div>
       )}
+
+      {/* Technical Log */}
+      <div className="rounded-lg border border-border bg-card">
+        <button
+          type="button"
+          onClick={() => setLogsOpen((o) => !o)}
+          className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Terminal className="h-4 w-4" />
+          <span>Log</span>
+          <span className="ml-1 text-xs tabular-nums text-muted-foreground/60">({logs.length})</span>
+          {logsOpen ? <ChevronDown className="ml-auto h-4 w-4" /> : <ChevronRight className="ml-auto h-4 w-4" />}
+        </button>
+        {logsOpen && (
+          <div className="max-h-64 overflow-y-auto border-t border-border bg-zinc-950 px-4 py-2 font-mono text-xs">
+            {logs.length === 0 && (
+              <p className="py-2 text-zinc-500">Waiting for events…</p>
+            )}
+            {logs.map((entry, i) => (
+              <div key={i} className="flex gap-2 py-0.5 leading-5">
+                <span className="shrink-0 text-zinc-500">
+                  {new Date(entry.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+                <span className={
+                  entry.level === 'error' ? 'text-red-400' :
+                  entry.level === 'warn' ? 'text-yellow-400' :
+                  'text-zinc-300'
+                }>
+                  {entry.message}
+                </span>
+              </div>
+            ))}
+            <div ref={logEndRef} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

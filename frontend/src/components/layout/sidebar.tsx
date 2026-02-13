@@ -1,113 +1,167 @@
 'use client';
 
+import { useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { LayoutDashboard, Users, Moon, Sun, X, BookOpen } from 'lucide-react';
+import {
+  Users,
+  Moon,
+  Sun,
+  BookOpen,
+  Calendar,
+  GitCompare,
+  Plus,
+  ClipboardList,
+  ArrowLeft,
+  ArrowRight,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { useUiStore } from '@/stores/ui-store';
-import { BackendStatus } from '@/components/common/backend-status';
+import { TERMS } from '@/lib/constants';
 
 const navItems = [
-  { href: '/tests', label: 'My Tests', icon: LayoutDashboard },
+  { href: '/', label: `New ${TERMS.singularCap}`, icon: Plus },
+  { href: '/tests', label: TERMS.pluralCap, icon: ClipboardList },
   { href: '/personas', label: 'Testers', icon: Users },
+  { href: '/schedules', label: 'Scheduled', icon: Calendar },
+  { href: '/compare', label: 'Compare', icon: GitCompare },
 ];
+
+function useNavHistory() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const historyRef = useRef<string[]>([]);
+  const indexRef = useRef(-1);
+  const navigatingRef = useRef(false);
+
+  useEffect(() => {
+    if (navigatingRef.current) {
+      navigatingRef.current = false;
+      return;
+    }
+    // Trim forward history and push new entry
+    historyRef.current = historyRef.current.slice(0, indexRef.current + 1);
+    historyRef.current.push(pathname);
+    indexRef.current = historyRef.current.length - 1;
+  }, [pathname]);
+
+  const canGoBack = indexRef.current > 0;
+  const canGoForward = indexRef.current < historyRef.current.length - 1;
+
+  const goBack = useCallback(() => {
+    if (indexRef.current > 0) {
+      navigatingRef.current = true;
+      indexRef.current--;
+      router.back();
+    }
+  }, [router]);
+
+  const goForward = useCallback(() => {
+    if (indexRef.current < historyRef.current.length - 1) {
+      navigatingRef.current = true;
+      indexRef.current++;
+      router.forward();
+    }
+  }, [router]);
+
+  return { canGoBack, canGoForward, goBack, goForward };
+}
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { sidebarOpen, setSidebarOpen } = useUiStore();
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { canGoBack, canGoForward, goBack, goForward } = useNavHistory();
 
   return (
-    <>
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-[var(--z-overlay)] bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-      <aside
-        className={cn(
-          'fixed inset-y-0 left-0 z-[var(--z-overlay)] w-64 border-r bg-sidebar lg:static lg:z-auto',
-          'transform lg:transform-none',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-        )}
-        style={{ transitionProperty: 'transform', transitionDuration: '200ms', transitionTimingFunction: 'ease-out' }}
-      >
-        <div className="flex h-full flex-col">
-          {/* Logo */}
-          <div className="flex h-14 items-center justify-between border-b px-4">
-            <Link href="/" className="font-semibold text-lg">
-              Mirror
-            </Link>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setSidebarOpen(false)}
-              aria-label="Close sidebar"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Nav */}
-          <nav className="flex flex-1 flex-col gap-1 px-3 py-3">
-            {navItems.map((item) => {
-              const isActive =
-                item.href === '/'
-                  ? pathname === '/'
-                  : pathname === item.href || pathname.startsWith(item.href + '/');
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={cn(
-                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium',
-                    'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                    isActive
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'text-sidebar-foreground',
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Bottom */}
-          <div className="border-t px-3 py-3 space-y-1">
+    <aside className="flex h-full w-52 shrink-0 flex-col border-r border-border bg-background">
+      {/* Logo + navigation arrows */}
+      <div className="px-5 pt-4 pb-3">
+        <div className="flex items-center justify-between">
+          <Link href="/" className="font-bold text-base">
+            Mirror
+          </Link>
+          <div className="flex items-center gap-0.5">
             <button
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              <Sun className="h-4 w-4 dark:hidden" />
-              <Moon className="hidden h-4 w-4 dark:block" />
-              <span className="dark:hidden">Light Mode</span>
-              <span className="hidden dark:inline">Dark Mode</span>
-            </button>
-            <Link
-              href="/docs"
-              onClick={() => setSidebarOpen(false)}
+              onClick={goBack}
+              disabled={!canGoBack}
               className={cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium',
-                'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                pathname.startsWith('/docs')
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-sidebar-foreground',
+                'rounded p-1 transition-colors',
+                canGoBack
+                  ? 'text-muted-foreground/40 hover:text-muted-foreground'
+                  : 'text-muted-foreground/15 cursor-default',
               )}
             >
-              <BookOpen className="h-4 w-4" />
-              Docs
-            </Link>
-            <BackendStatus />
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={goForward}
+              disabled={!canGoForward}
+              className={cn(
+                'rounded p-1 transition-colors',
+                canGoForward
+                  ? 'text-muted-foreground/40 hover:text-muted-foreground'
+                  : 'text-muted-foreground/15 cursor-default',
+              )}
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
-      </aside>
-    </>
+        <p className="mt-0.5 text-sm leading-tight text-muted-foreground">
+          Find UX issues before your users do
+        </p>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex flex-1 flex-col gap-0.5 px-3 py-1">
+        {navItems.map((item) => {
+          const isActive =
+            item.href === '/'
+              ? pathname === '/'
+              : pathname === item.href || pathname.startsWith(item.href + '/');
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-foreground/[0.06] text-foreground'
+                  : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
+              )}
+            >
+              <item.icon className="h-4 w-4 shrink-0" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Bottom */}
+      <div className="border-t border-border px-3 py-3 space-y-0.5">
+        <Link
+          href="/docs"
+          className={cn(
+            'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors',
+            pathname.startsWith('/docs')
+              ? 'bg-foreground/[0.06] text-foreground'
+              : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
+          )}
+        >
+          <BookOpen className="h-4 w-4 shrink-0" />
+          Docs
+        </Link>
+        <button
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+        >
+          <Sun className="h-4 w-4 shrink-0 dark:hidden" />
+          <Moon className="hidden h-4 w-4 shrink-0 dark:block" />
+          <span className="dark:hidden">Light</span>
+          <span className="hidden dark:inline">Dark</span>
+        </button>
+      </div>
+    </aside>
   );
 }

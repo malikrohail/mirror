@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { PageSkeleton } from '@/components/common/page-skeleton';
 import { useSchedules, useCreateSchedule, useUpdateSchedule, useDeleteSchedule, useTriggerSchedule } from '@/hooks/use-schedules';
 import { usePersonaTemplates } from '@/hooks/use-personas';
-import { API_BASE } from '@/lib/constants';
+import { API_BASE, TERMS } from '@/lib/constants';
 import type { ScheduleOut } from '@/types';
 
 function formatDate(d: string | null) {
@@ -55,13 +55,13 @@ function ScheduleRow({ s }: { s: ScheduleOut }) {
           <Button variant="ghost" size="icon" disabled={update.isPending} onClick={() => update.mutate({ id: s.id, data: { status: s.status === 'active' ? 'paused' : 'active' } })} title={s.status === 'active' ? 'Pause' : 'Resume'}>
             {s.status === 'active' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </Button>
-          <Button variant="ghost" size="icon" disabled={trigger.isPending || s.status !== 'active'} onClick={() => trigger.mutate(s.id, { onSuccess: (r) => toast.success(`Study ${r.study_id.slice(0, 8)}... triggered`) })} title="Trigger now">
+          <Button variant="ghost" size="icon" disabled={trigger.isPending || s.status !== 'active'} onClick={() => trigger.mutate(s.id, { onSuccess: (r) => toast.success(`${TERMS.singularCap} ${r.study_id.slice(0, 8)}... triggered`) })} title="Trigger now">
             {trigger.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
           </Button>
           <Dialog open={confirmDel} onOpenChange={setConfirmDel}>
             <DialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button></DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Delete schedule</DialogTitle><DialogDescription>Delete &quot;{s.name}&quot;? Existing studies will not be affected.</DialogDescription></DialogHeader>
+              <DialogHeader><DialogTitle>Delete schedule</DialogTitle><DialogDescription>Delete &quot;{s.name}&quot;? Existing {TERMS.plural} will not be affected.</DialogDescription></DialogHeader>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setConfirmDel(false)}>Cancel</Button>
                 <Button variant="destructive" disabled={del_.isPending} onClick={() => del_.mutate(s.id, { onSuccess: () => setConfirmDel(false) })}>{del_.isPending ? 'Deleting...' : 'Delete'}</Button>
@@ -127,7 +127,7 @@ export default function SchedulesPage() {
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-semibold">Scheduled Tests</h1><p className="text-sm text-muted-foreground">Set up recurring and webhook-triggered usability tests</p></div>
+        <div />
         <CreateDialog />
       </div>
       {schedules.length > 0 ? (

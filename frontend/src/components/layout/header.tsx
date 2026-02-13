@@ -10,14 +10,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { TERMS } from '@/lib/constants';
 
 export function Header() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <header className="sticky top-0 z-[var(--z-sticky)] flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <span className="font-bold text-lg">Mirror</span>
-      <span className="text-sm text-muted-foreground">Find UX issues before your users do.</span>
+    <header className="sticky top-0 z-[var(--z-sticky)] flex h-14 items-center gap-3 border-b border-border/50 px-4 backdrop-blur-xl bg-background/60">
+      <Link href="/" className="flex items-center gap-3">
+        <span className="font-bold text-lg">Mirror</span>
+        <span className="text-sm text-muted-foreground">Find UX issues before your users do.</span>
+      </Link>
 
       <div className="ml-auto">
         <DropdownMenu>
@@ -50,7 +53,7 @@ export function Header() {
             <DropdownMenuItem asChild>
               <Link href="/compare" className="flex items-center gap-2">
                 <GitCompare className="h-4 w-4" />
-                Compare Studies
+                Compare {TERMS.pluralCap}
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
