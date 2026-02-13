@@ -1,7 +1,8 @@
 import enum
+import uuid
 
-from sqlalchemy import Float, String, Text
-from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy import Float, ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import ENUM, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -20,6 +21,9 @@ class Study(Base, UUIDMixin, TimestampMixin):
 
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
     starting_path: Mapped[str] = mapped_column(String(2048), default="/")
+    schedule_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("schedules.id", ondelete="SET NULL"), nullable=True
+    )
     status: Mapped[StudyStatus] = mapped_column(
         ENUM(StudyStatus, name="study_status", create_type=False, values_callable=lambda e: [x.value for x in e]),
         default=StudyStatus.SETUP,
@@ -43,4 +47,7 @@ class Study(Base, UUIDMixin, TimestampMixin):
     )
     insights: Mapped[list["Insight"]] = relationship(  # noqa: F821
         "Insight", back_populates="study", cascade="all, delete-orphan"
+    )
+    schedule: Mapped["Schedule | None"] = relationship(  # noqa: F821
+        "Schedule", back_populates="studies", foreign_keys=[schedule_id]
     )

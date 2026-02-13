@@ -378,5 +378,119 @@
       "frustration_triggers": ["large page sizes", "no offline support", "lost form data on back", "auto-logout"],
       "personality": {"openness": 0.6, "conscientiousness": 0.5, "extraversion": 0.5, "agreeableness": 0.6, "neuroticism": 0.4}
     }
+  },
+  {
+    "name": "AI Shopping Assistant",
+    "emoji": "🛍️",
+    "category": "AI Agent",
+    "short_description": "An AI agent tasked with finding and comparing products — navigates like a bot that reads everything literally",
+    "default_profile": {
+      "name": "CartBot",
+      "age": 0,
+      "occupation": "AI Shopping Assistant",
+      "tech_literacy": "very_high",
+      "patience_level": "very_high",
+      "reading_speed": "thorough",
+      "trust_level": "neutral",
+      "device_preference": "desktop",
+      "accessibility_needs": ["semantic_html", "structured_data"],
+      "frustration_triggers": ["anti-bot CAPTCHAs", "price hidden behind interaction", "infinite scroll with no pagination", "dynamic content requiring hover", "login walls before product info"],
+      "personality": {"openness": 0.2, "conscientiousness": 1.0, "extraversion": 0.0, "agreeableness": 0.5, "neuroticism": 0.0}
+    }
+  },
+  {
+    "name": "AI Research Agent",
+    "emoji": "🔬",
+    "category": "AI Agent",
+    "short_description": "An AI agent gathering information from a website — follows links methodically and extracts structured data",
+    "default_profile": {
+      "name": "ResearchBot",
+      "age": 0,
+      "occupation": "AI Research Agent",
+      "tech_literacy": "very_high",
+      "patience_level": "very_high",
+      "reading_speed": "thorough",
+      "trust_level": "neutral",
+      "device_preference": "desktop",
+      "accessibility_needs": ["semantic_html", "structured_data", "clear_headings"],
+      "frustration_triggers": ["content loaded via JavaScript only", "no sitemap", "pagination without direct links", "content behind modals", "inconsistent URL structure"],
+      "personality": {"openness": 0.3, "conscientiousness": 1.0, "extraversion": 0.0, "agreeableness": 0.5, "neuroticism": 0.0}
+    }
+  },
+  {
+    "name": "AI Customer Support Bot",
+    "emoji": "🤖",
+    "category": "AI Agent",
+    "short_description": "An AI agent trying to navigate help docs and support flows on behalf of a user — needs clear paths to answers",
+    "default_profile": {
+      "name": "SupportBot",
+      "age": 0,
+      "occupation": "AI Customer Support Agent",
+      "tech_literacy": "very_high",
+      "patience_level": "high",
+      "reading_speed": "thorough",
+      "trust_level": "neutral",
+      "device_preference": "desktop",
+      "accessibility_needs": ["semantic_html", "clear_headings", "structured_data"],
+      "frustration_triggers": ["no search functionality", "FAQ not categorized", "support hidden behind chatbot", "no direct contact links", "circular navigation in help center"],
+      "personality": {"openness": 0.3, "conscientiousness": 0.9, "extraversion": 0.1, "agreeableness": 0.7, "neuroticism": 0.0}
+    }
+  },
+  {
+    "name": "AI Form-Filling Agent",
+    "emoji": "📝",
+    "category": "AI Agent",
+    "short_description": "An AI agent that fills out forms on behalf of users — trips on ambiguous labels, custom widgets, and CAPTCHAs",
+    "default_profile": {
+      "name": "FormBot",
+      "age": 0,
+      "occupation": "AI Form Automation Agent",
+      "tech_literacy": "very_high",
+      "patience_level": "high",
+      "reading_speed": "thorough",
+      "trust_level": "neutral",
+      "device_preference": "desktop",
+      "accessibility_needs": ["semantic_html", "labeled_inputs", "standard_form_controls"],
+      "frustration_triggers": ["unlabeled form fields", "custom date pickers", "CAPTCHAs", "multi-step forms without progress state", "drag-and-drop file upload only", "hidden required fields"],
+      "personality": {"openness": 0.1, "conscientiousness": 1.0, "extraversion": 0.0, "agreeableness": 0.5, "neuroticism": 0.0}
+    }
+  },
+  {
+    "name": "AI Accessibility Auditor",
+    "emoji": "♿",
+    "category": "AI Agent",
+    "short_description": "An AI agent that crawls sites checking for WCAG compliance — evaluates semantic HTML, ARIA, contrast, and keyboard nav",
+    "default_profile": {
+      "name": "A11yBot",
+      "age": 0,
+      "occupation": "AI Accessibility Auditor",
+      "tech_literacy": "very_high",
+      "patience_level": "very_high",
+      "reading_speed": "thorough",
+      "trust_level": "neutral",
+      "device_preference": "desktop",
+      "accessibility_needs": ["screen_reader", "keyboard_only", "high_contrast"],
+      "frustration_triggers": ["missing ARIA landmarks", "no skip-to-content link", "images without alt text", "poor heading hierarchy", "focus not visible", "color-only indicators"],
+      "personality": {"openness": 0.4, "conscientiousness": 1.0, "extraversion": 0.0, "agreeableness": 0.5, "neuroticism": 0.0}
+    }
+  },
+  {
+    "name": "AI Web Scraper",
+    "emoji": "🕷️",
+    "category": "AI Agent",
+    "short_description": "An AI scraper agent that extracts content at scale — blocked by anti-bot measures, JS-rendered pages, and inconsistent markup",
+    "default_profile": {
+      "name": "ScrapeBot",
+      "age": 0,
+      "occupation": "AI Web Scraper",
+      "tech_literacy": "very_high",
+      "patience_level": "moderate",
+      "reading_speed": "thorough",
+      "trust_level": "neutral",
+      "device_preference": "desktop",
+      "accessibility_needs": ["semantic_html", "structured_data"],
+      "frustration_triggers": ["content rendered only via JavaScript", "rate limiting", "CAPTCHAs", "inconsistent DOM structure", "no API available", "anti-scraping measures"],
+      "personality": {"openness": 0.2, "conscientiousness": 0.9, "extraversion": 0.0, "agreeableness": 0.3, "neuroticism": 0.0}
+    }
   }
 ]

@@ -48,3 +48,6 @@ class Session(Base, UUIDMixin, TimestampMixin):
     issues: Mapped[list["Issue"]] = relationship(  # noqa: F821
         "Issue", back_populates="session"
     )
+    video: Mapped["SessionVideo | None"] = relationship(  # noqa: F821
+        "SessionVideo", back_populates="session", uselist=False, cascade="all, delete-orphan"
+    )

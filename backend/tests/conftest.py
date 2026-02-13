@@ -7,8 +7,9 @@ from collections.abc import AsyncGenerator
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event
+from sqlalchemy import event, JSON, String
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.dialects.postgresql import JSONB, ENUM
 
 from app.config import settings
 from app.dependencies import get_db, get_redis
@@ -18,6 +19,27 @@ from app.models.base import Base
 
 # Use a separate test database URL (SQLite async for tests)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
+
+
+def _render_jsonb_for_sqlite():
+    """Make PostgreSQL JSONB columns render as JSON in SQLite for tests."""
+    from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
+
+    original = SQLiteTypeCompiler.visit_JSON
+
+    def visit_JSONB(self, type_, **kw):
+        return "JSON"
+
+    if not hasattr(SQLiteTypeCompiler, "_mirror_patched"):
+        SQLiteTypeCompiler.visit_JSONB = visit_JSONB
+        # Also handle PostgreSQL ENUM → VARCHAR in SQLite
+        _orig_enum = getattr(SQLiteTypeCompiler, "visit_ENUM", None)
+        if not _orig_enum:
+            SQLiteTypeCompiler.visit_ENUM = lambda self, type_, **kw: "VARCHAR"
+        SQLiteTypeCompiler._mirror_patched = True
+
+
+_render_jsonb_for_sqlite()
 
 
 @pytest.fixture(scope="session")

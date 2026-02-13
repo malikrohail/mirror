@@ -48,6 +48,11 @@ class Issue(Base, UUIDMixin, TimestampMixin):
     # Priority scoring (severity calibration)
     priority_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+    # AI-powered fix suggestions
+    fix_suggestion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fix_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fix_language: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
     # Relationships
     step: Mapped["Step | None"] = relationship("Step", back_populates="issues")  # noqa: F821
     session: Mapped["Session"] = relationship("Session", back_populates="issues")  # noqa: F821

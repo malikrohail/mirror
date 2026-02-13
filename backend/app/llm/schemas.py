@@ -236,3 +236,16 @@ class SessionSummary(BaseModel):
     emotional_arc: list[EmotionalState] = Field(default_factory=list)
     summary: str
     overall_difficulty: str = Field(..., description="easy, moderate, or difficult")
+
+
+# ---------------------------------------------------------------------------
+# Stage 6: AI-Powered Fix Suggestions
+# ---------------------------------------------------------------------------
+
+class FixSuggestion(BaseModel):
+    """A code fix suggestion for a UX issue."""
+
+    fix_explanation: str = Field(..., description="Human-readable explanation of the fix")
+    fix_code: str = Field(..., description="The actual code snippet to fix the issue")
+    fix_language: str = Field(..., description="Language of the fix: css, html, javascript, react, or general")
+    alternative_approaches: list[str] = Field(default_factory=list, description="1-2 alternative ways to fix the issue")

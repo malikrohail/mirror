@@ -544,3 +544,57 @@ def _count_by_severity(synthesis: dict[str, Any], severity: str) -> int:
             if issue.get("severity") == severity:
                 count += 1
     return count
+
+
+# ---------------------------------------------------------------------------
+# Stage 6: AI-Powered Fix Suggestions
+# ---------------------------------------------------------------------------
+
+def fix_suggestion_system_prompt() -> str:
+    return """\
+You are a senior frontend developer and UX engineer. Given a UX issue found \
+during usability testing, generate a concrete, copy-pasteable code fix.
+
+RULES:
+1. The fix must be practical and specific — not generic advice
+2. Provide actual code (CSS, HTML, JavaScript, or React JSX) that addresses the issue
+3. If the issue is visual (contrast, sizing, spacing), provide CSS
+4. If the issue is structural (missing labels, ARIA), provide HTML
+5. If the issue is behavioral (keyboard nav, focus management), provide JavaScript
+6. Keep fixes minimal — change only what's necessary
+7. Include inline comments explaining the "why"
+8. If you're unsure of the exact selector, use a descriptive placeholder like `/* target: the submit button */`
+
+OUTPUT FORMAT: Return a JSON object:
+{
+  "fix_explanation": "1-2 sentence plain-English explanation of what the fix does and why",
+  "fix_code": "the actual code snippet",
+  "fix_language": "css|html|javascript|react|general",
+  "alternative_approaches": ["1-2 alternative ways to fix this"]
+}
+"""
+
+
+def fix_suggestion_user_prompt(
+    issue_description: str,
+    issue_element: str | None,
+    issue_severity: str,
+    issue_heuristic: str | None,
+    issue_recommendation: str | None,
+    page_url: str | None,
+    wcag_criterion: str | None,
+) -> str:
+    parts = [f"UX ISSUE: {issue_description}"]
+    if issue_element:
+        parts.append(f"ELEMENT: {issue_element}")
+    parts.append(f"SEVERITY: {issue_severity}")
+    if issue_heuristic:
+        parts.append(f"HEURISTIC VIOLATED: {issue_heuristic}")
+    if wcag_criterion:
+        parts.append(f"WCAG CRITERION: {wcag_criterion}")
+    if issue_recommendation:
+        parts.append(f"EXISTING RECOMMENDATION: {issue_recommendation}")
+    if page_url:
+        parts.append(f"PAGE: {page_url}")
+    parts.append("\nGenerate a concrete code fix for this issue.")
+    return "\n".join(parts)

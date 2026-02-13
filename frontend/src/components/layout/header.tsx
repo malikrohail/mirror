@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { ChevronDown, ClipboardList, Users, BookOpen, Moon, Sun, User } from 'lucide-react';
+import { ChevronDown, ClipboardList, Users, BookOpen, Moon, Sun, User, Calendar, GitCompare, TrendingUp } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +39,24 @@ export function Header() {
               <Link href="/personas" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 All Testers
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/schedules" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Scheduled Tests
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/compare" className="flex items-center gap-2">
+                <GitCompare className="h-4 w-4" />
+                Compare Studies
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/history" className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Score History
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>

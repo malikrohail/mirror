@@ -7,9 +7,10 @@ For development, use: python scripts/dev_worker.py
 import logging
 
 from arq.connections import RedisSettings
+from arq.cron import cron
 
 from app.config import settings
-from app.workers.tasks import run_study_task
+from app.workers.tasks import check_schedules_task, run_study_task
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,10 @@ class WorkerSettings:
     """arq worker configuration."""
 
     functions = [run_study_task]
+    cron_jobs = [
+        # Check for due schedules every minute
+        cron(check_schedules_task, minute={0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59}),
+    ]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = _parse_redis_url(settings.REDIS_URL)

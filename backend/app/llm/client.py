@@ -13,6 +13,8 @@ import anthropic
 from pydantic import BaseModel
 
 from app.llm.prompts import (
+    fix_suggestion_system_prompt,
+    fix_suggestion_user_prompt,
     navigation_system_prompt,
     navigation_user_prompt,
     persona_from_description_prompt,
@@ -28,6 +30,7 @@ from app.llm.prompts import (
     synthesis_user_prompt,
 )
 from app.llm.schemas import (
+    FixSuggestion,
     NavigationDecision,
     PersonaProfile,
     ReportContent,
@@ -52,6 +55,7 @@ STAGE_MODEL_MAP: dict[str, str] = {
     "synthesis": OPUS_MODEL,
     "report_generation": OPUS_MODEL,
     "session_summary": SONNET_MODEL,
+    "fix_suggestion": SONNET_MODEL,
 }
 
 MAX_RETRIES = 3
@@ -437,6 +441,34 @@ class LLMClient:
         return await self._call_structured(
             "session_summary", system, messages, SessionSummary
         )
+
+    # ------------------------------------------------------------------
+    # Stage 6: Fix Suggestion Generation
+    # ------------------------------------------------------------------
+
+    async def generate_fix_suggestion(
+        self,
+        issue_description: str,
+        issue_element: str | None = None,
+        issue_severity: str = "major",
+        issue_heuristic: str | None = None,
+        issue_recommendation: str | None = None,
+        page_url: str | None = None,
+        wcag_criterion: str | None = None,
+    ) -> FixSuggestion:
+        """Generate a code fix suggestion for a UX issue."""
+        system = fix_suggestion_system_prompt()
+        user_text = fix_suggestion_user_prompt(
+            issue_description=issue_description,
+            issue_element=issue_element,
+            issue_severity=issue_severity,
+            issue_heuristic=issue_heuristic,
+            issue_recommendation=issue_recommendation,
+            page_url=page_url,
+            wcag_criterion=wcag_criterion,
+        )
+        messages = [{"role": "user", "content": user_text}]
+        return await self._call_structured("fix_suggestion", system, messages, FixSuggestion)
 
 
 # ---------------------------------------------------------------------------

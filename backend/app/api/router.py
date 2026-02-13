@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import compare, health, journeys, personas, proxy, reports, screenshots, scroll_depth, sessions, studies
+from app.api.v1 import compare, fixes, health, history, journeys, personas, proxy, reports, schedules, screenshots, scroll_depth, sessions, studies, videos
 
 api_router = APIRouter()
 
@@ -14,3 +14,8 @@ api_router.include_router(journeys.router, tags=["journeys"])
 api_router.include_router(scroll_depth.router, tags=["scroll-depth"])
 api_router.include_router(compare.router, tags=["compare"])
 api_router.include_router(proxy.router, prefix="/proxy", tags=["proxy"])
+api_router.include_router(schedules.router, prefix="/schedules", tags=["schedules"])
+api_router.include_router(schedules.webhook_router, prefix="/webhooks", tags=["webhooks"])
+api_router.include_router(history.router, tags=["history"])
+api_router.include_router(videos.router, tags=["videos"])
+api_router.include_router(fixes.router, tags=["fixes"])
