@@ -34,6 +34,16 @@ export interface LogEntry {
   message: string;
 }
 
+export interface StepHistoryEntry {
+  step_number: number;
+  think_aloud: string;
+  screenshot_url: string;
+  emotional_state: string;
+  action: string;
+  task_progress: number;
+  timestamp: number;
+}
+
 interface PersonaProgress {
   persona_name: string;
   session_id: string;
@@ -48,6 +58,7 @@ interface PersonaProgress {
   live_view_url: string | null;
   browser_active: boolean;
   screencast_available: boolean;
+  step_history: StepHistoryEntry[];
 }
 
 interface StudyCost {
@@ -156,6 +167,28 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
         const actionStr = normalizeAction(step.action);
         log('info', `[${step.persona_name}] Step ${step.step_number}: ${actionStr} — ${step.think_aloud?.slice(0, 80)}…`);
         const existing = current.personas[step.session_id];
+
+        // Build step history — inject synthetic "start" on first step
+        const prevHistory = existing?.step_history ?? [];
+        const newEntry: StepHistoryEntry = {
+          step_number: step.step_number,
+          think_aloud: step.think_aloud,
+          screenshot_url: step.screenshot_url,
+          emotional_state: step.emotional_state,
+          action: actionStr,
+          task_progress: step.task_progress,
+          timestamp: Date.now(),
+        };
+        let history = prevHistory;
+        if (prevHistory.length === 0) {
+          // Inject synthetic "start" entry
+          history = [{ step_number: 0, think_aloud: 'Starting navigation...', screenshot_url: '', emotional_state: 'curious', action: 'start', task_progress: 0, timestamp: Date.now() - 1 }];
+        }
+        // Deduplicate by step_number, then append
+        if (!history.some((e) => e.step_number === newEntry.step_number)) {
+          history = [...history, newEntry].slice(-50);
+        }
+
         const persona: PersonaProgress = {
           persona_name: step.persona_name,
           session_id: step.session_id,
@@ -170,6 +203,7 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
           live_view_url: resolveLiveViewUrl(existing?.live_view_url, step.live_view_url),
           browser_active: existing?.browser_active ?? true,
           screencast_available: existing?.screencast_available ?? false,
+          step_history: history,
         };
         set({
           activeStudy: {
@@ -184,10 +218,21 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
         const completedPersona = current.personas[msg.session_id]?.persona_name ?? msg.session_id.slice(0, 8);
         log('info', `[${completedPersona}] Session complete — ${msg.total_steps} steps`);
         if (current.personas[msg.session_id]) {
+          const prevHistory = current.personas[msg.session_id].step_history ?? [];
+          const completeEntry: StepHistoryEntry = {
+            step_number: msg.total_steps + 1,
+            think_aloud: 'Session completed successfully.',
+            screenshot_url: '',
+            emotional_state: 'satisfied',
+            action: 'complete',
+            task_progress: 100,
+            timestamp: Date.now(),
+          };
           const updated = {
             ...current.personas[msg.session_id],
             completed: true,
             total_steps: msg.total_steps,
+            step_history: [...prevHistory, completeEntry].slice(-50),
           };
           set({
             activeStudy: {
@@ -216,6 +261,7 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
           live_view_url: resolveLiveViewUrl(existing?.live_view_url, msg.live_view_url),
           browser_active: true,
           screencast_available: existing?.screencast_available ?? false,
+          step_history: existing?.step_history ?? [],
         };
         set({
           activeStudy: {
@@ -268,6 +314,7 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
                   total_steps: 0,
                   live_view_url: null,
                   browser_active: true,
+                  step_history: [],
                 }),
                 screencast_available: true,
               },
@@ -303,6 +350,7 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
             ),
             browser_active: snapshot.browser_active ?? existing?.browser_active ?? true,
             screencast_available: snapshot.screencast_available ?? existing?.screencast_available ?? false,
+            step_history: existing?.step_history ?? [],
           };
         }
         set({

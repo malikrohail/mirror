@@ -1,18 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, CheckCircle2, XCircle, ChevronDown, ChevronRight, Terminal } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import * as api from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
-import { ProgressBar } from '@/components/common/progress-bar';
 import { PersonaProgressCard } from './persona-progress-card';
 import { ErrorState } from '@/components/common/error-state';
 import { PageSkeleton } from '@/components/common/page-skeleton';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { useStudyStore } from '@/stores/study-store';
-import type { LogEntry } from '@/stores/study-store';
 import type { PersonaTemplateOut, SessionOut } from '@/types';
 
 interface StudyProgressProps {
@@ -31,12 +28,10 @@ type SessionProgress = SessionOut & {
 export function StudyProgress({ studyId }: StudyProgressProps) {
   const router = useRouter();
   const redirected = useRef(false);
-  const [logsOpen, setLogsOpen] = useState(false);
-  const logEndRef = useRef<HTMLDivElement>(null);
 
   const initStudy = useStudyStore((s) => s.initStudy);
   const activeStudy = useStudyStore((s) => s.activeStudy);
-  const logs = useStudyStore((s) => s.logs);
+
 
   useEffect(() => {
     initStudy(studyId);
@@ -102,12 +97,6 @@ export function StudyProgress({ studyId }: StudyProgressProps) {
         ? Math.round((sessionProgress / totalSessions) * 80)
         : 0;
 
-  // Auto-scroll log to bottom
-  useEffect(() => {
-    if (logsOpen && logEndRef.current) {
-      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [logs.length, logsOpen]);
 
   // Redirect on complete (not on failure — keep logs visible)
   useEffect(() => {
@@ -120,12 +109,6 @@ export function StudyProgress({ studyId }: StudyProgressProps) {
     }
   }, [isComplete, isFailed, studyId, router]);
 
-  // Auto-expand logs on failure
-  useEffect(() => {
-    if (isFailed) {
-      setLogsOpen(true);
-    }
-  }, [isFailed]);
 
   if (isLoading) return <PageSkeleton />;
 
@@ -139,35 +122,8 @@ export function StudyProgress({ studyId }: StudyProgressProps) {
     );
   }
 
-  const phase = isAnalyzing ? 'analyzing' : isRunning ? 'navigating' : null;
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        {isComplete && !isFailed ? (
-          <CheckCircle2 className="h-5 w-5 text-green-500" />
-        ) : isFailed ? (
-          <XCircle className="h-5 w-5 text-red-500" />
-        ) : (
-          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-        )}
-        <div>
-          <h2 className="text-lg font-semibold">
-            {isFailed ? 'Test Failed' : isComplete ? 'Test Complete!' : isAnalyzing ? 'Analyzing Results...' : 'Running Test...'}
-          </h2>
-          {isFailed ? (
-            <p className="text-sm text-red-500">
-              Something went wrong — check the log below for details
-            </p>
-          ) : phase ? (
-            <p className="text-sm capitalize text-muted-foreground">
-              Phase: {phase}
-            </p>
-          ) : null}
-        </div>
-      </div>
-
-      <ProgressBar value={percent} showLabel />
+    <div className="space-y-3">
 
       {isFailed && (
         <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
@@ -212,14 +168,14 @@ export function StudyProgress({ studyId }: StudyProgressProps) {
 
       {sessions && sessions.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground">
-            Tester Progress ({completedSessions}/{totalSessions})
-          </h3>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="space-y-3">
             {sessions.map((session) => {
               const persona = study?.personas.find((p) => p.id === session.persona_id);
               const template = persona?.template_id ? templateMap.get(persona.template_id) : null;
               const personaName = template?.name ?? 'Tester';
+              const personaAvatarUrl = template?.avatar_url ?? null;
+              const personaDescription = template?.short_description ?? null;
+              const personaProfile = template?.default_profile ?? null;
               const sessionComplete = session.status === 'complete' || session.status === 'failed';
               const stepCount = session.total_steps || 0;
 
@@ -237,6 +193,9 @@ export function StudyProgress({ studyId }: StudyProgressProps) {
                 <PersonaProgressCard
                   key={session.id}
                   personaName={ws?.persona_name || polled?.persona_name || personaName}
+                  personaAvatarUrl={personaAvatarUrl}
+                  personaDescription={personaDescription}
+                  personaProfile={personaProfile}
                   stepNumber={ws?.step_number ?? polled?.step_number ?? stepCount}
                   totalSteps={ws?.total_steps ?? polled?.total_steps ?? stepCount}
                   thinkAloud={ws?.think_aloud ?? polled?.think_aloud ?? session.current_think_aloud ?? session.summary ?? 'Starting...'}
@@ -249,48 +208,13 @@ export function StudyProgress({ studyId }: StudyProgressProps) {
                   browserActive={ws?.browser_active ?? polled?.browser_active ?? session.browser_active ?? !sessionComplete}
                   screencastAvailable={ws?.screencast_available ?? false}
                   sessionId={session.id}
+                  stepHistory={ws?.step_history ?? []}
                 />
               );
             })}
           </div>
         </div>
       )}
-
-      {/* Technical Log */}
-      <div className="rounded-lg border border-border bg-card">
-        <button
-          type="button"
-          onClick={() => setLogsOpen((o) => !o)}
-          className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <Terminal className="h-4 w-4" />
-          <span>Log</span>
-          <span className="ml-1 text-xs tabular-nums text-muted-foreground/60">({logs.length})</span>
-          {logsOpen ? <ChevronDown className="ml-auto h-4 w-4" /> : <ChevronRight className="ml-auto h-4 w-4" />}
-        </button>
-        {logsOpen && (
-          <div className="max-h-64 overflow-y-auto border-t border-border bg-zinc-950 px-4 py-2 font-mono text-xs">
-            {logs.length === 0 && (
-              <p className="py-2 text-zinc-500">Waiting for events…</p>
-            )}
-            {logs.map((entry, i) => (
-              <div key={i} className="flex gap-2 py-0.5 leading-5">
-                <span className="shrink-0 text-zinc-500">
-                  {new Date(entry.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                </span>
-                <span className={
-                  entry.level === 'error' ? 'text-red-400' :
-                  entry.level === 'warn' ? 'text-yellow-400' :
-                  'text-zinc-300'
-                }>
-                  {entry.message}
-                </span>
-              </div>
-            ))}
-            <div ref={logEndRef} />
-          </div>
-        )}
-      </div>
     </div>
   );
 }
