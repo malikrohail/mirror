@@ -8,7 +8,7 @@ import {
   CircleDot, X, Calendar, Play, Pause, Trash2, Copy,
   ExternalLink, Clock, Globe, Zap, RefreshCw,
   GitCompare, CheckCircle, AlertCircle, MinusCircle,
-  TrendingUp, TrendingDown, Loader2,
+  TrendingUp, TrendingDown, Loader2, Users,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,7 @@ import { DataTable } from '@/components/common/data-table';
 import { EmptyState } from '@/components/common/empty-state';
 import { ErrorState } from '@/components/common/error-state';
 import { PageSkeleton } from '@/components/common/page-skeleton';
+import { PageHeaderBar } from '@/components/layout/page-header-bar';
 import { formatDistanceToNow } from '@/lib/format';
 import { API_BASE, SEVERITY_COLORS, TERMS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -71,7 +72,7 @@ const statusColor = (status: string) =>
   'text-muted-foreground';
 
 function studyHref(s: StudySummary) {
-  return s.status === 'running' ? `/study/${s.id}/running` : `/study/${s.id}`;
+  return `/study/${s.id}/running`;
 }
 
 const STATUS_OPTIONS: { value: StudyStatus; label: string }[] = [
@@ -137,147 +138,108 @@ function ExpandedScoreChart({ url }: { url: string }) {
   );
 }
 
-// ── URL Group Row ──────────────────────────────────────
+// ── URL Group (strip header + test rows) ────────────────
 
-function UrlGroupRow({
+function UrlGroup({
   url,
   studies,
-  expanded,
-  onToggle,
+  collapsed,
+  onToggleCollapse,
   compareMode,
   selectedStudyIds,
   onToggleStudy,
 }: {
   url: string;
   studies: StudySummary[];
-  expanded: boolean;
-  onToggle: () => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
   compareMode: boolean;
   selectedStudyIds: Set<string>;
   onToggleStudy: (id: string) => void;
 }) {
-  const latest = studies[0];
-  const latestScore = studies.find(s => s.overall_score != null && s.overall_score > 0);
-
-  // Find score delta: compare two most recent studies that have scores
-  const scoreDelta = (() => {
-    const withScores = studies.filter(s => s.overall_score != null && s.overall_score > 0);
-    if (withScores.length < 2) return null;
-    return Math.round(withScores[0].overall_score!) - Math.round(withScores[1].overall_score!);
-  })();
-
   return (
     <div>
-      {/* URL summary row */}
+      {/* URL strip header */}
       <button
-        onClick={onToggle}
-        className="flex w-full items-center gap-4 border-b border-border px-3 py-2.5 text-[14px] transition-colors hover:bg-muted/50"
+        onClick={onToggleCollapse}
+        className={cn(
+          'flex w-full items-center gap-3 border border-border bg-muted/40 px-4 py-2.5',
+          collapsed ? 'rounded-lg' : 'rounded-t-lg',
+        )}
       >
-        <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-90')} />
-        <span className="min-w-0 flex-1 truncate text-left text-foreground">{url}</span>
-        <span className="shrink-0 w-16 text-right tabular-nums text-muted-foreground">
-          {studies.length} {studies.length === 1 ? 'test' : 'tests'}
-        </span>
-        <span className="shrink-0 w-32 text-right tabular-nums text-muted-foreground">
-          {latestScore?.overall_score != null ? (
-            <span className="inline-flex items-center gap-1.5">
-              <span>{Math.round(latestScore.overall_score)}/100</span>
-              {scoreDelta !== null && (
-                <span className={scoreDelta > 0 ? 'text-green-600' : scoreDelta < 0 ? 'text-red-500' : 'text-muted-foreground'}>
-                  {scoreDelta > 0 ? '+' : ''}{scoreDelta}
-                </span>
-              )}
-            </span>
-          ) : (
-            <span className="text-foreground/30">—</span>
-          )}
-        </span>
-        <span className="shrink-0 w-16 text-right text-foreground/30">
-          {formatDistanceToNow(latest.created_at)}
-        </span>
+        <Globe className="h-4 w-4 text-foreground/30" />
+        <span className="text-[14px] font-medium text-foreground">{url.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
+        <span className="text-[13px] text-foreground/30">{studies.length} {studies.length === 1 ? 'test' : 'tests'}</span>
+        <ChevronRight className={cn('ml-auto h-3.5 w-3.5 text-foreground/30 transition-transform', collapsed ? 'rotate-90' : '-rotate-90')} />
       </button>
+      {/* Test rows */}
+      {!collapsed && (
+      <div className="overflow-hidden rounded-b-lg border border-t-0 border-border">
+        {studies.map((study, i) => {
+          const isComplete = study.status === 'complete';
+          const isSelected = selectedStudyIds.has(study.id);
+          const showCheckbox = isComplete && (compareMode || selectedStudyIds.size > 0);
+          const checkDisabled = !isSelected && selectedStudyIds.size >= 2;
 
-      {/* Expanded: test list on left, chart on right */}
-      {expanded && (
-        <div className="flex border-b border-border bg-muted/10">
-          {/* Test rows — left side, shrink to content */}
-          <div className="shrink-0">
-            {/* Sub-header */}
-            <div className="flex items-center border-b border-border/50 px-3 py-1.5 pl-10 text-sm font-medium text-foreground/30">
-              <span className="shrink-0 w-14">Date</span>
-              <span className="shrink-0 w-[1px] self-stretch bg-border/40 mx-2" />
-              <span className="shrink-0 w-[72px]">Status</span>
-              <span className="shrink-0 w-[1px] self-stretch bg-border/40 mx-2" />
-              <span className="shrink-0 w-14 text-right">Tasks</span>
-              <span className="shrink-0 w-[1px] self-stretch bg-border/40 mx-2" />
-              <span className="shrink-0 w-[62px] text-right">Personas</span>
-              <span className="shrink-0 w-[1px] self-stretch bg-border/40 mx-2" />
-              <span className="shrink-0 w-14 text-right">Score</span>
-            </div>
-            {studies.map((study) => {
-              const isComplete = study.status === 'complete';
-              const isSelected = selectedStudyIds.has(study.id);
-              const showCheckbox = isComplete && (compareMode || selectedStudyIds.size > 0);
-              const checkDisabled = !isSelected && selectedStudyIds.size >= 2;
-
-              return (
-                <div key={study.id} className="group/row relative border-b border-border/50 last:border-b-0">
-                  {/* Checkbox overlaid in the pl-10 gutter */}
-                  {isComplete && (
-                    <button
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleStudy(study.id); }}
-                      disabled={checkDisabled}
-                      className={cn(
-                        'absolute left-3 top-1/2 z-10 -translate-y-1/2 flex items-center justify-center transition-opacity',
-                        showCheckbox || isSelected ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
-                        checkDisabled && 'cursor-not-allowed opacity-30',
-                      )}
-                    >
-                      <Checkbox
-                        checked={isSelected}
-                        disabled={checkDisabled}
-                        tabIndex={-1}
-                        className="pointer-events-none"
-                      />
-                    </button>
+          return (
+            <div key={study.id} className="group/row relative border-b border-border/50 last:border-b-0">
+              {isComplete && (
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleStudy(study.id); }}
+                  disabled={checkDisabled}
+                  className={cn(
+                    'absolute left-3 top-1/2 z-10 -translate-y-1/2 flex items-center justify-center transition-opacity',
+                    showCheckbox || isSelected ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
+                    checkDisabled && 'cursor-not-allowed opacity-30',
                   )}
-                  <Link
-                    href={studyHref(study)}
-                    className="flex items-center px-3 py-1.5 pl-10 text-sm transition-colors hover:bg-muted/40"
-                  >
-                    <span className="shrink-0 w-14 text-muted-foreground">
-                      {formatDistanceToNow(study.created_at)}
+                >
+                  <Checkbox
+                    checked={isSelected}
+                    disabled={checkDisabled}
+                    tabIndex={-1}
+                    className="pointer-events-none"
+                  />
+                </button>
+              )}
+              <Link
+                href={studyHref(study)}
+                className="flex items-center gap-4 pl-10 pr-4 py-2.5 text-[13px] hover:bg-muted/20 transition-colors"
+              >
+                <span className="w-6 shrink-0 text-center text-foreground/20 tabular-nums">#{i + 1}</span>
+                <span className="inline-flex items-center gap-1.5">
+                  {study.status === 'running' ? (
+                    <span className="relative inline-flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
                     </span>
-                    <span className="shrink-0 w-[1px] self-stretch bg-border/40 mx-2" />
-                    <span className={cn('shrink-0 w-[72px] capitalize', statusColor(study.status))}>
-                      {study.status}
+                  ) : study.status === 'analyzing' ? (
+                    <span className="relative inline-flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-pulse rounded-full bg-yellow-400 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-yellow-500" />
                     </span>
-                    <span className="shrink-0 w-[1px] self-stretch bg-border/40 mx-2" />
-                    <span className="shrink-0 tabular-nums text-muted-foreground w-14 text-right">
-                      {study.task_count ?? study.tasks?.length ?? 0}
-                    </span>
-                    <span className="shrink-0 w-[1px] self-stretch bg-border/40 mx-2" />
-                    <span className="shrink-0 tabular-nums text-muted-foreground w-[62px] text-right">
-                      {study.persona_count ?? study.personas?.length ?? 0}
-                    </span>
-                    <span className="shrink-0 w-[1px] self-stretch bg-border/40 mx-2" />
-                    <span className="shrink-0 tabular-nums text-muted-foreground w-14 text-right">
-                      {study.overall_score != null && study.overall_score > 0
-                        ? `${Math.round(study.overall_score)}/100`
-                        : <span className="text-foreground/30">—</span>}
-                    </span>
-                  </Link>
+                  ) : study.status === 'complete' ? (
+                    <span className="inline-flex h-2 w-2 rounded-full bg-green-500" />
+                  ) : (
+                    <span className="inline-flex h-2 w-2 rounded-full bg-red-400" />
+                  )}
+                  <span className={cn('capitalize', statusColor(study.status))}>{study.status}</span>
+                </span>
+                <span className="inline-flex items-center gap-1 text-foreground/40">
+                  <Users className="h-3 w-3" />
+                  {study.persona_count ?? study.personas?.length ?? 0}
+                </span>
+                <div className="tabular-nums">
+                  {study.overall_score != null && study.overall_score > 0
+                    ? <span className="font-medium text-foreground">{Math.round(study.overall_score)}/100</span>
+                    : <span className="text-foreground/20">—</span>}
                 </div>
-              );
-            })}
-          </div>
-          {/* Score chart — takes remaining space */}
-          {studies.length > 1 && (
-            <div className="hidden min-w-0 flex-1 border-l border-border/50 p-4 lg:block">
-              <ExpandedScoreChart url={url} />
+                <span className="ml-auto text-foreground/30">{fmtShort(study.created_at)}</span>
+                <ChevronRight className="h-3.5 w-3.5 -mr-1 text-foreground/30 opacity-0 group-hover/row:opacity-100 transition-opacity" />
+              </Link>
             </div>
-          )}
-        </div>
+          );
+        })}
+      </div>
       )}
     </div>
   );
@@ -401,7 +363,7 @@ function SchedulesPanel() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-muted-foreground">Schedules</span>
+        <p className="text-[14px] uppercase text-foreground/30">Upcoming tests</p>
         <CreateScheduleDialog />
       </div>
       {isLoading ? (
@@ -455,9 +417,9 @@ export default function DashboardPage() {
   const [page] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StudyStatus | null>(null);
   const [showFailed, setShowFailed] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [compareMode, setCompareMode] = useState(false);
   const [selectedStudyIds, setSelectedStudyIds] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [compareSheetOpen, setCompareSheetOpen] = useState(false);
   const compare = useCompareStudies();
   const { data, isLoading, isError, error, refetch } = useStudies(page, 50);
@@ -498,14 +460,22 @@ export default function DashboardPage() {
 
   const hasFilters = statusFilter !== null || showFailed;
 
-  const toggleGroup = (url: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(url)) next.delete(url);
-      else next.add(url);
-      return next;
-    });
-  };
+  const uniqueUrls = useMemo(() => {
+    if (!allStudies.length) return 0;
+    return new Set(allStudies.map((s) => s.url)).size;
+  }, [allStudies]);
+
+  const latestStudy = allStudies[0];
+
+  const headerChips = allStudies.length > 0
+    ? [
+        { label: 'Tests', value: data?.total ?? allStudies.length },
+        { label: 'Websites', value: uniqueUrls },
+        ...(latestStudy
+          ? [{ label: 'Last run', value: formatDistanceToNow(latestStudy.created_at) }]
+          : []),
+      ]
+    : [];
 
   if (isLoading) return <PageSkeleton />;
 
@@ -542,12 +512,36 @@ export default function DashboardPage() {
   }
 
   return (
+    <div>
+      {headerChips.length > 0 && (
+        <PageHeaderBar
+          chips={headerChips}
+          right={
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" className="h-[30px] text-sm">
+                  New Test
+                  <ChevronRight className="ml-1.5 h-3 w-3 rotate-90" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/">Single test</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/?schedule=1">Schedule</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          }
+        />
+      )}
     <div className="flex gap-6 p-6">
       {/* Left — Test history */}
       <div className="min-w-0 flex-1 basis-1/2 space-y-4">
         {/* Filter bar */}
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Test history</span>
+          <p className="text-[14px] uppercase text-foreground/30">Test history</p>
           <div className="flex-1" />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -605,13 +599,6 @@ export default function DashboardPage() {
             {compareMode ? 'Exit Compare' : 'Compare'}
           </Button>
 
-          <Button asChild size="sm" className="h-[30px] text-sm">
-            <Link href="/">
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              New Test
-            </Link>
-          </Button>
-
           {statusFilter && (
             <button
               onClick={() => setStatusFilter(null)}
@@ -623,41 +610,37 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Grouped table */}
-        <div className="overflow-hidden rounded-lg border border-border">
-          {/* Header */}
-          <div className="flex items-center gap-4 border-b border-border bg-muted/30 px-3 py-2 text-sm font-medium text-foreground/30">
-            <span className="w-3.5 shrink-0" />
-            <span className="min-w-0 flex-1">URL</span>
-            <span className="shrink-0 w-16 text-right">Tests</span>
-            <span className="shrink-0 w-32 text-right">Latest score</span>
-            <span className="shrink-0 w-16 text-right">Latest</span>
-          </div>
-
-          {grouped.length > 0 ? (
-            grouped.map(([url, groupStudies]) => (
-              <UrlGroupRow
+        {/* Grouped — strip headers + test rows */}
+        {grouped.length > 0 ? (
+          <div className="space-y-4">
+            {grouped.map(([url, groupStudies]) => (
+              <UrlGroup
                 key={url}
                 url={url}
                 studies={groupStudies}
-                expanded={expanded.has(url)}
-                onToggle={() => toggleGroup(url)}
+                collapsed={collapsed.has(url)}
+                onToggleCollapse={() => setCollapsed((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(url)) next.delete(url);
+                  else next.add(url);
+                  return next;
+                })}
                 compareMode={compareMode}
                 selectedStudyIds={selectedStudyIds}
                 onToggleStudy={toggleStudySelection}
               />
-            ))
-          ) : (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">No tests match this filter</p>
-          )}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <p className="py-6 text-center text-sm text-muted-foreground">No tests match this filter</p>
+        )}
 
-        {!showFailed && !statusFilter && failedCount > 0 && (
+        {!statusFilter && failedCount > 0 && (
           <button
-            onClick={() => setShowFailed(true)}
+            onClick={() => setShowFailed((v) => !v)}
             className="text-xs text-muted-foreground/40 transition-colors hover:text-muted-foreground"
           >
-            Show {failedCount} failed
+            {showFailed ? `Hide ${failedCount} failed` : `Show ${failedCount} failed`}
           </button>
         )}
       </div>
@@ -775,6 +758,7 @@ export default function DashboardPage() {
           })()}
         </SheetContent>
       </Sheet>
+    </div>
     </div>
   );
 }

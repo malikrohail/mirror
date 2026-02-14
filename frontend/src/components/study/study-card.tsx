@@ -11,10 +11,7 @@ interface StudyCardProps {
 }
 
 export function StudyCard({ study }: StudyCardProps) {
-  const href =
-    study.status === 'running'
-      ? `/study/${study.id}/running`
-      : `/study/${study.id}`;
+  const href = `/study/${study.id}/running`;
 
   return (
     <Link href={href} className="block">
