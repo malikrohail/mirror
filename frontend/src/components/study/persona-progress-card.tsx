@@ -1,15 +1,31 @@
 'use client';
 
 import { useState } from 'react';
-import { Monitor, Smartphone, Tablet } from 'lucide-react';
+import { Monitor, Smartphone, Tablet, ChevronUp, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { LiveBrowserView } from './live-browser-view';
-import { ScreencastViewer } from './screencast-viewer';
-import { LiveStepTimeline } from './live-step-timeline';
 import { EMOTION_ICONS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import type { EmotionalState } from '@/types';
-import type { StepHistoryEntry } from '@/stores/study-store';
+
+const MOOD_LABELS: Record<string, string> = {
+  curious: 'Curious',
+  confused: 'Confused',
+  frustrated: 'Frustrated',
+  satisfied: 'Satisfied',
+  stuck: 'Stuck',
+  neutral: 'Neutral',
+  confident: 'Confident',
+  anxious: 'Anxious',
+  delighted: 'Delighted',
+  excited: 'Excited',
+};
+
+const STATUS_LABELS: Record<string, { text: string; color: string }> = {
+  complete:  { text: 'Completed', color: 'text-green-600 dark:text-green-400' },
+  failed:    { text: 'Failed',    color: 'text-red-600 dark:text-red-400' },
+  gave_up:   { text: 'Gave up',   color: 'text-amber-600 dark:text-amber-400' },
+};
 
 const DEVICE_ICONS: Record<string, React.ReactNode> = {
   desktop: <Monitor className="h-3 w-3" />,
@@ -66,7 +82,9 @@ interface PersonaProgressCardProps {
   screencastAvailable?: boolean;
   sessionId?: string;
   confidence?: number | null;
-  stepHistory?: StepHistoryEntry[];
+  sessionStatus?: string;
+  selected?: boolean;
+  onSelect?: () => void;
 }
 
 export function PersonaProgressCard({
@@ -77,21 +95,14 @@ export function PersonaProgressCard({
   stepNumber,
   totalSteps,
   thinkAloud,
-  screenshotUrl,
   emotionalState,
-  action,
   taskProgress,
   completed,
-  liveViewUrl,
-  browserActive,
-  screencastAvailable,
-  sessionId,
-  confidence,
-  stepHistory,
+  sessionStatus,
+  selected,
+  onSelect,
 }: PersonaProgressCardProps) {
-  const [activeTab, setActiveTab] = useState<'steps' | 'browser'>('steps');
-  const hasLiveView = liveViewUrl !== undefined && liveViewUrl !== null;
-  const hasScreencast = screencastAvailable && sessionId;
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const profile = personaProfile ?? {};
   const age = profile.age as number | undefined;
@@ -106,201 +117,147 @@ export function PersonaProgressCard({
     ? (profile.accessibility_needs as string[])
     : [];
 
-  const hasBrowserContent = hasScreencast || hasLiveView || screenshotUrl;
-
-  const renderBrowserView = () => {
-    if (hasScreencast && (browserActive || !hasLiveView)) {
-      return (
-        <ScreencastViewer
-          sessionId={sessionId}
-          browserActive={browserActive ?? false}
-          personaName={personaName}
-          screenshotUrl={screenshotUrl}
-        />
-      );
-    }
-
-    if (hasLiveView) {
-      return (
-        <LiveBrowserView
-          liveViewUrl={liveViewUrl}
-          browserActive={browserActive ?? false}
-          personaName={personaName}
-          screenshotUrl={screenshotUrl}
-        />
-      );
-    }
-
-    if (screenshotUrl) {
-      return (
-        <img
-          src={screenshotUrl}
-          alt={`${personaName} – step ${stepNumber}`}
-          className="h-full w-full object-cover object-top"
-        />
-      );
-    }
-
-    return null;
-  };
-
-  const stepCount = stepHistory?.length ?? 0;
-
   return (
-    <Card className={`py-0 gap-0 text-[14px] ${completed ? 'opacity-75' : ''}`}>
+    <Card
+      className={cn(
+        'py-0 gap-0 text-[14px] transition-shadow cursor-pointer',
+        completed && 'opacity-75',
+        selected && 'ring-2 ring-primary/40',
+      )}
+      onClick={onSelect}
+    >
       <CardContent className="p-0">
-        <div className="flex">
-          {/* Left: persona info */}
-          <div className="flex w-[35%] shrink-0 flex-col p-4">
-            {/* Name + avatar row */}
-            <div className="flex items-center gap-3">
-              {personaAvatarUrl ? (
-                <img
-                  src={personaAvatarUrl}
-                  alt={personaName}
-                  className="h-10 w-10 shrink-0 rounded-full object-cover"
-                />
-              ) : (
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-lg">
-                  {EMOTION_ICONS[emotionalState as EmotionalState] ?? '🤔'}
-                </span>
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-semibold leading-tight truncate">{personaName}</p>
-                <p className="text-[12px] text-muted-foreground/60 truncate">
-                  {[occupation, age ? `${age}yo` : null].filter(Boolean).join(', ')}
-                </p>
-              </div>
-              {completed && (
-                <Badge variant="secondary" className="shrink-0 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 text-[11px] px-2 py-0.5">
-                  Done
-                </Badge>
-              )}
-            </div>
-
-            {/* Tech Adaptability */}
-            {(techLit || patience || device) && (
-              <div className="mt-3">
-                <p className="text-[11px] font-medium text-muted-foreground/40 mb-1.5">Overview</p>
-                <div className="flex flex-wrap gap-1">
-                  {techLit && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border/50 px-2 py-0.5 text-[11px] text-muted-foreground/70">
-                      Tech <LevelBars level={LITERACY_LEVEL[techLit] ?? 3} />
-                    </span>
-                  )}
-                  {patience && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border/50 px-2 py-0.5 text-[11px] text-muted-foreground/70">
-                      Patience <LevelBars level={PATIENCE_LEVEL[patience] ?? 3} />
-                    </span>
-                  )}
-                  {device && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-border/50 px-2 py-0.5 text-[11px] text-muted-foreground/70">
-                      {DEVICE_ICONS[device] ?? null} {capitalize(device)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Frustrated by */}
-            {triggers.length > 0 && (
-              <div className="mt-2.5">
-                <p className="text-[11px] font-medium text-muted-foreground/40 mb-1.5">Frustrated by</p>
-                <div className="flex flex-wrap gap-1">
-                  {triggers.map((t) => (
-                    <span key={t} className="rounded-full border border-border/50 px-2 py-0.5 text-[11px] text-muted-foreground/70">
-                      {capitalize(t)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Accessibility */}
-            {a11y.length > 0 && (
-              <div className="mt-2.5">
-                <p className="text-[11px] font-medium text-muted-foreground/40 mb-1.5">Accessibility</p>
-                <div className="flex flex-wrap gap-1">
-                  {a11y.map((n) => (
-                    <span key={n} className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-400">
-                      {capitalize(n)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right: tabbed steps / browser */}
-          <div className="flex min-w-0 flex-1 flex-col border-l border-border">
-            {/* Tab bar */}
-            <div className="flex h-9 items-center border-b border-border">
-              <button
-                type="button"
-                onClick={() => setActiveTab('steps')}
-                className={`flex h-full items-center gap-1.5 px-3 text-xs font-medium uppercase tracking-wider transition-colors ${
-                  activeTab === 'steps'
-                    ? 'border-b-2 border-foreground text-foreground'
-                    : 'text-muted-foreground/50 hover:text-muted-foreground'
-                }`}
-              >
-                Steps
-                {stepCount > 0 && (
-                  <Badge variant="secondary" className="text-[11px] px-1.5 py-0 tabular-nums">
-                    {stepCount}
-                  </Badge>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('browser')}
-                className={`flex h-full items-center px-3 text-xs font-medium uppercase tracking-wider transition-colors ${
-                  activeTab === 'browser'
-                    ? 'border-b-2 border-foreground text-foreground'
-                    : 'text-muted-foreground/50 hover:text-muted-foreground'
-                }`}
-              >
-                Browser
-              </button>
-              {/* Progress — right-aligned */}
-              <div className="ml-auto flex items-center gap-2 px-3">
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  Step {stepNumber}/{totalSteps || '—'}
-                </span>
-                <div className="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-300"
-                    style={{ width: `${Math.min(taskProgress, 100)}%` }}
-                  />
-                </div>
-                <span className="text-xs tabular-nums font-medium">{taskProgress}%</span>
-              </div>
-            </div>
-
-            {/* Tab content */}
-            {activeTab === 'steps' ? (
-              <div className="flex-1 overflow-hidden" style={{ maxHeight: '360px' }}>
-                <LiveStepTimeline steps={stepHistory ?? []} />
-              </div>
+        {/* Persona info */}
+        <div className="overflow-y-auto text-[14px]">
+          {/* Name + avatar + overview badges */}
+          <div className="flex items-start gap-3 px-4 py-4">
+            {personaAvatarUrl ? (
+              <img
+                src={personaAvatarUrl}
+                alt={personaName}
+                className="h-10 w-10 shrink-0 rounded-full object-cover mt-0.5"
+              />
             ) : (
-              <div className="relative flex-1">
-                {hasBrowserContent ? (
-                  <div className="h-full overflow-hidden">
-                    {renderBrowserView()}
-                  </div>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-lg mt-0.5">
+                {EMOTION_ICONS[emotionalState as EmotionalState] ?? '🤔'}
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="font-semibold leading-tight truncate">{personaName}</p>
+                {/* Progress indicator — inline with name */}
+                {completed ? (
+                  <span className="text-[13px] text-foreground/70">
+                    {STATUS_LABELS[sessionStatus ?? 'complete']?.text ?? 'Completed'}
+                    {' · '}
+                    {EMOTION_ICONS[emotionalState as EmotionalState] ?? '🤔'}{' '}
+                    {MOOD_LABELS[emotionalState] ?? capitalize(emotionalState)}
+                  </span>
+                ) : stepNumber === 0 && !totalSteps ? (
+                  <span className="text-[13px] text-foreground/30">Waiting</span>
                 ) : (
-                  <div className="flex h-full min-h-[180px] items-center justify-center bg-muted/20">
-                    <div className="text-center">
-                      <div className="mx-auto mb-2 h-8 w-12 rounded border border-dashed border-border/60" />
-                      <p className="text-sm text-muted-foreground/40">
-                        {browserActive ? 'Loading browser...' : 'Waiting to start...'}
-                      </p>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-0.5">
+                      {Array.from({ length: 10 }).map((_, idx) => {
+                        const filled = totalSteps > 0 ? idx < Math.round((stepNumber / totalSteps) * 10) : 0;
+                        return (
+                          <div
+                            key={idx}
+                            className={`h-1.5 w-2 rounded-sm transition-colors duration-300 ${
+                              filled ? 'bg-primary' : 'bg-muted'
+                            }`}
+                          />
+                        );
+                      })}
                     </div>
+                    <span className="text-[13px] tabular-nums text-foreground/30">{taskProgress}%</span>
                   </div>
                 )}
               </div>
+              <p className="text-[13px] text-muted-foreground/60 truncate">
+                {[occupation, age ? `${age}yo` : null].filter(Boolean).join(', ')}
+              </p>
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {techLit && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border/50 px-2 py-0.5 text-[12px] text-muted-foreground/70">
+                    Tech savvy <LevelBars level={LITERACY_LEVEL[techLit] ?? 3} />
+                  </span>
+                )}
+                {patience && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border/50 px-2 py-0.5 text-[12px] text-muted-foreground/70">
+                    Patience <LevelBars level={PATIENCE_LEVEL[patience] ?? 3} />
+                  </span>
+                )}
+                {device && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border/50 px-2 py-0.5 text-[12px] text-muted-foreground/70">
+                    {DEVICE_ICONS[device] ?? null} Uses {device}
+                  </span>
+                )}
+              </div>
+            </div>
+            {(triggers.length > 0 || a11y.length > 0 || personaDescription) && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDetailsOpen((o) => !o);
+                }}
+                className="shrink-0 inline-flex items-center gap-1 text-[13px] text-muted-foreground/40 hover:text-muted-foreground/60 transition-colors"
+              >
+                <span>{detailsOpen ? 'Hide details' : 'Show details'}</span>
+                {detailsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </button>
             )}
           </div>
+
+          {detailsOpen && (
+            <div className="border-t border-border/40" />
+          )}
+          {detailsOpen && (
+            <div className="px-4 pb-3 text-[14px]">
+              {/* Description */}
+              {personaDescription && (
+                <div className="mt-2">
+                  <p className="text-foreground/30 mb-1.5">About</p>
+                  <p className="text-foreground/70">{personaDescription}</p>
+                </div>
+              )}
+
+              {/* Accessibility */}
+              {a11y.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-foreground/30 mb-1.5">Accessibility</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {a11y.map((n) => (
+                      <span key={n} className="rounded-full border border-orange-200 bg-orange-50 px-2.5 py-0.5 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-400">
+                        {capitalize(n.replace(/_/g, ' '))}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Frustrations */}
+              {triggers.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-foreground/30 mb-1.5">Frustrations</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {triggers.map((t) => (
+                      <span key={t} className="rounded-full border border-border/50 px-2.5 py-0.5 text-foreground/70">
+                        {capitalize(t)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Model */}
+              <div className="mt-3">
+                <p className="text-foreground/30 mb-1.5">Model</p>
+                <p className="text-foreground/70">Claude Opus 4.6 <span className="text-foreground/30">({totalSteps} completed tests)</span></p>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
