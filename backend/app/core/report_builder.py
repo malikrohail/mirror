@@ -35,6 +35,83 @@ class ReportBuilder:
             tasks=tasks,
         )
 
+    @staticmethod
+    def build_report_from_synthesis(
+        study_url: str,
+        synthesis: StudySynthesis,
+        session_summaries: list[dict[str, Any]],
+        tasks: list[str],
+    ) -> ReportContent:
+        """Build a report directly from synthesis data — no LLM call needed.
+
+        Used for small studies where the LLM report generation is overkill
+        and frequently fails JSON parsing on large outputs.
+        """
+        from app.llm.schemas import ReportSection
+
+        sections: list[ReportSection] = []
+
+        # Key Findings
+        findings_parts = []
+        for issue in synthesis.universal_issues:
+            findings_parts.append(f"- **{issue.title}** ({issue.severity}): {issue.description}")
+        for issue in synthesis.persona_specific_issues:
+            findings_parts.append(f"- **{issue.title}** ({issue.severity}): {issue.description}")
+        if findings_parts:
+            sections.append(ReportSection(
+                heading="Key Findings",
+                content="\n".join(findings_parts),
+            ))
+
+        # Comparative Insights
+        if synthesis.comparative_insights:
+            insight_parts = []
+            for item in synthesis.comparative_insights:
+                insight_parts.append(f"- **{item.title}**: {item.description}")
+            sections.append(ReportSection(
+                heading="Comparative Insights",
+                content="\n".join(insight_parts),
+            ))
+
+        # Struggle Points
+        if synthesis.struggle_points:
+            struggle_parts = []
+            for sp in synthesis.struggle_points:
+                struggle_parts.append(f"- **{sp.page_url}**: {sp.description} (affected {len(sp.personas_affected)} persona(s))")
+            sections.append(ReportSection(
+                heading="Struggle Points",
+                content="\n".join(struggle_parts),
+            ))
+
+        # Task Overview
+        task_parts = [f"{i+1}. {t}" for i, t in enumerate(tasks)]
+        num_completed = sum(1 for s in session_summaries if s.get("task_completed"))
+        task_parts.append(f"\n**Completion rate:** {num_completed}/{len(session_summaries)} sessions completed the task.")
+        sections.append(ReportSection(
+            heading="Task Overview",
+            content="\n".join(task_parts),
+        ))
+
+        methodology = (
+            f"This study tested {study_url} with {len(session_summaries)} AI persona(s) "
+            f"across {len(tasks)} task(s). Each persona navigated the live site using "
+            f"a real browser, with AI analyzing every step for UX issues."
+        )
+
+        conclusion = (
+            f"The overall UX score is {synthesis.overall_ux_score}/100. "
+            + (f"There are {len(synthesis.recommendations)} prioritized recommendations for improvement."
+               if synthesis.recommendations else "No critical issues were identified.")
+        )
+
+        return ReportContent(
+            title=f"Usability Test Report: {study_url}",
+            executive_summary=synthesis.executive_summary,
+            methodology=methodology,
+            sections=sections,
+            conclusion=conclusion,
+        )
+
     def render_markdown(
         self,
         report: ReportContent,

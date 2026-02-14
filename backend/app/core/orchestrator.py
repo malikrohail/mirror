@@ -244,12 +244,20 @@ class StudyOrchestrator:
                     logger.warning("Issue dedup/prioritization failed (non-fatal): %s", e)
 
             # Run report generation and post-synthesis DB tasks in parallel
-            await asyncio.gather(
-                self._generate_reports_with_builder(
+            if is_small_study:
+                # Build report directly from synthesis (no LLM call — instant)
+                report_content = ReportBuilder.build_report_from_synthesis(
+                    study_url, synthesis, session_summaries, task_descriptions
+                )
+                report_coro = self._save_report(
+                    study_id, study_url, synthesis, session_summaries, report_content
+                )
+            else:
+                report_coro = self._generate_reports_with_builder(
                     study_id, study_url, synthesis, session_summaries, task_descriptions, report_builder
-                ),
-                _post_synthesis_tasks(),
-            )
+                )
+
+            await asyncio.gather(report_coro, _post_synthesis_tasks())
 
             await self._publish_progress(study_id, 95, "report_complete")
 
@@ -867,6 +875,39 @@ class StudyOrchestrator:
         await self._generate_reports_with_builder(
             study_id, study_url, synthesis, session_summaries, tasks, self._report_builder
         )
+
+    async def _save_report(
+        self,
+        study_id: uuid.UUID,
+        study_url: str,
+        synthesis: Any,
+        session_summaries: list[dict[str, Any]],
+        report_content: Any,
+    ) -> None:
+        """Save a pre-built report to disk (no LLM call)."""
+        storage_path = os.getenv("STORAGE_PATH", "./data")
+        report_dir = f"{storage_path}/studies/{study_id}"
+        os.makedirs(report_dir, exist_ok=True)
+
+        try:
+            md_content = self._report_builder.render_markdown(
+                report_content, synthesis, session_summaries
+            )
+            md_path = f"{report_dir}/report.md"
+            with open(md_path, "w") as f:
+                f.write(md_content)
+            logger.info("Saved Markdown report (template): %s", md_path)
+
+            try:
+                pdf_bytes = self._report_builder.render_pdf(md_content, study_url)
+                pdf_path = f"{report_dir}/report.pdf"
+                with open(pdf_path, "wb") as f:
+                    f.write(pdf_bytes)
+                logger.info("Saved PDF report: %s", pdf_path)
+            except Exception as e:
+                logger.warning("PDF generation failed (non-fatal): %s", e)
+        except Exception as e:
+            logger.error("Report save failed: %s", e)
 
     async def _generate_reports_with_builder(
         self,
