@@ -24,6 +24,14 @@ export function Header() {
     if (stored === 'local' || stored === 'cloud') {
       setBrowserMode(stored);
     }
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'mirror-browser-mode' && (e.newValue === 'local' || e.newValue === 'cloud')) {
+        setBrowserMode(e.newValue);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   const toggleBrowserMode = (mode: BrowserMode) => {

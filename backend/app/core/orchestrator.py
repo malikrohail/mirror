@@ -36,6 +36,7 @@ from app.core.synthesizer import Synthesizer
 from app.db.repositories.session_repo import SessionRepository
 from app.db.repositories.study_repo import StudyRepository
 from app.llm.client import LLMClient
+from app.llm.schemas import AccessibilityNeeds, PersonaProfile
 from app.models.insight import Insight, InsightType
 from app.models.session import SessionStatus
 from app.models.study import StudyStatus
@@ -214,11 +215,20 @@ class StudyOrchestrator:
 
             study.overall_score = synthesis.overall_ux_score
             study.executive_summary = synthesis.executive_summary
+
+            # Persist cost breakdown to study record
+            cost_breakdown = self._cost_tracker.get_breakdown()
+            study.llm_input_tokens = cost_breakdown.llm_input_tokens
+            study.llm_output_tokens = cost_breakdown.llm_output_tokens
+            study.llm_total_tokens = cost_breakdown.llm_total_tokens
+            study.llm_api_calls = cost_breakdown.llm_api_calls
+            study.llm_cost_usd = cost_breakdown.llm_cost_usd
+            study.browser_mode = cost_breakdown.browser_mode
+            study.browser_cost_usd = cost_breakdown.browser_cost_usd
+            study.total_cost_usd = cost_breakdown.total_cost_usd
+
             await self.study_repo.update_status(study_id, StudyStatus.COMPLETE)
             await self.db.commit()
-
-            # Build cost breakdown
-            cost_breakdown = self._cost_tracker.get_breakdown()
 
             await self._publish_event(study_id, {
                 "type": "study:complete",
@@ -268,17 +278,28 @@ class StudyOrchestrator:
     # ------------------------------------------------------------------
 
     async def _generate_persona_profiles(self, study: Any) -> list[dict[str, Any]]:
-        """Generate full PersonaProfiles for each persona in the study."""
+        """Generate full PersonaProfiles for each persona in the study.
+
+        Builds PersonaProfile directly from template data to skip the expensive
+        LLM call (~19s per persona via Opus). Falls back to LLM generation only
+        for custom personas with only a description.
+        """
         profiles = []
         for persona in study.personas:
             try:
                 template = persona.profile or {}
+
+                # Custom personas with only a description require LLM generation
                 if persona.is_custom and template.get("description"):
                     profile = await self._persona_engine.generate_custom(
                         template["description"]
                     )
-                elif template:
-                    profile = await self._persona_engine.generate_from_template(template)
+                elif template and template.get("name"):
+                    profile = self._build_profile_from_template(template)
+                    logger.info(
+                        "Persona %s built from template (LLM skipped)",
+                        persona.id,
+                    )
                 else:
                     profile = await self._persona_engine.generate_random()
 
@@ -289,6 +310,50 @@ class StudyOrchestrator:
             except Exception as e:
                 logger.error("Failed to generate persona %s: %s", persona.id, e)
         return profiles
+
+    @staticmethod
+    def _build_profile_from_template(t: dict[str, Any]) -> PersonaProfile:
+        """Convert a template dict (string values) into a PersonaProfile (int values).
+
+        Templates use strings like 'high'/'low' for behavioral attributes,
+        while PersonaProfile expects 1-10 integers. This avoids an Opus API call.
+        """
+        LEVEL_MAP = {"low": 2, "moderate": 5, "medium": 5, "high": 8}
+        READING_MAP = {"skims": 2, "scans": 3, "moderate": 5, "thorough": 8, "careful": 8}
+
+        def to_int(val: Any, mapping: dict[str, int], default: int = 5) -> int:
+            if isinstance(val, int):
+                return max(1, min(10, val))
+            if isinstance(val, str):
+                return mapping.get(val.lower(), default)
+            return default
+
+        # Convert accessibility_needs from list/dict/etc to AccessibilityNeeds
+        acc_raw = t.get("accessibility_needs", {})
+        if isinstance(acc_raw, list):
+            acc = AccessibilityNeeds()
+        elif isinstance(acc_raw, dict):
+            acc = AccessibilityNeeds(**acc_raw)
+        else:
+            acc = AccessibilityNeeds()
+
+        return PersonaProfile(
+            name=t.get("name", "Tester"),
+            age=t.get("age", 30),
+            occupation=t.get("occupation", "General user"),
+            emoji=t.get("emoji", "🧑"),
+            short_description=t.get("short_description", f"{t.get('name', 'Tester')}, {t.get('age', 30)}, {t.get('occupation', 'user')}"),
+            background=t.get("background", f"{t.get('name', 'Tester')} is a {t.get('age', 30)}-year-old {t.get('occupation', 'user')}."),
+            tech_literacy=to_int(t.get("tech_literacy"), LEVEL_MAP),
+            patience_level=to_int(t.get("patience_level"), LEVEL_MAP),
+            reading_speed=to_int(t.get("reading_speed"), {**READING_MAP, **LEVEL_MAP}),
+            trust_level=to_int(t.get("trust_level"), LEVEL_MAP),
+            exploration_tendency=to_int(t.get("exploration_tendency"), LEVEL_MAP, 5),
+            device_preference=t.get("device_preference", "desktop"),
+            frustration_triggers=t.get("frustration_triggers", []),
+            goals=t.get("goals", []),
+            accessibility_needs=acc,
+        )
 
     # ------------------------------------------------------------------
     # Site Pre-Crawling
