@@ -72,6 +72,7 @@ const statusColor = (status: string) =>
   'text-muted-foreground';
 
 function studyHref(s: StudySummary) {
+  if (s.status === 'complete' || s.status === 'failed') return `/study/${s.id}`;
   return `/study/${s.id}/running`;
 }
 
@@ -184,22 +185,20 @@ function UrlGroup({
           return (
             <div key={study.id} className="group/row relative border-b border-border/50 last:border-b-0">
               {isComplete && (
-                <button
+                <div
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleStudy(study.id); }}
-                  disabled={checkDisabled}
                   className={cn(
-                    'absolute left-3 top-1/2 z-10 -translate-y-1/2 flex items-center justify-center transition-opacity',
+                    'absolute left-3 top-1/2 z-10 -translate-y-1/2 flex items-center justify-center transition-opacity cursor-pointer',
                     showCheckbox || isSelected ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
-                    checkDisabled && 'cursor-not-allowed opacity-30',
+                    checkDisabled && 'cursor-not-allowed opacity-30 pointer-events-none',
                   )}
                 >
                   <Checkbox
                     checked={isSelected}
                     disabled={checkDisabled}
                     tabIndex={-1}
-                    className="pointer-events-none"
                   />
-                </button>
+                </div>
               )}
               <Link
                 href={studyHref(study)}
@@ -416,6 +415,7 @@ function IssueDiffRow({ issue }: { issue: IssueDiff }) {
 export default function DashboardPage() {
   const [page] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StudyStatus | null>(null);
+  const [urlFilter, setUrlFilter] = useState<string | null>(null);
   const [showFailed, setShowFailed] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const [selectedStudyIds, setSelectedStudyIds] = useState<Set<string>>(new Set());
@@ -452,13 +452,21 @@ export default function DashboardPage() {
   const allStudies = data?.items ?? [];
   const failedCount = allStudies.filter((s) => s.status === 'failed').length;
   const studies = allStudies.filter((s) => {
-    if (statusFilter) return s.status === statusFilter;
+    if (statusFilter && s.status !== statusFilter) return false;
+    if (urlFilter && s.url !== urlFilter) return false;
     if (!showFailed && s.status === 'failed') return false;
     return true;
   });
   const grouped = useMemo(() => groupByUrl(studies), [studies]);
 
-  const hasFilters = statusFilter !== null || showFailed;
+  const hasFilters = statusFilter !== null || urlFilter !== null || showFailed;
+
+  const urlOptions = useMemo(() => {
+    const urls = Array.from(new Set(allStudies.map((s) => s.url))).sort();
+    return urls.map((u) => {
+      try { return { value: u, label: new URL(u).hostname }; } catch { return { value: u, label: u }; }
+    });
+  }, [allStudies]);
 
   const uniqueUrls = useMemo(() => {
     if (!allStudies.length) return 0;
@@ -526,10 +534,11 @@ export default function DashboardPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
-                  <Link href="/">Single test</Link>
+                  <Link href="/">Now</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/?schedule=1">Schedule</Link>
+                <DropdownMenuItem disabled className="opacity-50 cursor-default" title="Coming soon">
+                  Schedule
+                  <span className="ml-auto text-[10px] text-muted-foreground">Coming soon</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -546,7 +555,7 @@ export default function DashboardPage() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className={cn(
-                'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors',
+                'flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 text-sm font-medium transition-colors',
                 hasFilters
                   ? 'border-foreground/20 bg-foreground/5 text-foreground'
                   : 'border-border text-muted-foreground hover:text-foreground',
@@ -572,6 +581,22 @@ export default function DashboardPage() {
                   ))}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Globe className="mr-2 h-4 w-4" />
+                  URL
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-48">
+                  <DropdownMenuItem onClick={() => setUrlFilter(null)}>
+                    <span className={urlFilter === null ? 'font-medium' : ''}>All</span>
+                  </DropdownMenuItem>
+                  {urlOptions.map((opt) => (
+                    <DropdownMenuItem key={opt.value} onClick={() => setUrlFilter(opt.value)}>
+                      <span className={urlFilter === opt.value ? 'font-medium' : ''}>{opt.label}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setShowFailed((v) => !v)}>
                 <Checkbox checked={showFailed} className="pointer-events-none mr-2" />
@@ -580,7 +605,7 @@ export default function DashboardPage() {
               {hasFilters && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => { setStatusFilter(null); setShowFailed(false); }}>
+                  <DropdownMenuItem onClick={() => { setStatusFilter(null); setUrlFilter(null); setShowFailed(false); }}>
                     <X className="mr-2 h-4 w-4" />
                     Clear filters
                   </DropdownMenuItem>
@@ -605,6 +630,15 @@ export default function DashboardPage() {
               className="flex items-center gap-1 rounded-full bg-foreground/5 px-2 py-0.5 text-sm text-muted-foreground hover:text-foreground"
             >
               Status: {STATUS_OPTIONS.find((o) => o.value === statusFilter)?.label}
+              <X className="h-3 w-3" />
+            </button>
+          )}
+          {urlFilter && (
+            <button
+              onClick={() => setUrlFilter(null)}
+              className="flex items-center gap-1 rounded-full bg-foreground/5 px-2 py-0.5 text-sm text-muted-foreground hover:text-foreground"
+            >
+              {urlOptions.find((o) => o.value === urlFilter)?.label ?? urlFilter}
               <X className="h-3 w-3" />
             </button>
           )}
@@ -645,10 +679,6 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Right — Schedules */}
-      <div className="hidden min-w-0 flex-1 basis-1/2 lg:block">
-        <SchedulesPanel />
-      </div>
 
       {/* Floating compare action bar */}
       {selectedStudyIds.size > 0 && (

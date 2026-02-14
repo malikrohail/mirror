@@ -19,7 +19,7 @@ import { TERMS } from '@/lib/constants';
 
 const navItems = [
   { href: '/', label: `New ${TERMS.singularCap}`, icon: Plus },
-  { href: '/tests', label: TERMS.pluralCap, icon: ClipboardList },
+  { href: '/tests', label: `My ${TERMS.plural}`, icon: ClipboardList },
   { href: '/personas', label: 'Testers', icon: Users },
 ];
 
