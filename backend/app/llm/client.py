@@ -591,7 +591,7 @@ class LLMClient:
                     model=model,
                     max_tokens=max_tokens,
                     thinking={
-                        "type": "enabled",
+                        "type": "adaptive",
                         "budget_tokens": thinking_budget_tokens,
                     },
                     messages=messages,

@@ -84,6 +84,15 @@ class StudyOrchestrator:
         self._report_builder = ReportBuilder(self._llm)
         self._firecrawl = FirecrawlClient()
 
+        # Fast LLM client for small studies (uses Sonnet for synthesis + reports)
+        from app.llm.client import SONNET_MODEL
+        self._fast_llm = LLMClient(stage_model_overrides={
+            "synthesis": SONNET_MODEL,
+            "report_generation": SONNET_MODEL,
+        })
+        self._fast_synthesizer = Synthesizer(self._fast_llm)
+        self._fast_report_builder = ReportBuilder(self._fast_llm)
+
         # Browser pool (initialized lazily)
         self._pool: BrowserPool | None = None
 
@@ -154,16 +163,32 @@ class StudyOrchestrator:
                 )
             await self._publish_progress(study_id, 60, "navigation_complete")
 
-            # --- Phase 4: Analysis ---
+            # --- Phase 4: Analysis + Heatmaps (parallel) ---
             await self.study_repo.update_status(study_id, StudyStatus.ANALYZING)
             await self._publish_progress(study_id, 65, "analyzing")
 
-            all_issues, all_steps = await self._run_analysis_pipeline(
-                study_id, nav_results
-            )
+            # Determine if this is a small study (use faster models)
+            is_small_study = len(nav_results) <= 2
+            synthesizer = self._fast_synthesizer if is_small_study else self._synthesizer
+            report_builder = self._fast_report_builder if is_small_study else self._report_builder
+            if is_small_study:
+                logger.info("Small study (%d sessions) — using Sonnet for synthesis + report", len(nav_results))
 
-            # --- Phase 4.5: Accessibility audit ---
-            a11y_report = await self._run_accessibility_audit(study_id, nav_results)
+            session_summaries = self._build_session_summaries(nav_results)
+            task_descriptions = [t.description for t in study.tasks]
+
+            # Run analysis + a11y audit + heatmap prep in parallel
+            analysis_task = asyncio.create_task(
+                self._run_analysis_pipeline(study_id, nav_results)
+            )
+            a11y_task = asyncio.create_task(
+                self._run_accessibility_audit(study_id, nav_results)
+            )
+            all_issues_steps, a11y_report = await asyncio.gather(
+                analysis_task, a11y_task
+            )
+            all_issues, all_steps = all_issues_steps
+
             if a11y_report and a11y_report.get("visual_issues"):
                 for vi in a11y_report["visual_issues"]:
                     all_issues.append({
@@ -178,59 +203,60 @@ class StudyOrchestrator:
 
             await self._publish_progress(study_id, 75, "analysis_complete")
 
-            # --- Phase 5: Synthesis ---
+            # --- Phase 5: Synthesis + Heatmaps (parallel) ---
             await self._publish_event(study_id, {
                 "type": "study:analyzing",
                 "study_id": str(study_id),
                 "phase": "synthesis",
             })
 
-            session_summaries = self._build_session_summaries(nav_results)
-            task_descriptions = [t.description for t in study.tasks]
-
-            synthesis = await self._synthesizer.synthesize(
+            # Run synthesis and heatmaps in parallel (heatmaps don't need synthesis)
+            synthesis_coro = synthesizer.synthesize(
                 study_url=study_url,
                 tasks=task_descriptions,
                 session_summaries=session_summaries,
                 all_issues=all_issues,
+                extended_thinking=not is_small_study,
+                thinking_budget_tokens=5000 if is_small_study else 10000,
             )
+            heatmap_coro = self._generate_heatmaps(study_id, all_steps)
 
-            # --- Persist insights to database ---
-            await self._save_insights(study_id, synthesis)
-
-            # --- Issue deduplication & prioritization ---
-            try:
-                deduplicator = IssueDeduplicator(self.db)
-                await deduplicator.deduplicate_study_issues(study_id, study_url)
-                prioritizer = IssuePrioritizer(self.db)
-                await prioritizer.prioritize_study_issues(study_id)
-            except Exception as e:
-                logger.warning("Issue dedup/prioritization failed (non-fatal): %s", e)
-
-            # --- Phase 5.5: Auto-generate fix suggestions ---
-            try:
-                fix_service = FixService(self.db)
-                await fix_service.generate_fixes_for_study(study_id)
-                logger.info("Auto-generated fix suggestions for study %s", study_id)
-            except Exception as e:
-                logger.warning("Auto-fix generation failed (non-fatal): %s", e)
+            synthesis, _ = await asyncio.gather(synthesis_coro, heatmap_coro)
 
             await self._publish_progress(study_id, 85, "synthesis_complete")
 
-            # --- Phase 6: Heatmaps ---
-            await self._generate_heatmaps(study_id, all_steps)
-            await self._publish_progress(study_id, 90, "heatmaps_complete")
-
-            # --- Phase 7: Reports ---
+            # --- Phase 6: Report + Insights + Dedup (parallel) ---
             await self._publish_event(study_id, {
                 "type": "study:analyzing",
                 "study_id": str(study_id),
                 "phase": "report",
             })
 
-            await self._generate_reports(
-                study_id, study_url, synthesis, session_summaries, task_descriptions
+            async def _post_synthesis_tasks() -> None:
+                """Save insights + dedup + fix suggestions."""
+                await self._save_insights(study_id, synthesis)
+                try:
+                    deduplicator = IssueDeduplicator(self.db)
+                    await deduplicator.deduplicate_study_issues(study_id, study_url)
+                    prioritizer = IssuePrioritizer(self.db)
+                    await prioritizer.prioritize_study_issues(study_id)
+                except Exception as e:
+                    logger.warning("Issue dedup/prioritization failed (non-fatal): %s", e)
+                try:
+                    fix_service = FixService(self.db)
+                    await fix_service.generate_fixes_for_study(study_id)
+                    logger.info("Auto-generated fix suggestions for study %s", study_id)
+                except Exception as e:
+                    logger.warning("Auto-fix generation failed (non-fatal): %s", e)
+
+            # Run report generation and post-synthesis DB tasks in parallel
+            await asyncio.gather(
+                self._generate_reports_with_builder(
+                    study_id, study_url, synthesis, session_summaries, task_descriptions, report_builder
+                ),
+                _post_synthesis_tasks(),
             )
+
             await self._publish_progress(study_id, 95, "report_complete")
 
             # --- Phase 8: Complete ---
@@ -844,19 +870,33 @@ class StudyOrchestrator:
         tasks: list[str],
     ) -> None:
         """Generate Markdown and PDF reports."""
+        await self._generate_reports_with_builder(
+            study_id, study_url, synthesis, session_summaries, tasks, self._report_builder
+        )
+
+    async def _generate_reports_with_builder(
+        self,
+        study_id: uuid.UUID,
+        study_url: str,
+        synthesis: Any,
+        session_summaries: list[dict[str, Any]],
+        tasks: list[str],
+        builder: ReportBuilder,
+    ) -> None:
+        """Generate Markdown and PDF reports using the given builder."""
         storage_path = os.getenv("STORAGE_PATH", "./data")
         report_dir = f"{storage_path}/studies/{study_id}"
         os.makedirs(report_dir, exist_ok=True)
 
         try:
-            report = await self._report_builder.generate_report_content(
+            report = await builder.generate_report_content(
                 study_url=study_url,
                 synthesis=synthesis,
                 session_summaries=session_summaries,
                 tasks=tasks,
             )
 
-            md_content = self._report_builder.render_markdown(
+            md_content = builder.render_markdown(
                 report, synthesis, session_summaries
             )
 
@@ -868,7 +908,7 @@ class StudyOrchestrator:
 
             # Save PDF
             try:
-                pdf_bytes = self._report_builder.render_pdf(md_content, study_url)
+                pdf_bytes = builder.render_pdf(md_content, study_url)
                 pdf_path = f"{report_dir}/report.pdf"
                 with open(pdf_path, "wb") as f:
                     f.write(pdf_bytes)
