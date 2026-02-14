@@ -59,17 +59,17 @@ T = TypeVar("T", bound=BaseModel)
 # Model constants — overridable via env
 OPUS_MODEL = os.getenv("OPUS_MODEL", "claude-opus-4-6")
 SONNET_MODEL = os.getenv("SONNET_MODEL", "claude-sonnet-4-5-20250929")
-# Sonnet 3.5 for fast vision tasks (navigation) — much lower latency than 4.5
-SONNET_FAST_MODEL = os.getenv("SONNET_FAST_MODEL", "claude-3-5-sonnet-20241022")
+# Haiku for fast tasks (navigation) — much lower latency than Sonnet 4.5
+HAIKU_MODEL = os.getenv("HAIKU_MODEL", "claude-haiku-4-5-20251001")
 
 # Pipeline stage → default model mapping
 STAGE_MODEL_MAP: dict[str, str] = {
     "persona_generation": OPUS_MODEL,
-    "navigation": SONNET_FAST_MODEL,  # 3.5 is 3-5s/step vs 10-15s for 4.5
+    "navigation": HAIKU_MODEL,  # Haiku 4.5 is fast + cheap for vision nav decisions
     "screenshot_analysis": OPUS_MODEL,
     "synthesis": OPUS_MODEL,
     "report_generation": OPUS_MODEL,
-    "session_summary": SONNET_FAST_MODEL,
+    "session_summary": HAIKU_MODEL,
     "fix_suggestion": OPUS_MODEL,
     "accessibility_audit": OPUS_MODEL,
     "flow_analysis": OPUS_MODEL,
