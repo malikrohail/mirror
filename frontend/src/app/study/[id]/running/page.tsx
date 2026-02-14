@@ -166,6 +166,20 @@ export default function StudyRunningPage({
   const isComplete = study?.status === 'complete';
   const isFailed = study?.status === 'failed';
 
+  // Auto-switch to Log tab and inject error message when study fails
+  const addLog = useStudyStore((s) => s.addLog);
+  useEffect(() => {
+    if (isFailed) {
+      setRunningTab('log');
+      const errorMsg = study?.error_message || activeStudy?.error || 'The test encountered an error and could not complete.';
+      // Only add if not already present in logs
+      const alreadyLogged = logs.some((l) => l.level === 'error' && l.message.includes(errorMsg));
+      if (!alreadyLogged) {
+        addLog('error', errorMsg);
+      }
+    }
+  }, [isFailed]);
+
   // Calculate progress
   const maxSteps = 30;
   const totalSessions = sessions?.length ?? 0;

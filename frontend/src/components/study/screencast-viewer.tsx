@@ -58,7 +58,7 @@ export function ScreencastViewer({
   // Session ended
   if (!browserActive && !hasReceivedFrame && !screenshotUrl) {
     return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-md border bg-muted/30">
+      <div className="flex aspect-video w-full items-center justify-center rounded-md bg-muted/30">
         <div className="text-center">
           <p className="text-sm font-medium">Session ended</p>
           <p className="text-xs text-muted-foreground">
@@ -70,7 +70,7 @@ export function ScreencastViewer({
   }
 
   return (
-    <div ref={containerRef} className="relative overflow-hidden rounded-md border group">
+    <div ref={containerRef} className="relative overflow-hidden rounded-md group">
       {/* Canvas for screencast frames */}
       <canvas
         ref={canvasRef}

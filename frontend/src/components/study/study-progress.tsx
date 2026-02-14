@@ -90,14 +90,6 @@ export function StudyProgress({ studyId, hideLabel, selectedSessionId, onSelectS
   return (
     <div className="space-y-3">
 
-      {isFailed && (
-        <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
-          <p className="text-sm text-red-700 dark:text-red-300">
-            {activeStudy?.error || 'The test encountered an error and could not complete.'}
-          </p>
-        </div>
-      )}
-
       {sessions && sessions.length > 0 && (
         <div className="space-y-3">
           {!hideLabel && <p className="text-[14px] uppercase text-foreground/30">Testers</p>}
