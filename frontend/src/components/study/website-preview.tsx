@@ -189,6 +189,7 @@ export function WebsitePreview({ url, onUrlChange, viewMode: externalViewMode, o
             previewState === 'loaded' ? 'opacity-100' : 'opacity-0'
           }`}
           sandbox="allow-scripts allow-forms allow-popups"
+          tabIndex={-1}
           onLoad={handleIframeLoad}
           onError={handleIframeError}
         />

@@ -12,8 +12,8 @@ type PageHeaderBarProps = {
 
 export function PageHeaderBar({ chips, right }: PageHeaderBarProps) {
   return (
-    <div>
-      <div className="flex items-center gap-3 pl-3 pr-6 text-[14px] bg-[#F9F9FC]">
+    <div className="sticky top-0 z-30">
+      <div className="flex h-[42px] items-center gap-3 pl-3 pr-6 text-[14px] bg-[#F9F9FC]">
         {chips.map((chip, i) => (
           <span key={i} className="contents">
             {i > 0 && <div className="self-stretch w-px bg-foreground/5" />}

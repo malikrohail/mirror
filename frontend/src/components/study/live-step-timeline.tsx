@@ -45,7 +45,7 @@ const MOOD_EMOJI: Record<string, string> = {
   excited: '🤩',
 };
 
-function TypewriterText({ text, speed = 20, onComplete }: { text: string; speed?: number; onComplete?: () => void }) {
+function TypewriterText({ text, speed = 8, onComplete }: { text: string; speed?: number; onComplete?: () => void }) {
   const [displayed, setDisplayed] = useState('');
   const textRef = useRef(text);
   const calledComplete = useRef(false);

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { useTheme } from 'next-themes';
-import { ChevronDown, Monitor, Smartphone, Plus, X, Calendar, Clock, RotateCcw, Sparkles, Check, Cloud, User, ClipboardList, Users, TrendingUp, BookOpen, Moon, Sun } from 'lucide-react';
+import { ChevronDown, Monitor, Smartphone, X, Calendar, RotateCcw, Sparkles, Check, Cloud, User, ClipboardList, Users, TrendingUp, BookOpen, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -15,7 +15,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCreateStudy, useRunStudy, useStudies } from '@/hooks/use-study';
-import { useCreateSchedule, useTriggerSchedule } from '@/hooks/use-schedules';
 import { TERMS } from '@/lib/constants';
 import { PageHeaderBar } from '@/components/layout/page-header-bar';
 import { WizardStepPersonas } from './wizard-step-personas';
@@ -23,14 +22,6 @@ import { WebsitePreview } from './website-preview';
 import { QuickStart } from './quick-start';
 import type { StudySummary } from '@/types';
 
-const MAX_TASKS = 3;
-
-const CRON_PRESETS = [
-  { label: 'Every day at 9 AM', value: '0 9 * * *' },
-  { label: 'Every Monday at 9 AM', value: '0 9 * * 1' },
-  { label: 'Every 1st of the month', value: '0 9 1 * *' },
-  { label: 'Custom', value: '' },
-] as const;
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -48,7 +39,7 @@ export function StudySetupWizard() {
   const [data, setData] = useState({
     url: searchParams.get('url') ?? '',
     tasks: [''],
-    personaIds: [] as string[],
+    personaIds: searchParams.get('personas')?.split(',').filter(Boolean) ?? ([] as string[]),
   });
 
   useEffect(() => {
@@ -83,18 +74,6 @@ export function StudySetupWizard() {
     }));
   };
 
-  const [enableSchedule, setEnableSchedule] = useState(false);
-  const [schedule, setSchedule] = useState({
-    name: '',
-    cronPreset: '' as string,
-    cronCustom: '',
-  });
-
-  const cronExpression =
-    schedule.cronPreset === ''
-      ? schedule.cronCustom.trim()
-      : schedule.cronPreset;
-
   const [setupMode, setSetupMode] = useState<'quick' | 'manual'>('quick');
 
   const [bookmarks, setBookmarks] = useState<string[]>([]);
@@ -110,8 +89,6 @@ export function StudySetupWizard() {
 
   const createStudy = useCreateStudy();
   const runStudy = useRunStudy();
-  const createSchedule = useCreateSchedule();
-  const triggerSchedule = useTriggerSchedule();
   const { data: previousStudies } = useStudies(1, 50);
 
   const completedStudies = (previousStudies?.items ?? []).filter(
@@ -132,8 +109,7 @@ export function StudySetupWizard() {
   const canSubmit =
     data.url.trim().length > 0 &&
     data.tasks.some((t) => t.trim().length > 0) &&
-    data.personaIds.length > 0 &&
-    (!enableSchedule || schedule.name.trim().length > 0);
+    data.personaIds.length > 0;
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -141,26 +117,14 @@ export function StudySetupWizard() {
       const tasks = data.tasks
         .filter((t) => t.trim())
         .map((t, i) => ({ description: t.trim(), order_index: i }));
-      if (enableSchedule) {
-        const sched = await createSchedule.mutateAsync({
-          name: schedule.name.trim(),
-          url: data.url.trim(),
-          tasks,
-          persona_template_ids: data.personaIds,
-          cron_expression: cronExpression || undefined,
-        });
-        const run = await triggerSchedule.mutateAsync(sched.id);
-        router.push(`/study/${run.study_id}/running`);
-      } else {
-        const study = await createStudy.mutateAsync({
-          url: data.url.trim(),
-          tasks,
-          persona_template_ids: data.personaIds,
-        });
-        const browserMode = localStorage.getItem('mirror-browser-mode') || 'local';
-        await runStudy.mutateAsync({ studyId: study.id, browserMode });
-        router.push(`/study/${study.id}/running`);
-      }
+      const study = await createStudy.mutateAsync({
+        url: data.url.trim(),
+        tasks,
+        persona_template_ids: data.personaIds,
+      });
+      const browserMode = localStorage.getItem('mirror-browser-mode') || 'local';
+      await runStudy.mutateAsync({ studyId: study.id, browserMode });
+      router.push(`/study/${study.id}/running`);
     } catch (err) {
       toast.error(`Failed to create ${TERMS.singular}`, {
         description: err instanceof Error ? err.message : 'Unknown error',
@@ -183,31 +147,6 @@ export function StudySetupWizard() {
 
   const headerRight = (
     <div className="flex items-center gap-3">
-      {/* Browser engine toggle */}
-      <div className="flex rounded-md border p-0.5">
-        <button
-          onClick={() => toggleBrowserMode('local')}
-          className={`flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors ${
-            browserMode === 'local'
-              ? 'bg-foreground text-background'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Monitor className="h-3 w-3" />
-          Local
-        </button>
-        <button
-          onClick={() => toggleBrowserMode('cloud')}
-          className={`flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors ${
-            browserMode === 'cloud'
-              ? 'bg-foreground text-background'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Cloud className="h-3 w-3" />
-          Cloud
-        </button>
-      </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
@@ -441,60 +380,21 @@ export function StudySetupWizard() {
               <label className="block text-[14px] font-medium uppercase text-foreground/50">
                 What should the testers achieve?
               </label>
-              <div className="mt-2 space-y-2">
-                {data.tasks.map((task, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={task}
-                      onChange={(e) =>
-                        setData((d) => ({
-                          ...d,
-                          tasks: d.tasks.map((t, j) => (j === i ? e.target.value : t)),
-                        }))
-                      }
-                      onKeyDown={(e) => {
-                        const ph = i === 0 ? 'Open a pro account' : `Task ${i + 1}`;
-                        acceptPlaceholder(e, task, ph, (v) =>
-                          setData((d) => ({
-                            ...d,
-                            tasks: d.tasks.map((t, j) => (j === i ? v : t)),
-                          })),
-                        );
-                      }}
-                      placeholder={
-                        i === 0
-                          ? 'Open a pro account'
-                          : `Task ${i + 1}`
-                      }
-                      className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none placeholder:text-foreground/30 focus:ring-1 focus:ring-ring dark:border-input dark:bg-background"
-                    />
-                    {data.tasks.length > 1 && (
-                      <button
-                        onClick={() =>
-                          setData((d) => ({
-                            ...d,
-                            tasks: d.tasks.filter((_, j) => j !== i),
-                          }))
-                        }
-                        className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-                {data.tasks.length < MAX_TASKS && (
-                  <button
-                    onClick={() =>
-                      setData((d) => ({ ...d, tasks: [...d.tasks, ''] }))
-                    }
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    <Plus className="h-3 w-3" />
-                    Add another task
-                  </button>
-                )}
+              <div className="mt-2">
+                <input
+                  type="text"
+                  value={data.tasks[0]}
+                  onChange={(e) =>
+                    setData((d) => ({ ...d, tasks: [e.target.value] }))
+                  }
+                  onKeyDown={(e) => {
+                    acceptPlaceholder(e, data.tasks[0], 'Open a pro account', (v) =>
+                      setData((d) => ({ ...d, tasks: [v] })),
+                    );
+                  }}
+                  placeholder="Open a pro account"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none placeholder:text-foreground/30 focus:ring-1 focus:ring-ring dark:border-input dark:bg-background"
+                />
               </div>
             </div>
 
@@ -565,89 +465,6 @@ export function StudySetupWizard() {
               </p>
             </div>
 
-            {/* Schedule */}
-            <div>
-              <button
-                onClick={() => setEnableSchedule((v) => !v)}
-                className="flex w-full items-center gap-2 text-[14px] font-medium uppercase text-foreground/50"
-              >
-                <div
-                  className={`flex h-4 w-7 shrink-0 items-center rounded-full px-0.5 transition-colors ${
-                    enableSchedule ? 'bg-primary' : 'bg-muted-foreground/30'
-                  }`}
-                >
-                  <div
-                    className={`h-3 w-3 rounded-full bg-white transition-transform ${
-                      enableSchedule ? 'translate-x-3' : 'translate-x-0'
-                    }`}
-                  />
-                </div>
-                <Calendar className="h-3.5 w-3.5" />
-                Schedule recurring runs
-              </button>
-
-              {enableSchedule && (
-                <div className="mt-3 space-y-3 rounded-md border border-dashed p-3">
-                  <div>
-                    <label className="block text-xs font-medium text-foreground/50">
-                      Schedule name
-                    </label>
-                    <input
-                      type="text"
-                      value={schedule.name}
-                      onChange={(e) =>
-                        setSchedule((s) => ({ ...s, name: e.target.value }))
-                      }
-                      placeholder="e.g. Weekly checkout test"
-                      className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none placeholder:text-foreground/30 focus:ring-1 focus:ring-ring dark:border-input dark:bg-background"
-                    />
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-1 text-xs font-medium text-foreground/50">
-                      <Clock className="h-3 w-3" />
-                      Frequency
-                    </label>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {CRON_PRESETS.map((preset) => (
-                        <button
-                          key={preset.label}
-                          onClick={() =>
-                            setSchedule((s) => ({
-                              ...s,
-                              cronPreset: preset.value,
-                            }))
-                          }
-                          className={`rounded-md border px-2.5 py-1 text-xs transition-colors ${
-                            schedule.cronPreset === preset.value
-                              ? 'border-primary bg-primary/5 text-foreground'
-                              : 'border-border text-muted-foreground hover:border-foreground/20'
-                          }`}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                    {schedule.cronPreset === '' && (
-                      <input
-                        type="text"
-                        value={schedule.cronCustom}
-                        onChange={(e) =>
-                          setSchedule((s) => ({
-                            ...s,
-                            cronCustom: e.target.value,
-                          }))
-                        }
-                        placeholder="0 9 * * 1 (cron expression)"
-                        className="mt-2 w-full rounded-md border border-input bg-background px-3 py-1.5 font-mono text-xs outline-none placeholder:text-foreground/30 focus:ring-1 focus:ring-ring dark:border-input dark:bg-background"
-                      />
-                    )}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    A webhook URL will also be generated for CI/CD triggers.
-                  </p>
-                </div>
-              )}
-            </div>
           </div>
         </div>
 
@@ -694,8 +511,7 @@ export function StudySetupWizard() {
         <div className="relative" title={!canSubmit && !submitting ? (
           !data.url.trim() ? 'Enter a website URL' :
           !data.tasks.some((t) => t.trim()) ? 'Add a task for testers' :
-          data.personaIds.length === 0 ? 'Select at least one tester' :
-          enableSchedule && !schedule.name.trim() ? 'Enter a schedule name' : ''
+          data.personaIds.length === 0 ? 'Select at least one tester' : ''
         ) : undefined}>
           <Button
             onClick={canSubmit && !submitting ? handleSubmit : undefined}
@@ -704,11 +520,9 @@ export function StudySetupWizard() {
           >
             {submitting
               ? 'Creating...'
-              : enableSchedule
-                ? 'Schedule & Run Now'
-                : mode === 'rerun'
-                  ? `Rerun ${TERMS.singularCap}`
-                  : `Run ${TERMS.singularCap}`}
+              : mode === 'rerun'
+                ? `Rerun ${TERMS.singularCap}`
+                : `Run ${TERMS.singularCap}`}
           </Button>
         </div>
       </div>
