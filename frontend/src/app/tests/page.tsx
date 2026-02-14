@@ -204,7 +204,7 @@ function UrlGroup({
                 href={studyHref(study)}
                 className="flex items-center gap-4 pl-10 pr-4 py-2.5 text-[13px] hover:bg-muted/20 transition-colors"
               >
-                <span className="w-6 shrink-0 text-center text-foreground/20 tabular-nums">#{i + 1}</span>
+                <span className="w-6 shrink-0 text-center text-foreground/20 tabular-nums">#{studies.length - i}</span>
                 <span className="inline-flex items-center gap-1.5">
                   {study.status === 'running' ? (
                     <span className="relative inline-flex h-2 w-2">

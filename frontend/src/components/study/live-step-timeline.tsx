@@ -234,7 +234,7 @@ export function LiveStepTimeline({ steps }: LiveStepTimelineProps) {
                 {isExpanded && entry.think_aloud && (
                   <div className="mt-2 rounded-lg bg-muted/60 px-3 py-2.5">
                     <p className="text-[14px] leading-relaxed text-muted-foreground">
-                      {isLatest && !animatedSteps.current.has(entry.step_number) ? (
+                      {isLatest && !animatedSteps.current.has(entry.step_number) && (Date.now() - entry.timestamp < 3000) ? (
                         <TypewriterText
                           text={entry.think_aloud}
                           onComplete={() => animatedSteps.current.add(entry.step_number)}

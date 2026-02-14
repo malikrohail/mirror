@@ -35,7 +35,7 @@ export function LiveBrowserView({
   // Browser session ended
   if (!browserActive && !screenshotUrl) {
     return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-md border bg-muted/30">
+      <div className="flex aspect-video w-full items-center justify-center rounded-md bg-muted/30">
         <div className="text-center">
           <p className="text-sm font-medium">Session ended</p>
           <p className="text-xs text-muted-foreground">
@@ -47,7 +47,7 @@ export function LiveBrowserView({
   }
 
   return (
-    <div className="relative overflow-hidden rounded-md border">
+    <div className="relative overflow-hidden rounded-md">
       {screenshotUrl ? (
         <img
           ref={imgRef}

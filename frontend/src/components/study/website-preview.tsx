@@ -137,6 +137,41 @@ export function WebsitePreview({ url, onUrlChange, viewMode: externalViewMode, o
     setPreviewState((prev) => (prev === 'loading' ? 'loaded' : prev));
   }, []);
 
+  // Prevent iframe from stealing focus from inputs outside the preview.
+  // When an iframe loads, its content can grab focus away from the parent document.
+  useEffect(() => {
+    let lastInput: HTMLElement | null = null;
+
+    const trackInput = (e: FocusEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') {
+        lastInput = t;
+      }
+    };
+
+    const onWindowBlur = () => {
+      // When focus moves to the iframe, the main window fires 'blur'.
+      // Restore focus to the last active input if it exists.
+      if (lastInput && lastInput.ownerDocument.contains(lastInput)) {
+        setTimeout(() => {
+          if (
+            document.activeElement === document.body ||
+            document.activeElement === iframeRef.current
+          ) {
+            lastInput!.focus();
+          }
+        }, 0);
+      }
+    };
+
+    document.addEventListener('focusin', trackInput);
+    window.addEventListener('blur', onWindowBlur);
+    return () => {
+      document.removeEventListener('focusin', trackInput);
+      window.removeEventListener('blur', onWindowBlur);
+    };
+  }, []);
+
   const handleIframeError = useCallback(() => {
     setPreviewState('failed');
   }, []);
