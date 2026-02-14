@@ -233,7 +233,7 @@ class StudyOrchestrator:
             })
 
             async def _post_synthesis_tasks() -> None:
-                """Save insights + dedup + fix suggestions."""
+                """Save insights + dedup. Fix suggestions are generated on-demand."""
                 await self._save_insights(study_id, synthesis)
                 try:
                     deduplicator = IssueDeduplicator(self.db)
@@ -242,12 +242,6 @@ class StudyOrchestrator:
                     await prioritizer.prioritize_study_issues(study_id)
                 except Exception as e:
                     logger.warning("Issue dedup/prioritization failed (non-fatal): %s", e)
-                try:
-                    fix_service = FixService(self.db)
-                    await fix_service.generate_fixes_for_study(study_id)
-                    logger.info("Auto-generated fix suggestions for study %s", study_id)
-                except Exception as e:
-                    logger.warning("Auto-fix generation failed (non-fatal): %s", e)
 
             # Run report generation and post-synthesis DB tasks in parallel
             await asyncio.gather(
