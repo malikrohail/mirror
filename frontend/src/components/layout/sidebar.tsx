@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
@@ -29,16 +29,18 @@ function useNavHistory() {
   const historyRef = useRef<string[]>([]);
   const indexRef = useRef(-1);
   const navigatingRef = useRef(false);
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     if (navigatingRef.current) {
       navigatingRef.current = false;
+      setTick((t) => t + 1);
       return;
     }
-    // Trim forward history and push new entry
     historyRef.current = historyRef.current.slice(0, indexRef.current + 1);
     historyRef.current.push(pathname);
     indexRef.current = historyRef.current.length - 1;
+    setTick((t) => t + 1);
   }, [pathname]);
 
   const canGoBack = indexRef.current > 0;
@@ -70,9 +72,9 @@ export function Sidebar() {
   const { canGoBack, canGoForward, goBack, goForward } = useNavHistory();
 
   return (
-    <aside className="flex h-full w-52 shrink-0 flex-col border-r border-border bg-background">
+    <aside className="flex h-full w-52 shrink-0 flex-col border-r border-border bg-[#F9F9FC]">
       {/* Logo + navigation arrows */}
-      <div className="px-5 pt-4 pb-3">
+      <div className="px-5 pt-2 pb-3">
         <div className="flex items-center justify-between">
           <Link href="/" className="font-bold text-base">
             Mirror

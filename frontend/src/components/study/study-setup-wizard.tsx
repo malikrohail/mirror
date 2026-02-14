@@ -1,19 +1,23 @@
 'use client';
 
-import { useState, KeyboardEvent } from 'react';
+import { useState, useEffect, KeyboardEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { toast } from 'sonner';
-import { ChevronDown, Monitor, Smartphone, Plus, X, Calendar, Clock, RotateCcw, Sparkles, Check } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { ChevronDown, Monitor, Smartphone, Plus, X, Calendar, Clock, RotateCcw, Sparkles, Check, Cloud, User, ClipboardList, Users, TrendingUp, BookOpen, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCreateStudy, useRunStudy, useStudies } from '@/hooks/use-study';
 import { useCreateSchedule, useTriggerSchedule } from '@/hooks/use-schedules';
 import { TERMS } from '@/lib/constants';
+import { PageHeaderBar } from '@/components/layout/page-header-bar';
 import { WizardStepPersonas } from './wizard-step-personas';
 import { WebsitePreview } from './website-preview';
 import type { StudySummary } from '@/types';
@@ -31,16 +35,32 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+type BrowserMode = 'local' | 'cloud';
+
 export function StudySetupWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { theme, setTheme } = useTheme();
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<'new' | 'rerun'>('new');
+  const [browserMode, setBrowserMode] = useState<BrowserMode>('local');
   const [data, setData] = useState({
     url: searchParams.get('url') ?? '',
     tasks: [''],
     personaIds: [] as string[],
   });
+
+  useEffect(() => {
+    const stored = localStorage.getItem('mirror-browser-mode');
+    if (stored === 'local' || stored === 'cloud') {
+      setBrowserMode(stored);
+    }
+  }, []);
+
+  const toggleBrowserMode = (m: BrowserMode) => {
+    setBrowserMode(m);
+    localStorage.setItem('mirror-browser-mode', m);
+  };
 
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
 
@@ -140,7 +160,93 @@ export function StudySetupWizard() {
     }
   };
 
+  const headerRight = (
+    <div className="flex items-center gap-3">
+      {/* Browser engine toggle */}
+      <div className="flex rounded-md border p-0.5">
+        <button
+          onClick={() => toggleBrowserMode('local')}
+          className={`flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors ${
+            browserMode === 'local'
+              ? 'bg-foreground text-background'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Monitor className="h-3 w-3" />
+          Local
+        </button>
+        <button
+          onClick={() => toggleBrowserMode('cloud')}
+          className={`flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors ${
+            browserMode === 'cloud'
+              ? 'bg-foreground text-background'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Cloud className="h-3 w-3" />
+          Cloud
+        </button>
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+            <User className="h-4 w-4" />
+            <span>Profile</span>
+            <ChevronDown className="h-3 w-3" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem asChild>
+            <Link href="/tests" className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Previous Tests
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/personas" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              All Testers
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/schedules" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Scheduled Tests
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/history" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Score History
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/docs" className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              Docs
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="flex items-center gap-2">
+            <Sun className="h-4 w-4 dark:hidden" />
+            <Moon className="hidden h-4 w-4 dark:block" />
+            <span className="dark:hidden">Dark Mode</span>
+            <span className="hidden dark:inline">Light Mode</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+
   return (
+    <div>
+      <PageHeaderBar
+        chips={[
+          { label: 'Mode', value: mode === 'rerun' ? 'Rerun' : 'New Test' },
+          { label: 'Browser', value: browserMode === 'cloud' ? 'Cloud' : 'Local' },
+        ]}
+        right={headerRight}
+      />
     <div className="grid min-h-full grid-cols-1 lg:grid-cols-[minmax(380px,1fr)_1.5fr] gap-4 p-6">
       {/* Left column — config + testers + run button */}
       <div className="flex flex-col gap-6">
@@ -516,6 +622,7 @@ export function StudySetupWizard() {
           </Button>
         </div>
       </div>
+    </div>
     </div>
   );
 }
