@@ -554,8 +554,8 @@ class BrowserPool:
 
     async def _fetch_live_view_url(self, bb_session_id: str) -> str | None:
         """Resolve Browserbase debug URL with short retries."""
-        max_attempts = 6
-        retry_delay_seconds = 1.5
+        max_attempts = 3
+        retry_delay_seconds = 1.0
 
         async with httpx.AsyncClient() as client:
             for attempt in range(1, max_attempts + 1):

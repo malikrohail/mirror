@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type {
   WsServerMessage,
   WsSessionSnapshotState,
@@ -99,7 +100,9 @@ function inferStudyId(msg: WsServerMessage): string | null {
   return null;
 }
 
-export const useStudyStore = create<StudyStore>((set, get) => ({
+export const useStudyStore = create<StudyStore>()(
+  persist(
+    (set, get) => ({
   activeStudy: null,
   logs: [],
 
@@ -403,4 +406,10 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
   },
 
   reset: () => set({ activeStudy: null, logs: [] }),
-}));
+    }),
+    {
+      name: 'mirror-study-progress',
+      storage: createJSONStorage(() => sessionStorage),
+    }
+  )
+);

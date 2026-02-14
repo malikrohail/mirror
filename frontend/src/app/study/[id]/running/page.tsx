@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MoreVertical, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api-client';
@@ -72,6 +72,7 @@ export default function StudyRunningPage({
   const { id } = use(params);
   const router = useRouter();
   const deleteStudy = useDeleteStudy();
+  const queryClient = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [runningTab, setRunningTab] = useState<RunningTab>('browser');
@@ -149,6 +150,16 @@ export default function StudyRunningPage({
       setSelectedSessionId(sessions[0].id);
     }
   }, [sessions, selectedSessionId]);
+
+  // Invalidate queries when study completes so results page gets fresh data
+  useEffect(() => {
+    if (study?.status === 'complete') {
+      queryClient.invalidateQueries({ queryKey: ['study', id] });
+      queryClient.invalidateQueries({ queryKey: ['sessions', id] });
+      queryClient.invalidateQueries({ queryKey: ['issues', id] });
+      queryClient.invalidateQueries({ queryKey: ['insights', id] });
+    }
+  }, [study?.status, id, queryClient]);
 
   const isRunning = study?.status === 'running';
   const isAnalyzing = study?.status === 'analyzing';

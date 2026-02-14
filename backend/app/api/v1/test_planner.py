@@ -1,11 +1,14 @@
 """Natural language test planner endpoint — converts descriptions into study plans."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.test_planner import TestPlanner
+from app.dependencies import get_db
 from app.llm.client import LLMClient
 from app.llm.schemas import PlannedPersona, PlannedTask, StudyPlan
+from app.services.persona_service import PersonaService
 
 router = APIRouter()
 
@@ -63,13 +66,8 @@ class StudyPlanResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.post("/studies/plan", response_model=StudyPlanResponse)
-async def plan_study(body: StudyPlanRequest):
-    """Generate a study plan from a natural language description.
-
-    Accepts a plain-English description of what to test and a target URL,
-    then uses the LLM to generate tasks, persona recommendations, device
-    settings, and an estimated duration.
-    """
+async def plan_study(body: StudyPlanRequest, db: AsyncSession = Depends(get_db)):
+    """Generate a study plan from a natural language description."""
     llm = LLMClient()
     planner = TestPlanner(llm)
 
@@ -77,6 +75,25 @@ async def plan_study(body: StudyPlanRequest):
         description=body.description,
         url=body.url,
     )
+
+    # Match personas to templates by name
+    svc = PersonaService(db)
+    templates = await svc.list_templates()
+    template_map = {t.name.lower(): str(t.id) for t in templates}
+
+    personas = []
+    for p in plan.personas:
+        matched_id = template_map.get(p.name.lower())
+        if not matched_id:
+            for tname, tid in template_map.items():
+                if tname in p.name.lower() or p.name.lower() in tname:
+                    matched_id = tid
+                    break
+        personas.append(PlannedPersonaOut(
+            name=p.name,
+            description=p.description,
+            template_id=matched_id,
+        ))
 
     return StudyPlanResponse(
         tasks=[
@@ -86,14 +103,7 @@ async def plan_study(body: StudyPlanRequest):
             )
             for t in plan.tasks
         ],
-        personas=[
-            PlannedPersonaOut(
-                name=p.name,
-                description=p.description,
-                template_id=p.template_id,
-            )
-            for p in plan.personas
-        ],
+        personas=personas,
         device_recommendation=plan.device_recommendation,
         estimated_duration_minutes=plan.estimated_duration_minutes,
         rationale=plan.rationale,

@@ -200,7 +200,7 @@ class StudySynthesis(BaseModel):
     """Output of the cross-persona synthesis LLM call (Stage 4)."""
 
     executive_summary: str
-    overall_ux_score: int = Field(..., ge=0, le=100)
+    overall_ux_score: int = Field(default=50, ge=0, le=100)
     reasoning_trace: str = Field(default="", description="Full Opus extended thinking trace for synthesis")
     universal_issues: list[InsightItem] = Field(default_factory=list)
     persona_specific_issues: list[InsightItem] = Field(default_factory=list)

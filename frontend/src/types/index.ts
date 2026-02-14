@@ -358,7 +358,7 @@ export interface StudyPlanTask {
 }
 
 export interface StudyPlanPersona {
-  template_id: string;
+  template_id: string | null;
   name: string;
   emoji: string;
   reason: string;

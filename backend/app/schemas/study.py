@@ -18,7 +18,7 @@ class PersonaSelect(BaseModel):
 class StudyCreate(BaseModel):
     url: str = Field(..., min_length=1, max_length=2048)
     starting_path: str = "/"
-    tasks: list[TaskCreate] = Field(..., min_length=1, max_length=3)
+    tasks: list[TaskCreate] = Field(..., min_length=1, max_length=10)
     persona_template_ids: list[uuid.UUID] = Field(..., min_length=1, max_length=10)
 
 

@@ -71,6 +71,7 @@ class StepRecord:
     click_y: int | None = None
     screenshot_path: str | None = None
     page_title: str = ""
+    action_error: str | None = None
 
 
 @dataclass
@@ -228,7 +229,7 @@ class Navigator:
             # Navigate to starting URL with retry
             await self._goto_with_retry(page, start_url)
             # Brief wait for JS frameworks to hydrate
-            await page.wait_for_timeout(1500)
+            await page.wait_for_timeout(500)
 
             # Auto-dismiss cookie consent banners
             try:
@@ -446,6 +447,7 @@ class Navigator:
                 click_x, click_y = pos
 
         # 4. ACT (with retry logic — Iteration 2)
+        action_error: str | None = None
         if decision.action.type not in (ActionType.done, ActionType.give_up):
             action_kwargs: dict[str, Any] = {}
             if decision.action.selector:
@@ -458,8 +460,9 @@ class Navigator:
             )
 
             if not action_result.success:
+                action_error = action_result.error
                 logger.warning(
-                    "Action failed at step %d: %s", step_number, action_result.error,
+                    "Action failed at step %d: %s", step_number, action_error,
                 )
 
         # 5. RECORD (fire as background task so next step's PERCEIVE starts immediately)
@@ -490,6 +493,7 @@ class Navigator:
             think_aloud=decision.think_aloud,
             task_progress=decision.task_progress,
             emotional_state=decision.emotional_state.value,
+            action_error=action_error,
         ), screenshot, record_task
 
     @staticmethod
@@ -582,19 +586,29 @@ class Navigator:
             return ""
         lines = []
         for step in history[-8:]:  # Last 8 steps to stay within token budget
-            lines.append(
+            line = (
                 f"Step {step.step_number}: [{step.emotional_state}] "
                 f"{step.think_aloud[:80]} → {step.action_type} "
                 f"(progress: {step.task_progress}%)"
             )
+            if step.action_error:
+                line += f" *** ACTION FAILED: {step.action_error} — DO NOT retry this selector ***"
+            lines.append(line)
         return "\n".join(lines)
 
     @staticmethod
     def _is_stuck(history: list[StepRecord]) -> bool:
-        """Detect if the persona is stuck (same URL N consecutive times with no progress)."""
+        """Detect if the persona is stuck (same URL N consecutive times with no progress,
+        or consecutive action failures)."""
         if len(history) < STUCK_THRESHOLD:
             return False
         recent = history[-STUCK_THRESHOLD:]
+
+        # Stuck if all recent actions failed
+        all_failed = all(s.action_error is not None for s in recent)
+        if all_failed:
+            return True
+
         same_url = all(s.page_url == recent[0].page_url for s in recent)
         no_progress = all(
             s.task_progress == recent[0].task_progress for s in recent

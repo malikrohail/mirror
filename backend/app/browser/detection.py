@@ -100,7 +100,7 @@ class PageDetection:
         for selector in CAPTCHA_SELECTORS:
             try:
                 element = page.locator(selector).first
-                if await element.is_visible(timeout=500):
+                if await element.is_visible(timeout=200):
                     return {
                         "type": "captcha",
                         "detected_at": page.url,

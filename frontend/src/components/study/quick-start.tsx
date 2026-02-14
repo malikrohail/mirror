@@ -68,11 +68,19 @@ export function QuickStart() {
     if (!plan) return;
     setSubmitting(true);
     try {
-      const tasks = editableTasks.map((t, i) => ({
+      const tasks = editableTasks.slice(0, 10).map((t, i) => ({
         description: t.description,
         order_index: i,
       }));
-      const personaIds = editablePersonas.map((p) => p.template_id);
+      const personaIds = editablePersonas
+        .map((p) => p.template_id)
+        .filter((id): id is string => id != null && id.length > 0);
+
+      if (personaIds.length === 0) {
+        toast.error('No valid personas matched. Try manual setup instead.');
+        setSubmitting(false);
+        return;
+      }
 
       const study = await createStudy.mutateAsync({
         url: plan.url,
@@ -259,7 +267,7 @@ export function QuickStart() {
                 <div className="flex flex-wrap gap-2">
                   {editablePersonas.map((persona, i) => (
                     <motion.div
-                      key={persona.template_id}
+                      key={persona.template_id ?? `persona-${i}`}
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: i * 0.05 }}
@@ -376,7 +384,7 @@ export function QuickStart() {
                 <div className="space-y-2">
                   {editablePersonas.map((persona, i) => (
                     <div
-                      key={persona.template_id}
+                      key={persona.template_id ?? `persona-${i}`}
                       className="flex items-center justify-between rounded-lg border p-2.5"
                     >
                       <div className="flex items-center gap-2">

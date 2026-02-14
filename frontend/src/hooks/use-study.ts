@@ -16,6 +16,7 @@ export function useStudy(id: string) {
     queryKey: ['study', id],
     queryFn: () => api.getStudy(id),
     enabled: !!id,
+    staleTime: 0,
   });
 }
 
@@ -61,6 +62,7 @@ export function useSessions(studyId: string) {
     queryKey: ['sessions', studyId],
     queryFn: () => api.listSessions(studyId),
     enabled: !!studyId,
+    staleTime: 0,
   });
 }
 
@@ -72,6 +74,7 @@ export function useIssues(
     queryKey: ['issues', studyId, filters],
     queryFn: () => api.listIssues(studyId, filters),
     enabled: !!studyId,
+    staleTime: 0,
   });
 }
 
@@ -80,5 +83,6 @@ export function useInsights(studyId: string) {
     queryKey: ['insights', studyId],
     queryFn: () => api.listInsights(studyId),
     enabled: !!studyId,
+    staleTime: 0,
   });
 }

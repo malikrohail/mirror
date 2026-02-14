@@ -62,7 +62,7 @@ async def dismiss_cookie_consent(page: Page, timeout_ms: int = 3000) -> bool:
     for selector in CONSENT_SELECTORS:
         try:
             element = page.locator(selector).first
-            if await element.is_visible(timeout=500):
+            if await element.is_visible(timeout=200):
                 await element.click(timeout=timeout_ms)
                 logger.info("Dismissed cookie consent via: %s", selector)
                 # Wait for banner to disappear

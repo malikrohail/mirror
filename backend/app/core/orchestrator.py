@@ -335,6 +335,24 @@ class StudyOrchestrator:
                 profiles.append(profile_dict)
             except Exception as e:
                 logger.error("Failed to generate persona %s: %s", persona.id, e)
+                # Create a minimal fallback profile instead of skipping
+                fallback = {
+                    "id": str(persona.id),
+                    "name": template.get("name", f"Tester {str(persona.id)[:8]}"),
+                    "age": template.get("age", 30),
+                    "occupation": template.get("occupation", "General user"),
+                    "tech_literacy": 5,
+                    "patience_level": 5,
+                    "reading_speed": 5,
+                    "trust_level": 5,
+                    "exploration_tendency": 5,
+                    "device_preference": "desktop",
+                    "frustration_triggers": [],
+                    "goals": [],
+                    "background": "A general user testing the website.",
+                    "behavioral_notes": "",
+                }
+                profiles.append(fallback)
         return profiles
 
     @staticmethod
@@ -588,6 +606,12 @@ class StudyOrchestrator:
         coros = []
         for session in study.sessions:
             persona_dict = persona_map.get(str(session.persona_id), {})
+            if not persona_dict:
+                logger.warning(
+                    "No persona profile found for session %s (persona_id=%s). "
+                    "Persona map keys: %s",
+                    session.id, session.persona_id, list(persona_map.keys()),
+                )
             task_desc = ""
             for t in study.tasks:
                 if t.id == session.task_id:
