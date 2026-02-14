@@ -23,6 +23,8 @@ class Synthesizer:
         tasks: list[str],
         session_summaries: list[dict[str, Any]],
         all_issues: list[dict[str, Any]],
+        extended_thinking: bool = True,
+        thinking_budget_tokens: int = 10000,
     ) -> StudySynthesis:
         """Run cross-persona synthesis to produce the final study analysis.
 
@@ -31,15 +33,38 @@ class Synthesizer:
             tasks: List of task descriptions.
             session_summaries: Summary data from each persona's session.
             all_issues: All UX issues found across all sessions.
+            extended_thinking: Enable Opus extended thinking for deeper analysis.
+            thinking_budget_tokens: Token budget for extended thinking.
 
         Returns:
             StudySynthesis with executive summary, scores, issues,
             struggle points, and prioritized recommendations.
+            Includes reasoning_trace when extended_thinking is enabled.
         """
         logger.info(
-            "Synthesizing study: url=%s, sessions=%d, issues=%d",
-            study_url, len(session_summaries), len(all_issues),
+            "Synthesizing study: url=%s, sessions=%d, issues=%d, extended_thinking=%s",
+            study_url, len(session_summaries), len(all_issues), extended_thinking,
         )
+
+        if extended_thinking:
+            try:
+                synthesis = await self._llm.synthesize_study_with_thinking(
+                    study_url=study_url,
+                    tasks=tasks,
+                    session_summaries=session_summaries,
+                    all_issues=all_issues,
+                    thinking_budget_tokens=thinking_budget_tokens,
+                )
+                logger.info(
+                    "Synthesis with thinking complete: score=%d, reasoning_trace=%d chars",
+                    synthesis.overall_ux_score,
+                    len(synthesis.reasoning_trace),
+                )
+                return synthesis
+            except Exception as e:
+                logger.warning(
+                    "Extended thinking synthesis failed, falling back to standard: %s", e
+                )
 
         synthesis = await self._llm.synthesize_study(
             study_url=study_url,

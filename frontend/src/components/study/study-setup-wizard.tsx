@@ -20,6 +20,7 @@ import { TERMS } from '@/lib/constants';
 import { PageHeaderBar } from '@/components/layout/page-header-bar';
 import { WizardStepPersonas } from './wizard-step-personas';
 import { WebsitePreview } from './website-preview';
+import { QuickStart } from './quick-start';
 import type { StudySummary } from '@/types';
 
 const MAX_TASKS = 3;
@@ -63,6 +64,24 @@ export function StudySetupWizard() {
   };
 
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [browserEngine, setBrowserEngine] = useState<'local' | 'cloud'>('local');
+
+  useEffect(() => {
+    const stored = localStorage.getItem('mirror-browser-mode');
+    if (stored === 'local' || stored === 'cloud') {
+      setBrowserEngine(stored);
+    }
+  }, []);
+
+  const handleBrowserEngineChange = (mode: 'local' | 'cloud') => {
+    setBrowserEngine(mode);
+    localStorage.setItem('mirror-browser-mode', mode);
+    // Dispatch storage event for same-window listeners (storage event only fires cross-tab)
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'mirror-browser-mode',
+      newValue: mode,
+    }));
+  };
 
   const [enableSchedule, setEnableSchedule] = useState(false);
   const [schedule, setSchedule] = useState({
@@ -75,6 +94,8 @@ export function StudySetupWizard() {
     schedule.cronPreset === ''
       ? schedule.cronCustom.trim()
       : schedule.cronPreset;
+
+  const [setupMode, setSetupMode] = useState<'quick' | 'manual'>('quick');
 
   const [bookmarks, setBookmarks] = useState<string[]>([]);
 
@@ -98,12 +119,12 @@ export function StudySetupWizard() {
   );
 
   const loadFromStudy = (study: StudySummary) => {
-    const templateIds = study.personas
+    const templateIds = (study.personas ?? [])
       .map((p) => p.template_id)
       .filter((id): id is string => id !== null);
     setData({
       url: study.url,
-      tasks: study.tasks.length > 0 ? study.tasks.map((t) => t.description) : [''],
+      tasks: (study.tasks ?? []).length > 0 ? (study.tasks ?? []).map((t) => t.description) : [''],
       personaIds: templateIds,
     });
   };
@@ -250,6 +271,37 @@ export function StudySetupWizard() {
     <div className="grid min-h-full grid-cols-1 lg:grid-cols-[minmax(380px,1fr)_1.5fr] gap-4 p-6">
       {/* Left column — config + testers + run button */}
       <div className="flex flex-col gap-6">
+        {/* Mode toggle: Quick Start / Manual */}
+        <div className="flex rounded-md border p-0.5">
+          <button
+            onClick={() => setSetupMode('quick')}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-[5px] px-3 py-1.5 text-sm font-medium transition-colors ${
+              setupMode === 'quick'
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Quick Start
+          </button>
+          <button
+            onClick={() => setSetupMode('manual')}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-[5px] px-3 py-1.5 text-sm font-medium transition-colors ${
+              setupMode === 'manual'
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Manual Setup
+          </button>
+        </div>
+
+        {/* Quick Start mode */}
+        {setupMode === 'quick' && <QuickStart />}
+
+        {/* Manual mode — existing panels */}
+        {setupMode === 'manual' && (
+        <>
         {/* Panel 1 — Configure test */}
         <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card min-h-0">
           <div className="flex h-[46px] shrink-0 items-center border-b border-border px-3">
@@ -295,7 +347,7 @@ export function StudySetupWizard() {
                     </p>
                   ) : (
                     completedStudies.map((s) => {
-                      const isSelected = s.url === data.url && s.tasks.every((t, i) => data.tasks[i] === t.description);
+                      const isSelected = s.url === data.url && (s.tasks ?? []).every((t, i) => data.tasks[i] === t.description);
                       return (
                         <button
                           key={s.id}
@@ -311,7 +363,7 @@ export function StudySetupWizard() {
                               {(() => { try { return new URL(s.url).hostname + new URL(s.url).pathname; } catch { return s.url; } })()}
                             </p>
                             <p className="truncate text-muted-foreground">
-                              {s.tasks.map((t) => t.description).join(', ')}
+                              {(s.tasks ?? []).map((t) => t.description).join(', ')}
                             </p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
@@ -477,6 +529,42 @@ export function StudySetupWizard() {
               </div>
             </div>
 
+            {/* Browser engine */}
+            <div>
+              <label className="block text-[14px] font-medium uppercase text-foreground/50">
+                Browser engine
+              </label>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => handleBrowserEngineChange('local')}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                    browserEngine === 'local'
+                      ? 'border-primary bg-primary/5 text-foreground'
+                      : 'border-border text-muted-foreground hover:border-foreground/20'
+                  }`}
+                >
+                  <Monitor className="h-4 w-4" />
+                  Local
+                </button>
+                <button
+                  onClick={() => handleBrowserEngineChange('cloud')}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                    browserEngine === 'cloud'
+                      ? 'border-primary bg-primary/5 text-foreground'
+                      : 'border-border text-muted-foreground hover:border-foreground/20'
+                  }`}
+                >
+                  <Cloud className="h-4 w-4" />
+                  Cloud
+                </button>
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {browserEngine === 'local'
+                  ? 'Uses local Chromium — free, no CAPTCHA solving'
+                  : 'Uses Browserbase — live view, auto CAPTCHA solving'}
+              </p>
+            </div>
+
             {/* Schedule */}
             <div>
               <button
@@ -591,6 +679,8 @@ export function StudySetupWizard() {
           </div>
         </div>
 
+        </>
+        )}
       </div>
 
       {/* Right column — Website preview + Run Test */}

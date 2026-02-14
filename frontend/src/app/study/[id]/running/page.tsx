@@ -77,6 +77,13 @@ export default function StudyRunningPage({
   const [runningTab, setRunningTab] = useState<RunningTab>('browser');
   const [completeTab, setCompleteTab] = useState<CompleteTab>('issues');
 
+  const [browserMode, setBrowserMode] = useState<'local' | 'cloud'>('local');
+
+  useEffect(() => {
+    const stored = localStorage.getItem('mirror-browser-mode');
+    if (stored === 'cloud') setBrowserMode('cloud');
+  }, []);
+
   const activeStudy = useStudyStore((s) => s.activeStudy);
   const logs = useStudyStore((s) => s.logs);
 

@@ -598,3 +598,239 @@ def fix_suggestion_user_prompt(
         parts.append(f"PAGE: {page_url}")
     parts.append("\nGenerate a concrete code fix for this issue.")
     return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Agentic Navigation with Tool Use (Feature 1b)
+# ---------------------------------------------------------------------------
+
+def navigation_tool_use_system_prompt(
+    persona: dict[str, Any],
+    task_description: str,
+    behavioral_notes: str,
+) -> str:
+    return f"""\
+You are simulating a real person using a website. You ARE this person — think, \
+feel, and behave exactly as they would.
+
+YOUR IDENTITY:
+- Name: {persona.get('name', 'User')}
+- Age: {persona.get('age', 30)}
+- Occupation: {persona.get('occupation', 'Unknown')}
+- Tech literacy: {persona.get('tech_literacy', 5)}/10
+- Patience: {persona.get('patience_level', 5)}/10
+
+BEHAVIORAL NOTES:
+{behavioral_notes}
+
+YOUR TASK:
+"{task_description}"
+
+INSTRUCTIONS:
+You have access to tools to interact with the page. Use them to:
+1. Click elements, type text, scroll, or read content
+2. After performing an action, use check_result to verify it worked
+3. If an action fails, try an alternative approach
+4. Think aloud as your persona while you work
+
+After using tools, provide your final assessment as a JSON object:
+{{
+  "think_aloud": "persona's inner monologue",
+  "action": {{
+    "type": "click|type|scroll|navigate|wait|go_back|done|give_up",
+    "selector": "CSS selector or null",
+    "value": "text/URL/direction or null",
+    "description": "what you did"
+  }},
+  "ux_issues": [{{
+    "element": "element", "description": "issue",
+    "severity": "critical|major|minor|enhancement",
+    "heuristic": "Nielsen heuristic", "wcag_criterion": "or null",
+    "recommendation": "fix suggestion"
+  }}],
+  "confidence": float (0-1),
+  "task_progress": int (0-100),
+  "emotional_state": "confident|curious|neutral|hesitant|confused|frustrated|satisfied|anxious",
+  "reasoning": "why you chose this action"
+}}
+"""
+
+
+# ---------------------------------------------------------------------------
+# Multi-Image Flow Analysis (Feature 1c)
+# ---------------------------------------------------------------------------
+
+def flow_analysis_system_prompt() -> str:
+    return """\
+You are a senior UX researcher analyzing a SEQUENCE of screenshots from a user's \
+journey through a website. Focus on the TRANSITIONS between pages, not individual pages.
+
+ANALYSIS FOCUS:
+1. Visual consistency: Do headers, navigation, and branding stay consistent?
+2. Information continuity: Is context preserved between pages? (cart count, breadcrumbs, user state)
+3. Flow logic: Does the page sequence make sense? Are there unexpected jumps?
+4. Progress indicators: Can the user tell where they are in the process?
+5. Error recovery: If the user goes back, is state preserved?
+
+OUTPUT FORMAT: Return a JSON object:
+{
+  "flow_name": "name of the flow being analyzed",
+  "pages": ["list of URLs in sequence"],
+  "consistency_score": int (1-10, how consistent the UI is across pages),
+  "transition_issues": [
+    {
+      "from_page": "URL",
+      "to_page": "URL",
+      "description": "what breaks in the transition",
+      "severity": "critical|major|minor|enhancement",
+      "heuristic": "Nielsen heuristic violated",
+      "recommendation": "how to fix it"
+    }
+  ],
+  "information_loss": ["list of information/context lost between page transitions"],
+  "strengths": ["things that work well across the flow"],
+  "summary": "2-3 sentence overall flow assessment"
+}
+"""
+
+
+def flow_analysis_user_prompt(
+    flow_name: str,
+    page_urls: list[str],
+    persona_context: str | None = None,
+) -> str:
+    ctx = ""
+    if persona_context:
+        ctx = f"\nPERSONA CONTEXT: {persona_context}"
+    pages = "\n".join(f"  {i+1}. {url}" for i, url in enumerate(page_urls))
+    return f"""\
+Analyze the flow between these consecutive pages:
+
+FLOW: {flow_name}
+PAGES:
+{pages}
+{ctx}
+
+Focus on transitions, consistency, and information preservation between pages."""
+
+
+# ---------------------------------------------------------------------------
+# Accessibility Deep Audit (Feature 5)
+# ---------------------------------------------------------------------------
+
+def accessibility_audit_system_prompt() -> str:
+    return """\
+You are a WCAG 2.1 accessibility expert performing a visual accessibility audit \
+using the provided screenshot AND the accessibility tree.
+
+You can detect issues that automated tools CANNOT:
+- Actual color contrast from rendered screenshots (not just CSS values)
+- Touch target sizes from visual layout
+- Text over images readability
+- Visual grouping and proximity
+- Icon-only actions without labels
+- Focus indicator visibility
+- Reading order vs visual order mismatches
+
+OUTPUT FORMAT: Return a JSON object:
+{
+  "page_url": "string",
+  "wcag_level": "AA",
+  "pass_count": int,
+  "fail_count": int,
+  "compliance_percentage": float (0-100),
+  "criteria": [
+    {
+      "criterion": "1.1.1 Non-text Content",
+      "level": "A",
+      "status": "pass|fail|not_applicable",
+      "evidence": "specific evidence for the assessment"
+    }
+  ],
+  "visual_issues": [
+    {
+      "description": "detailed description",
+      "wcag_criterion": "criterion code (e.g., 1.4.3)",
+      "measured_value": "e.g., contrast ratio: 2.3:1",
+      "required_value": "e.g., minimum 4.5:1",
+      "element_description": "the affected element",
+      "severity": "critical|major|minor|enhancement",
+      "screenshot_region": {"x": 0, "y": 0, "w": 100, "h": 50}
+    }
+  ],
+  "summary": "overall accessibility assessment"
+}
+
+Be precise and evidence-based. Reference specific WCAG criteria codes."""
+
+
+def accessibility_audit_user_prompt(
+    page_url: str,
+    page_title: str,
+    a11y_tree: str,
+) -> str:
+    return f"""\
+Perform a deep WCAG 2.1 AA accessibility audit of this page.
+
+Page: {page_title}
+URL: {page_url}
+
+ACCESSIBILITY TREE:
+{a11y_tree[:6000]}
+
+Analyze both the visual screenshot and the accessibility tree to find issues \
+that automated tools would miss. Focus on visual contrast, touch targets, \
+text readability, and assistive technology compatibility."""
+
+
+# ---------------------------------------------------------------------------
+# Natural Language Test Builder (Feature 6)
+# ---------------------------------------------------------------------------
+
+def test_planner_system_prompt() -> str:
+    return """\
+You are a UX research expert who converts natural language test descriptions \
+into structured study configurations.
+
+Given a user's description of what they want to test and the target URL, generate:
+1. A list of specific, actionable tasks for personas to complete
+2. Recommended personas (with name, brief description)
+3. Device recommendation (desktop/mobile/tablet)
+4. Estimated duration
+
+OUTPUT FORMAT: Return a JSON object:
+{
+  "tasks": [
+    {
+      "description": "specific task description",
+      "success_criteria": "how to determine if the task is complete"
+    }
+  ],
+  "personas": [
+    {
+      "name": "persona name",
+      "description": "brief description matching a common user type",
+      "template_id": "template ID if matches existing, or null"
+    }
+  ],
+  "device_recommendation": "desktop|mobile|tablet",
+  "estimated_duration_minutes": int,
+  "rationale": "brief explanation of why these tasks and personas were chosen"
+}
+
+RULES:
+- Generate 2-4 tasks that are specific and measurable
+- Recommend 2-4 diverse personas that represent the target audience
+- Tasks should be completable in 5-30 steps
+- Consider the website type when choosing personas
+"""
+
+
+def test_planner_user_prompt(description: str, url: str) -> str:
+    return f"""\
+TARGET WEBSITE: {url}
+
+USER'S TEST DESCRIPTION:
+"{description}"
+
+Generate a complete study plan based on this description."""

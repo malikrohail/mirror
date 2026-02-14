@@ -42,6 +42,16 @@ export interface StudyOut {
   updated_at: string;
   tasks: TaskOut[];
   personas: PersonaOut[];
+
+  // Cost tracking
+  llm_input_tokens: number | null;
+  llm_output_tokens: number | null;
+  llm_total_tokens: number | null;
+  llm_api_calls: number | null;
+  llm_cost_usd: number | null;
+  browser_mode: string | null;
+  browser_cost_usd: number | null;
+  total_cost_usd: number | null;
 }
 
 export interface StudySummary {
@@ -160,6 +170,7 @@ export interface InsightOut {
   personas_affected: Record<string, boolean> | null;
   evidence: Record<string, unknown> | null;
   rank: number | null;
+  reasoning_trace: string | null;
   created_at: string;
 }
 
@@ -329,6 +340,50 @@ export interface VideoOut {
 
 export interface VideoGenerateResponse {
   video_id: string;
+  session_id: string;
+  status: string;
+  message: string;
+}
+
+// ── Study Plan (Quick Start) ─────────────────────────
+
+export interface StudyPlanRequest {
+  description: string;
+  url: string;
+}
+
+export interface StudyPlanTask {
+  description: string;
+  order_index: number;
+}
+
+export interface StudyPlanPersona {
+  template_id: string;
+  name: string;
+  emoji: string;
+  reason: string;
+}
+
+export interface StudyPlanResponse {
+  url: string;
+  tasks: StudyPlanTask[];
+  personas: StudyPlanPersona[];
+  summary: string;
+}
+
+// ── Narration ───────────────────────────────────────
+
+export interface NarrationStatusOut {
+  session_id: string;
+  status: 'not_started' | 'generating' | 'complete' | 'failed';
+  total_steps: number;
+  generated_steps: number;
+  failed_steps: number;
+  voice_id: string | null;
+  error: string | null;
+}
+
+export interface NarrationGenerateResponse {
   session_id: string;
   status: string;
   message: string;

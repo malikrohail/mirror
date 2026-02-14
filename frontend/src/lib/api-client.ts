@@ -27,6 +27,10 @@ import type {
   VideoGenerateResponse,
   FixSuggestionOut,
   FixGenerateResponse,
+  StudyPlanRequest,
+  StudyPlanResponse,
+  NarrationStatusOut,
+  NarrationGenerateResponse,
 } from '@/types';
 
 class ApiError extends Error {
@@ -91,6 +95,13 @@ export function runStudy(
 
 export function getStudyStatus(id: string): Promise<StudyStatusResponse> {
   return request(`/studies/${id}/status`);
+}
+
+export function generateStudyPlan(data: StudyPlanRequest): Promise<StudyPlanResponse> {
+  return request('/studies/plan', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
 export function getLiveState(studyId: string): Promise<Record<string, LiveSessionState>> {
@@ -267,6 +278,20 @@ export function getVideoDownloadUrl(sessionId: string): string {
 
 export function listStudyVideos(studyId: string): Promise<VideoOut[]> {
   return request(`/studies/${studyId}/videos`);
+}
+
+// ── Narration ────────────────────────────────────────
+
+export function generateNarration(sessionId: string): Promise<NarrationGenerateResponse> {
+  return request(`/sessions/${sessionId}/narration/generate`, { method: 'POST' });
+}
+
+export function getNarrationStatus(sessionId: string): Promise<NarrationStatusOut> {
+  return request(`/sessions/${sessionId}/narration/status`);
+}
+
+export function getNarrationAudioUrl(sessionId: string, stepNumber: number): string {
+  return `${API_BASE}/sessions/${sessionId}/narration/${stepNumber}`;
 }
 
 // ── Fix Suggestions ──────────────────────────────────

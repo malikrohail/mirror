@@ -90,6 +90,7 @@ class InsightOut(BaseModel):
     personas_affected: list | dict | None = None
     evidence: list | dict | None = None
     rank: int | None = None
+    reasoning_trace: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

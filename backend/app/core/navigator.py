@@ -211,6 +211,7 @@ class Navigator:
         """Inner navigation loop (wrapped by per-session timeout)."""
         page = await browser_context.new_page()
         steps: list[StepRecord] = []
+        pending_record_tasks: list[asyncio.Task[None]] = []
         gave_up = False
         task_completed = False
         error: str | None = None
@@ -256,7 +257,7 @@ class Navigator:
 
             for step_number in range(1, self._max_steps + 1):
                 try:
-                    step_result, curr_screenshot = await self._execute_step(
+                    step_result, curr_screenshot, record_task = await self._execute_step(
                         page=page,
                         session_id=session_id,
                         persona=persona,
@@ -270,6 +271,10 @@ class Navigator:
                     )
                     steps.append(step_result)
                     prev_screenshot = curr_screenshot
+
+                    # Collect background RECORD task if present
+                    if record_task is not None:
+                        pending_record_tasks.append(record_task)
 
                     # Check termination conditions
                     if step_result.action_type in ("done", "give_up"):
@@ -313,6 +318,20 @@ class Navigator:
                 "Navigation session failed for persona %s: %s", persona_name, e,
             )
         finally:
+            # Await all pending RECORD tasks before closing the page/session.
+            # This ensures every step's data is persisted and published before
+            # we return the NavigationResult.
+            if pending_record_tasks:
+                results = await asyncio.gather(
+                    *pending_record_tasks, return_exceptions=True,
+                )
+                for i, result in enumerate(results):
+                    if isinstance(result, Exception):
+                        logger.error(
+                            "Background record task %d failed for session %s: %s",
+                            i, session_id, result,
+                        )
+
             # Stop screencast before closing page
             if screencast is not None:
                 try:
@@ -365,11 +384,14 @@ class Navigator:
         history: list[StepRecord],
         recorder: StepRecorder | None,
         prev_screenshot: bytes | None = None,
-    ) -> tuple[StepRecord, bytes]:
+    ) -> tuple[StepRecord, bytes, asyncio.Task[None] | None]:
         """Execute a single PERCEIVE → THINK → ACT → RECORD cycle.
 
-        Returns (StepRecord, screenshot_bytes) — screenshot is returned for
-        visual diff computation in the next step (Iteration 3).
+        Returns (StepRecord, screenshot_bytes, record_task) — screenshot is
+        returned for visual diff computation in the next step (Iteration 3).
+        The record_task is a background asyncio.Task for the RECORD phase
+        (publish_step_event + save_step) that runs concurrently with the next
+        step's PERCEIVE phase. The caller must await it before the session ends.
         """
 
         # 1. PERCEIVE
@@ -440,26 +462,25 @@ class Navigator:
                     "Action failed at step %d: %s", step_number, action_result.error,
                 )
 
-        # 5. RECORD
+        # 5. RECORD (fire as background task so next step's PERCEIVE starts immediately)
+        record_task: asyncio.Task[None] | None = None
         if recorder:
-            await recorder.save_step(
-                session_id=session_id,
-                step_number=step_number,
-                screenshot=screenshot,
-                decision=decision,
-                page_url=metadata.url,
-                page_title=metadata.title,
-                viewport_width=metadata.viewport_width,
-                viewport_height=metadata.viewport_height,
-                click_x=click_x,
-                click_y=click_y,
-            )
-            await recorder.publish_step_event(
-                session_id=session_id,
-                persona_name=persona_name,
-                step_number=step_number,
-                decision=decision,
-                screenshot_url=f"{session_id}/steps/step_{step_number:03d}.png",
+            record_task = asyncio.create_task(
+                self._record_step_background(
+                    recorder=recorder,
+                    session_id=session_id,
+                    persona_name=persona_name,
+                    step_number=step_number,
+                    screenshot=screenshot,
+                    decision=decision,
+                    page_url=metadata.url,
+                    page_title=metadata.title,
+                    viewport_width=metadata.viewport_width,
+                    viewport_height=metadata.viewport_height,
+                    click_x=click_x,
+                    click_y=click_y,
+                ),
+                name=f"record-step-{session_id}-{step_number}",
             )
 
         return StepRecord(
@@ -469,7 +490,63 @@ class Navigator:
             think_aloud=decision.think_aloud,
             task_progress=decision.task_progress,
             emotional_state=decision.emotional_state.value,
-        ), screenshot
+        ), screenshot, record_task
+
+    @staticmethod
+    async def _record_step_background(
+        recorder: StepRecorder,
+        session_id: str,
+        persona_name: str,
+        step_number: int,
+        screenshot: bytes,
+        decision: NavigationDecision,
+        page_url: str,
+        page_title: str,
+        viewport_width: int,
+        viewport_height: int,
+        click_x: int | None,
+        click_y: int | None,
+    ) -> None:
+        """Background coroutine for the RECORD phase.
+
+        Publishes the WebSocket step event first (so the frontend gets the
+        update ASAP), then persists the step data. Exceptions are logged but
+        never propagated — a failed record must not crash the navigation loop.
+        """
+        try:
+            # Publish first — sends the real-time WebSocket update to the frontend
+            await recorder.publish_step_event(
+                session_id=session_id,
+                persona_name=persona_name,
+                step_number=step_number,
+                decision=decision,
+                screenshot_url=f"{session_id}/steps/step_{step_number:03d}.png",
+            )
+        except Exception:
+            logger.error(
+                "Background publish_step_event failed for step %d of session %s",
+                step_number, session_id, exc_info=True,
+            )
+
+        try:
+            # Then persist the full step data (screenshot + metadata)
+            await recorder.save_step(
+                session_id=session_id,
+                step_number=step_number,
+                screenshot=screenshot,
+                decision=decision,
+                page_url=page_url,
+                page_title=page_title,
+                viewport_width=viewport_width,
+                viewport_height=viewport_height,
+                click_x=click_x,
+                click_y=click_y,
+            )
+        except Exception:
+            logger.error(
+                "Background save_step failed for step %d of session %s",
+                step_number, session_id, exc_info=True,
+            )
 
     async def _execute_action_with_retry(
         self, page: Any, action_type: str, **kwargs: Any

@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -39,6 +39,14 @@ class ActionType(str, Enum):
     go_back = "go_back"
     done = "done"
     give_up = "give_up"
+
+
+class FixLanguage(str, Enum):
+    css = "css"
+    html = "html"
+    javascript = "javascript"
+    react = "react"
+    general = "general"
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +193,7 @@ class InsightItem(BaseModel):
     severity: Severity
     personas_affected: list[str] = Field(default_factory=list)
     evidence: list[str] = Field(default_factory=list)
+    reasoning_trace: str = Field(default="", description="Opus extended thinking trace for this insight")
 
 
 class StudySynthesis(BaseModel):
@@ -192,6 +201,7 @@ class StudySynthesis(BaseModel):
 
     executive_summary: str
     overall_ux_score: int = Field(..., ge=0, le=100)
+    reasoning_trace: str = Field(default="", description="Full Opus extended thinking trace for synthesis")
     universal_issues: list[InsightItem] = Field(default_factory=list)
     persona_specific_issues: list[InsightItem] = Field(default_factory=list)
     comparative_insights: list[InsightItem] = Field(default_factory=list)
@@ -247,5 +257,152 @@ class FixSuggestion(BaseModel):
 
     fix_explanation: str = Field(..., description="Human-readable explanation of the fix")
     fix_code: str = Field(..., description="The actual code snippet to fix the issue")
-    fix_language: str = Field(..., description="Language of the fix: css, html, javascript, react, or general")
+    fix_language: FixLanguage = Field(..., description="Language of the fix: css, html, javascript, react, or general")
     alternative_approaches: list[str] = Field(default_factory=list, description="1-2 alternative ways to fix the issue")
+
+    @field_validator("fix_explanation", "fix_code")
+    @classmethod
+    def _must_not_be_blank(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("Field cannot be blank")
+        return trimmed
+
+    @field_validator("fix_language", mode="before")
+    @classmethod
+    def _normalize_fix_language(cls, value: str | FixLanguage) -> str | FixLanguage:
+        if isinstance(value, FixLanguage):
+            return value
+        if not isinstance(value, str):
+            return value
+
+        normalized = value.strip().lower()
+        aliases = {
+            "js": "javascript",
+            "ts": "javascript",
+            "jsx": "react",
+            "tsx": "react",
+        }
+        return aliases.get(normalized, normalized)
+
+
+# ---------------------------------------------------------------------------
+# Stage 2b: Agentic Navigation with Tool Use (Feature 1b)
+# ---------------------------------------------------------------------------
+
+class ToolCallRecord(BaseModel):
+    """Record of a single tool call in the agentic navigation loop."""
+
+    tool_name: str = Field(..., description="Name of the tool called")
+    tool_input: dict[str, Any] = Field(default_factory=dict)
+    tool_result: str = Field(default="", description="Result returned by tool execution")
+    success: bool = Field(default=True)
+
+
+class AgenticNavigationDecision(BaseModel):
+    """Output of agentic navigation with tool use (multi-step reasoning)."""
+
+    think_aloud: str = Field(..., description="Persona's inner monologue")
+    tool_calls: list[ToolCallRecord] = Field(default_factory=list, description="Chain of tool calls made")
+    final_action: NavigationAction = Field(..., description="Final resolved action after tool use")
+    ux_issues: list[UXIssue] = Field(default_factory=list)
+    confidence: float = Field(..., ge=0, le=1)
+    task_progress: int = Field(..., ge=0, le=100)
+    emotional_state: EmotionalState = Field(default=EmotionalState.neutral)
+    reasoning: str = Field(default="", description="Internal reasoning chain")
+
+
+# ---------------------------------------------------------------------------
+# Stage 3b: Multi-Image Flow Analysis (Feature 1c)
+# ---------------------------------------------------------------------------
+
+class TransitionIssue(BaseModel):
+    """Issue found in the transition between pages in a flow."""
+
+    from_page: str = Field(..., description="URL of the source page")
+    to_page: str = Field(..., description="URL of the destination page")
+    description: str
+    severity: Severity
+    heuristic: str = Field(default="", description="Nielsen heuristic violated")
+    recommendation: str = Field(default="")
+
+
+class FlowAnalysis(BaseModel):
+    """Output of multi-image flow analysis (Stage 3b)."""
+
+    flow_name: str = Field(..., description="Name of the analyzed flow (e.g., 'checkout flow')")
+    pages: list[str] = Field(default_factory=list, description="URLs in this flow sequence")
+    consistency_score: int = Field(..., ge=1, le=10, description="Visual/UX consistency across pages")
+    transition_issues: list[TransitionIssue] = Field(default_factory=list)
+    information_loss: list[str] = Field(default_factory=list, description="Info lost between page transitions")
+    strengths: list[str] = Field(default_factory=list)
+    summary: str
+
+
+# ---------------------------------------------------------------------------
+# Accessibility Deep Audit (Feature 5)
+# ---------------------------------------------------------------------------
+
+class VisualAccessibilityIssue(BaseModel):
+    """An accessibility issue detected via Opus vision that automated tools miss."""
+
+    description: str
+    wcag_criterion: str = Field(..., description="WCAG 2.1 criterion code (e.g., '1.4.3')")
+    measured_value: str | None = Field(None, description="e.g., 'contrast ratio: 2.3:1'")
+    required_value: str | None = Field(None, description="e.g., 'minimum 4.5:1'")
+    element_description: str = Field(..., description="Description of the affected element")
+    severity: Severity = Field(default=Severity.major)
+    screenshot_region: dict[str, int] = Field(
+        default_factory=dict, description="Bounding box {x, y, w, h}"
+    )
+
+
+class WCAGCriterionResult(BaseModel):
+    """Pass/fail result for a single WCAG criterion."""
+
+    criterion: str = Field(..., description="e.g., '1.1.1 Non-text Content'")
+    level: str = Field(..., description="A, AA, or AAA")
+    status: str = Field(..., description="pass, fail, or not_applicable")
+    evidence: str = Field(default="", description="Evidence for the assessment")
+
+
+class AccessibilityAudit(BaseModel):
+    """Output of the deep accessibility audit using Opus vision."""
+
+    page_url: str
+    wcag_level: str = Field(default="AA", description="Target WCAG level: A, AA, or AAA")
+    pass_count: int = Field(default=0)
+    fail_count: int = Field(default=0)
+    compliance_percentage: float = Field(default=0.0, ge=0, le=100)
+    criteria: list[WCAGCriterionResult] = Field(default_factory=list)
+    visual_issues: list[VisualAccessibilityIssue] = Field(default_factory=list)
+    summary: str = Field(default="")
+
+
+# ---------------------------------------------------------------------------
+# Natural Language Test Builder (Feature 6)
+# ---------------------------------------------------------------------------
+
+class PlannedTask(BaseModel):
+    """A task generated from natural language description."""
+
+    description: str
+    success_criteria: str = Field(default="", description="How to determine task completion")
+
+
+class PlannedPersona(BaseModel):
+    """A persona recommendation from the test planner."""
+
+    name: str
+    description: str
+    template_id: str | None = Field(None, description="Match to existing template if available")
+
+
+class StudyPlan(BaseModel):
+    """Output of the natural language test builder."""
+
+    tasks: list[PlannedTask] = Field(default_factory=list)
+    personas: list[PlannedPersona] = Field(default_factory=list)
+    device_recommendation: str = Field(default="desktop")
+    estimated_duration_minutes: int = Field(default=5)
+    rationale: str = Field(default="", description="Why these tasks and personas were chosen")
