@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # MIRROR — AI User Testing Platform
 
 ## What Is Mirror
@@ -12,9 +16,9 @@ Mirror is an AI-powered usability testing platform. Users paste a URL, define ta
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Frontend | Next.js (App Router) | 15.x |
+| Frontend | Next.js (App Router) | 16.x |
 | Language (FE) | TypeScript | 5.x |
-| Styling | Tailwind CSS | 3.x |
+| Styling | Tailwind CSS | 4.x |
 | Components | shadcn/ui | latest |
 | State | Zustand | 5.x |
 | Data Fetching | TanStack Query (React Query) | 5.x |
@@ -471,7 +475,63 @@ LOG_LEVEL=INFO
 
 ---
 
-## Running the Project
+## Common Development Commands
+
+```bash
+# ── Quick Start (everything at once) ──
+make dev-all                          # Starts Docker infra + backend + worker + frontend via scripts/dev.sh
+
+# ── Infrastructure ──
+make docker-up                        # Start PostgreSQL + Redis containers
+make docker-down                      # Stop all containers
+
+# ── Backend ──
+make dev                              # Backend API only (uvicorn --reload on :8000)
+make worker                           # arq worker (production mode)
+make dev-worker                       # arq worker with auto-reload (uses scripts/dev_worker.py)
+
+# ── Frontend ──
+cd frontend && npx next dev --webpack # IMPORTANT: must use --webpack flag (see Turbopack note below)
+
+# ── Database ──
+make migrate                          # Run pending migrations (alembic upgrade head)
+make migrate-create msg="add foo"     # Create new migration
+make seed                             # Seed persona templates into DB
+
+# ── Testing ──
+make test                             # Backend tests (pytest -v)
+make test-cov                         # Backend tests with coverage report
+cd backend && python -m pytest tests/test_api/test_studies.py -v   # Single test file
+cd backend && python -m pytest tests/ -k "test_name" -v            # Single test by name
+cd frontend && npx vitest             # Frontend tests (Vitest)
+cd frontend && npx vitest run         # Frontend tests (single run, no watch)
+
+# ── Linting & Formatting ──
+make lint                             # Check backend (ruff check + format --check)
+make format                           # Fix backend (ruff check --fix + format)
+cd frontend && npx eslint .           # Frontend lint
+
+# ── Setup (first time) ──
+make install                          # Install backend deps + Playwright Chromium
+cd frontend && npm install            # Install frontend deps
+
+# ── Local Playwright Mode (no Browserbase) ──
+make docker-local                     # Full stack with local Chromium in Docker
+make health-browser                   # Check browser pool health
+```
+
+## Critical: Tailwind CSS v4 + Turbopack
+
+`postcss.config.mjs` with `@tailwindcss/postcss` + Tailwind v4 causes Turbopack to hang indefinitely. **Always run Next.js with the `--webpack` flag:**
+
+```bash
+npx next dev --webpack                # Correct — uses webpack
+npx next dev                          # WRONG — Turbopack hangs forever
+```
+
+Do NOT remove `postcss.config.mjs` — without it, Tailwind CSS won't process at all. The `globals.css` imports from `../styles/tw-animate.css` and `../styles/shadcn.css` (local copies in `src/styles/`).
+
+## Running the Project (Manual Setup)
 
 ```bash
 # Start infrastructure (PostgreSQL + Redis)
@@ -488,14 +548,18 @@ uvicorn app.main:app --reload --port 8000
 # Worker (separate terminal)
 arq app.workers.settings.WorkerSettings
 
-# Frontend
+# Frontend (MUST use --webpack flag)
 cd frontend
 npm install
-npm run dev                           # Starts on port 3000
+npx next dev --webpack                # Starts on port 3000
 
 # Full stack (Docker)
 docker compose up --build
 ```
+
+## Frontend Proxy
+
+The frontend proxies `/api/v1/*` requests to the backend via `next.config.ts` rewrites. In development, the backend runs on `:8000` and the frontend on `:3000` — API calls from the browser go to `:3000/api/v1/...` and get forwarded.
 
 ---
 
