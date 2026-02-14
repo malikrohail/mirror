@@ -57,6 +57,16 @@ class StudyOut(BaseModel):
     tasks: list[TaskOut] = []
     personas: list[PersonaOut] = []
 
+    # Cost tracking
+    llm_input_tokens: int | None = None
+    llm_output_tokens: int | None = None
+    llm_total_tokens: int | None = None
+    llm_api_calls: int | None = None
+    llm_cost_usd: float | None = None
+    browser_mode: str | None = None
+    browser_cost_usd: float | None = None
+    total_cost_usd: float | None = None
+
     model_config = {"from_attributes": True}
 
 

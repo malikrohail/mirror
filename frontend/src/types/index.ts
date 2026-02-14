@@ -42,6 +42,16 @@ export interface StudyOut {
   updated_at: string;
   tasks: TaskOut[];
   personas: PersonaOut[];
+
+  // Cost tracking
+  llm_input_tokens: number | null;
+  llm_output_tokens: number | null;
+  llm_total_tokens: number | null;
+  llm_api_calls: number | null;
+  llm_cost_usd: number | null;
+  browser_mode: string | null;
+  browser_cost_usd: number | null;
+  total_cost_usd: number | null;
 }
 
 export interface StudySummary {

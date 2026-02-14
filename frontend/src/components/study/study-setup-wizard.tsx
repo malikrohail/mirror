@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, KeyboardEvent } from 'react';
+import { useState, useEffect, KeyboardEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { ChevronDown, Monitor, Smartphone, Plus, X, Calendar, Clock, RotateCcw, Sparkles, Check } from 'lucide-react';
+import { ChevronDown, Monitor, Smartphone, Plus, X, Calendar, Clock, RotateCcw, Sparkles, Check, Cloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -43,6 +43,24 @@ export function StudySetupWizard() {
   });
 
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [browserEngine, setBrowserEngine] = useState<'local' | 'cloud'>('local');
+
+  useEffect(() => {
+    const stored = localStorage.getItem('mirror-browser-mode');
+    if (stored === 'local' || stored === 'cloud') {
+      setBrowserEngine(stored);
+    }
+  }, []);
+
+  const handleBrowserEngineChange = (mode: 'local' | 'cloud') => {
+    setBrowserEngine(mode);
+    localStorage.setItem('mirror-browser-mode', mode);
+    // Dispatch storage event for same-window listeners (storage event only fires cross-tab)
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'mirror-browser-mode',
+      newValue: mode,
+    }));
+  };
 
   const [enableSchedule, setEnableSchedule] = useState(false);
   const [schedule, setSchedule] = useState({
@@ -78,12 +96,12 @@ export function StudySetupWizard() {
   );
 
   const loadFromStudy = (study: StudySummary) => {
-    const templateIds = study.personas
+    const templateIds = (study.personas ?? [])
       .map((p) => p.template_id)
       .filter((id): id is string => id !== null);
     setData({
       url: study.url,
-      tasks: study.tasks.length > 0 ? study.tasks.map((t) => t.description) : [''],
+      tasks: (study.tasks ?? []).length > 0 ? (study.tasks ?? []).map((t) => t.description) : [''],
       personaIds: templateIds,
     });
   };
@@ -189,7 +207,7 @@ export function StudySetupWizard() {
                     </p>
                   ) : (
                     completedStudies.map((s) => {
-                      const isSelected = s.url === data.url && s.tasks.every((t, i) => data.tasks[i] === t.description);
+                      const isSelected = s.url === data.url && (s.tasks ?? []).every((t, i) => data.tasks[i] === t.description);
                       return (
                         <button
                           key={s.id}
@@ -205,7 +223,7 @@ export function StudySetupWizard() {
                               {(() => { try { return new URL(s.url).hostname + new URL(s.url).pathname; } catch { return s.url; } })()}
                             </p>
                             <p className="truncate text-muted-foreground">
-                              {s.tasks.map((t) => t.description).join(', ')}
+                              {(s.tasks ?? []).map((t) => t.description).join(', ')}
                             </p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
@@ -369,6 +387,42 @@ export function StudySetupWizard() {
                   Mobile
                 </button>
               </div>
+            </div>
+
+            {/* Browser engine */}
+            <div>
+              <label className="block text-[14px] font-medium uppercase text-foreground/50">
+                Browser engine
+              </label>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => handleBrowserEngineChange('local')}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                    browserEngine === 'local'
+                      ? 'border-primary bg-primary/5 text-foreground'
+                      : 'border-border text-muted-foreground hover:border-foreground/20'
+                  }`}
+                >
+                  <Monitor className="h-4 w-4" />
+                  Local
+                </button>
+                <button
+                  onClick={() => handleBrowserEngineChange('cloud')}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                    browserEngine === 'cloud'
+                      ? 'border-primary bg-primary/5 text-foreground'
+                      : 'border-border text-muted-foreground hover:border-foreground/20'
+                  }`}
+                >
+                  <Cloud className="h-4 w-4" />
+                  Cloud
+                </button>
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {browserEngine === 'local'
+                  ? 'Uses local Chromium — free, no CAPTCHA solving'
+                  : 'Uses Browserbase — live view, auto CAPTCHA solving'}
+              </p>
             </div>
 
             {/* Schedule */}

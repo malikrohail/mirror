@@ -1,10 +1,10 @@
 'use client';
 
-import { use, useRef, useState } from 'react';
+import { use, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, MoreVertical, Terminal, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Cloud, Monitor, MoreVertical, Terminal, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api-client';
 import { useDeleteStudy } from '@/hooks/use-study';
@@ -35,6 +35,13 @@ export default function StudyRunningPage({
   const router = useRouter();
   const deleteStudy = useDeleteStudy();
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const [browserMode, setBrowserMode] = useState<'local' | 'cloud'>('local');
+
+  useEffect(() => {
+    const stored = localStorage.getItem('mirror-browser-mode');
+    if (stored === 'cloud') setBrowserMode('cloud');
+  }, []);
 
   const activeStudy = useStudyStore((s) => s.activeStudy);
   const logs = useStudyStore((s) => s.logs);
@@ -75,7 +82,7 @@ export default function StudyRunningPage({
     if (s.status === 'complete' || s.status === 'failed') return sum + 1;
     const ws = activeStudy?.personas[s.id];
     const polled = liveState?.[s.id];
-    const step = ws?.step_number ?? (polled as Record<string, unknown>)?.step_number as number ?? s.total_steps ?? 0;
+    const step = ws?.step_number ?? (polled as unknown as Record<string, unknown>)?.step_number as number ?? s.total_steps ?? 0;
     return sum + Math.min(step / maxSteps, 0.95);
   }, 0) ?? 0;
   const percent = isComplete
@@ -123,6 +130,11 @@ export default function StudyRunningPage({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {/* Browser mode badge */}
+            <div className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground">
+              {browserMode === 'cloud' ? <Cloud className="h-3.5 w-3.5" /> : <Monitor className="h-3.5 w-3.5" />}
+              {browserMode === 'cloud' ? 'Cloud' : 'Local'}
+            </div>
             {/* Progress badge */}
             <div className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground">
               <span className={isInProgress ? 'animate-pulse' : ''} style={isInProgress ? { animationDuration: '2s' } : undefined}>

@@ -1,7 +1,7 @@
 import enum
 import uuid
 
-from sqlalchemy import Float, ForeignKey, String, Text
+from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import ENUM, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,6 +31,16 @@ class Study(Base, UUIDMixin, TimestampMixin):
     )
     overall_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     executive_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Cost tracking
+    llm_input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_total_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_api_calls: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    browser_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    browser_cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    total_cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Relationships
     tasks: Mapped[list["Task"]] = relationship(  # noqa: F821
