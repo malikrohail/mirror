@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.llm.client import LLMClient
-from app.llm.schemas import ScreenshotAnalysis, UXIssue
+from app.llm.schemas import FlowAnalysis, ScreenshotAnalysis, UXIssue
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +113,70 @@ class Analyzer:
                     seen[key] = issue
 
         return list(seen.values())
+
+    async def analyze_flows(
+        self,
+        steps: list[dict[str, Any]],
+        persona_context: str | None = None,
+    ) -> list[FlowAnalysis]:
+        """Group steps into flows and analyze transitions between pages.
+
+        Groups consecutive steps by URL sequence to identify user flows
+        (e.g., homepage → product → cart → checkout), then sends each flow
+        to Opus for multi-image analysis.
+        """
+        flows = self._group_steps_into_flows(steps)
+        results: list[FlowAnalysis] = []
+
+        for flow_name, flow_steps in flows.items():
+            screenshots = [s["screenshot_bytes"] for s in flow_steps if s.get("screenshot_bytes")]
+            urls = [s["page_url"] for s in flow_steps]
+
+            if len(screenshots) < 2:
+                continue
+
+            try:
+                analysis = await self._llm.analyze_flow(
+                    screenshots=screenshots[:5],  # Max 5 images per flow
+                    page_urls=urls[:5],
+                    flow_name=flow_name,
+                    persona_context=persona_context,
+                )
+                results.append(analysis)
+            except Exception as e:
+                logger.error("Flow analysis failed for '%s': %s", flow_name, e)
+
+        return results
+
+    @staticmethod
+    def _group_steps_into_flows(
+        steps: list[dict[str, Any]],
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Group consecutive steps into named flows based on URL patterns."""
+        if not steps:
+            return {}
+
+        flows: dict[str, list[dict[str, Any]]] = {}
+        current_flow: list[dict[str, Any]] = []
+        seen_urls: list[str] = []
+
+        for step in steps:
+            url = step.get("page_url", "")
+            if url not in seen_urls:
+                seen_urls.append(url)
+                current_flow.append(step)
+            elif current_flow:
+                # URL repeated — end current flow
+                flow_name = f"flow_{len(flows) + 1}"
+                if len(current_flow) >= 2:
+                    flows[flow_name] = current_flow
+                current_flow = [step]
+                seen_urls = [url]
+
+        if len(current_flow) >= 2:
+            flows[f"flow_{len(flows) + 1}"] = current_flow
+
+        return flows
 
     @staticmethod
     def issues_to_dicts(issues: list[UXIssue]) -> list[dict[str, Any]]:

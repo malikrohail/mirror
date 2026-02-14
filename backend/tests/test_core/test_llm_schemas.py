@@ -11,6 +11,7 @@ from app.llm.schemas import (
     AccessibilityNeeds,
     ActionType,
     EmotionalState,
+    FixSuggestion,
     NavigationAction,
     NavigationDecision,
     PersonaProfile,
@@ -115,6 +116,26 @@ class TestSeverityEnum:
         assert Severity.major.value == "major"
         assert Severity.minor.value == "minor"
         assert Severity.enhancement.value == "enhancement"
+
+
+class TestFixSuggestionValidation:
+    """Test FixSuggestion schema normalization and validation."""
+
+    def test_language_alias_normalization(self) -> None:
+        fix = FixSuggestion(
+            fix_explanation="Add a visible label and aria-describedby helper text.",
+            fix_code="label { color: #111; }",
+            fix_language="js",
+        )
+        assert fix.fix_language.value == "javascript"
+
+    def test_blank_fields_rejected(self) -> None:
+        with pytest.raises(Exception):
+            FixSuggestion(
+                fix_explanation="   ",
+                fix_code="   ",
+                fix_language="css",
+            )
 
 
 class TestParseJsonResponse:

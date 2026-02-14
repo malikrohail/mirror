@@ -50,7 +50,11 @@ class FixService:
                 )
                 issue.fix_suggestion = fix.fix_explanation
                 issue.fix_code = fix.fix_code
-                issue.fix_language = fix.fix_language
+                issue.fix_language = (
+                    fix.fix_language.value
+                    if hasattr(fix.fix_language, "value")
+                    else str(fix.fix_language)
+                )
                 updated.append(issue)
             except Exception as e:
                 logger.warning("Failed to generate fix for issue %s: %s", issue.id, e)

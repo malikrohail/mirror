@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     HYBRID_CRASH_THRESHOLD: int = 2  # Local crashes before failover to cloud
     MEMORY_MIN_FREE_MB: int = 500  # Minimum free memory for new sessions
 
+    # ElevenLabs TTS
+    ELEVENLABS_API_KEY: str = ""
+    ELEVENLABS_MODEL_ID: str = "eleven_multilingual_v2"
+
     # Server
     LOG_LEVEL: str = "INFO"
 

@@ -1,11 +1,15 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useIssues } from '@/hooks/use-study';
 import { IssueList } from './issue-list';
+import { FixPanel } from './fix-panel';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SEVERITIES } from '@/lib/constants';
 import { Skeleton } from '@/components/ui/skeleton';
+import * as api from '@/lib/api-client';
+import type { FixSuggestionOut } from '@/types';
 
 interface IssuesTabProps {
   studyId: string;
@@ -14,6 +18,19 @@ interface IssuesTabProps {
 export function IssuesTab({ studyId }: IssuesTabProps) {
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const { data: issues, isLoading } = useIssues(studyId);
+  const { data: fixes } = useQuery({
+    queryKey: ['fixes', studyId],
+    queryFn: () => api.listFixes(studyId),
+  });
+
+  const fixesByIssueId = useMemo(() => {
+    if (!fixes) return {};
+    const map: Record<string, FixSuggestionOut> = {};
+    for (const fix of fixes) {
+      map[fix.issue_id] = fix;
+    }
+    return map;
+  }, [fixes]);
 
   const filtered = useMemo(() => {
     if (!issues) return [];
@@ -52,7 +69,8 @@ export function IssuesTab({ studyId }: IssuesTabProps) {
           {filtered.length} issue{filtered.length !== 1 ? 's' : ''}
         </span>
       </div>
-      <IssueList issues={filtered} studyId={studyId} />
+      <IssueList issues={filtered} studyId={studyId} fixesByIssueId={fixesByIssueId} />
+      <FixPanel studyId={studyId} />
     </div>
   );
 }

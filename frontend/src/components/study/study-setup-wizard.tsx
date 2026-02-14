@@ -16,6 +16,7 @@ import { useCreateSchedule, useTriggerSchedule } from '@/hooks/use-schedules';
 import { TERMS } from '@/lib/constants';
 import { WizardStepPersonas } from './wizard-step-personas';
 import { WebsitePreview } from './website-preview';
+import { QuickStart } from './quick-start';
 import type { StudySummary } from '@/types';
 
 const MAX_TASKS = 3;
@@ -73,6 +74,8 @@ export function StudySetupWizard() {
     schedule.cronPreset === ''
       ? schedule.cronCustom.trim()
       : schedule.cronPreset;
+
+  const [setupMode, setSetupMode] = useState<'quick' | 'manual'>('quick');
 
   const [bookmarks, setBookmarks] = useState<string[]>([]);
 
@@ -162,6 +165,37 @@ export function StudySetupWizard() {
     <div className="grid min-h-full grid-cols-1 lg:grid-cols-[minmax(380px,1fr)_1.5fr] gap-4 p-6">
       {/* Left column — config + testers + run button */}
       <div className="flex flex-col gap-6">
+        {/* Mode toggle: Quick Start / Manual */}
+        <div className="flex rounded-md border p-0.5">
+          <button
+            onClick={() => setSetupMode('quick')}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-[5px] px-3 py-1.5 text-sm font-medium transition-colors ${
+              setupMode === 'quick'
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Quick Start
+          </button>
+          <button
+            onClick={() => setSetupMode('manual')}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-[5px] px-3 py-1.5 text-sm font-medium transition-colors ${
+              setupMode === 'manual'
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Manual Setup
+          </button>
+        </div>
+
+        {/* Quick Start mode */}
+        {setupMode === 'quick' && <QuickStart />}
+
+        {/* Manual mode — existing panels */}
+        {setupMode === 'manual' && (
+        <>
         {/* Panel 1 — Configure test */}
         <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card min-h-0">
           <div className="flex h-[46px] shrink-0 items-center border-b border-border px-3">
@@ -539,6 +573,8 @@ export function StudySetupWizard() {
           </div>
         </div>
 
+        </>
+        )}
       </div>
 
       {/* Right column — Website preview + Run Test */}

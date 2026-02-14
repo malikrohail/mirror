@@ -10,6 +10,9 @@ import { Button } from '@/components/ui/button';
 import { ExportButton } from '@/components/common/export-button';
 import { OverviewTab } from '@/components/results/overview-tab';
 import { IssuesTab } from '@/components/results/issues-tab';
+import { FixPanel } from '@/components/results/fix-panel';
+import { AccessibilityTab } from '@/components/results/accessibility-tab';
+import { FlowIssuesTab } from '@/components/results/flow-issues-tab';
 import { PageSkeleton } from '@/components/common/page-skeleton';
 import { ErrorState } from '@/components/common/error-state';
 
@@ -92,6 +95,9 @@ export default function StudyResultsPage({
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="issues">Issues</TabsTrigger>
+          <TabsTrigger value="fixes">Fixes</TabsTrigger>
+          <TabsTrigger value="accessibility">Accessibility</TabsTrigger>
+          <TabsTrigger value="flow-issues">Flow Issues</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -106,6 +112,18 @@ export default function StudyResultsPage({
 
         <TabsContent value="issues" className="mt-4">
           <IssuesTab studyId={id} />
+        </TabsContent>
+
+        <TabsContent value="fixes" className="mt-4">
+          <FixPanel studyId={id} />
+        </TabsContent>
+
+        <TabsContent value="accessibility" className="mt-4">
+          <AccessibilityTab studyId={id} />
+        </TabsContent>
+
+        <TabsContent value="flow-issues" className="mt-4">
+          <FlowIssuesTab studyId={id} />
         </TabsContent>
       </Tabs>
     </div>

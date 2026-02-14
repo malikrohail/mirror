@@ -64,3 +64,16 @@ class FixGenerateResponse(BaseModel):
     study_id: uuid.UUID
     fixes_generated: int
     fixes: list[FixSuggestionOut]
+
+
+class FixPreviewResponse(BaseModel):
+    """Response from the fix preview (before/after diff) endpoint."""
+
+    success: bool
+    before_url: str | None = None
+    after_url: str | None = None
+    diff_url: str | None = None
+    before_base64: str | None = None
+    after_base64: str | None = None
+    diff_base64: str | None = None
+    error: str | None = None

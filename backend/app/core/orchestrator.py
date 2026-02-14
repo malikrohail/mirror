@@ -23,6 +23,7 @@ from app.browser.pool import BrowserPool
 from app.browser.screencast import CDPScreencastManager
 from app.browser.screenshots import ScreenshotService
 from app.config import settings
+from app.core.accessibility_auditor import AccessibilityAuditor
 from app.core.analyzer import Analyzer
 from app.core.deduplicator import IssueDeduplicator
 from app.core.firecrawl_client import FirecrawlClient, SiteMap
@@ -40,8 +41,9 @@ from app.llm.schemas import AccessibilityNeeds, PersonaProfile
 from app.models.insight import Insight, InsightType
 from app.models.session import SessionStatus
 from app.models.study import StudyStatus
-from app.services.live_session_state import LiveSessionStateStore
 from app.services.cost_estimator import CostTracker
+from app.services.fix_service import FixService
+from app.services.live_session_state import LiveSessionStateStore
 from app.storage.file_storage import FileStorage
 
 logger = logging.getLogger(__name__)
@@ -77,6 +79,7 @@ class StudyOrchestrator:
         )
         self._analyzer = Analyzer(self._llm)
         self._synthesizer = Synthesizer(self._llm)
+        self._accessibility_auditor = AccessibilityAuditor(self._llm)
         self._heatmap_gen = HeatmapGenerator()
         self._report_builder = ReportBuilder(self._llm)
         self._firecrawl = FirecrawlClient()
@@ -158,6 +161,21 @@ class StudyOrchestrator:
             all_issues, all_steps = await self._run_analysis_pipeline(
                 study_id, nav_results
             )
+
+            # --- Phase 4.5: Accessibility audit ---
+            a11y_report = await self._run_accessibility_audit(study_id, nav_results)
+            if a11y_report and a11y_report.get("visual_issues"):
+                for vi in a11y_report["visual_issues"]:
+                    all_issues.append({
+                        "description": vi.get("description", ""),
+                        "severity": vi.get("severity", "minor"),
+                        "page_url": vi.get("page_url", ""),
+                        "element": vi.get("element", "Accessibility"),
+                        "heuristic": "Accessibility",
+                        "recommendation": vi.get("recommendation", ""),
+                        "wcag_criterion": vi.get("wcag_criterion", ""),
+                    })
+
             await self._publish_progress(study_id, 75, "analysis_complete")
 
             # --- Phase 5: Synthesis ---
@@ -188,6 +206,14 @@ class StudyOrchestrator:
                 await prioritizer.prioritize_study_issues(study_id)
             except Exception as e:
                 logger.warning("Issue dedup/prioritization failed (non-fatal): %s", e)
+
+            # --- Phase 5.5: Auto-generate fix suggestions ---
+            try:
+                fix_service = FixService(self.db)
+                await fix_service.generate_fixes_for_study(study_id)
+                logger.info("Auto-generated fix suggestions for study %s", study_id)
+            except Exception as e:
+                logger.warning("Auto-fix generation failed (non-fatal): %s", e)
 
             await self._publish_progress(study_id, 85, "synthesis_complete")
 
@@ -629,7 +655,129 @@ class StudyOrchestrator:
             except Exception as e:
                 logger.error("Analysis failed for session %s: %s", result.session_id, e)
 
+        # --- Flow analysis (Feature 1c) ---
+        try:
+            storage_path = os.getenv("STORAGE_PATH", "./data")
+            for result in nav_results:
+                if not result.steps or len(result.steps) < 2:
+                    continue
+                step_data_with_screenshots: list[dict[str, Any]] = []
+                for step in result.steps:
+                    screenshot_bytes: bytes | None = None
+                    if step.screenshot_path:
+                        full_path = os.path.join(storage_path, step.screenshot_path)
+                        if os.path.exists(full_path):
+                            with open(full_path, "rb") as f:
+                                screenshot_bytes = f.read()
+                    step_data_with_screenshots.append({
+                        "step_number": step.step_number,
+                        "page_url": step.page_url,
+                        "page_title": step.page_title,
+                        "action_type": step.action_type,
+                        "think_aloud": step.think_aloud,
+                        "task_progress": step.task_progress,
+                        "emotional_state": step.emotional_state,
+                        "screenshot_bytes": screenshot_bytes,
+                    })
+                flow_analyses = await self._analyzer.analyze_flows(
+                    step_data_with_screenshots, result.persona_name
+                )
+                # Convert flow transition issues to regular issues for synthesis
+                for fa in flow_analyses:
+                    for ti in fa.transition_issues:
+                        all_issues.append({
+                            "description": ti.description,
+                            "severity": ti.severity.value if hasattr(ti.severity, "value") else str(ti.severity),
+                            "page_url": ti.from_page,
+                            "element": f"Transition: {ti.from_page} → {ti.to_page}",
+                            "heuristic": ti.heuristic,
+                            "recommendation": ti.recommendation,
+                            "flow_name": fa.flow_name,
+                        })
+        except Exception as e:
+            logger.warning("Flow analysis failed (non-fatal): %s", e)
+
         return all_issues, all_steps
+
+    # ------------------------------------------------------------------
+    # AI Engine: Accessibility Audit
+    # ------------------------------------------------------------------
+
+    async def _run_accessibility_audit(
+        self,
+        study_id: uuid.UUID,
+        nav_results: list[NavigationResult],
+    ) -> dict[str, Any] | None:
+        """Run deep accessibility audit on unique pages from navigation results.
+
+        Collects unique page screenshots from all sessions and runs the
+        accessibility auditor on each. Results are aggregated into a
+        compliance report. This is non-fatal; failures are logged as warnings.
+
+        Returns:
+            Compliance report dict, or None if the audit could not run.
+        """
+        try:
+            storage_path = os.getenv("STORAGE_PATH", "./data")
+            seen_urls: set[str] = set()
+            audits = []
+
+            for result in nav_results:
+                if not result.steps:
+                    continue
+                for step in result.steps:
+                    page_url = step.page_url
+                    if not page_url or page_url in seen_urls:
+                        continue
+                    seen_urls.add(page_url)
+
+                    # Load screenshot from disk
+                    if not step.screenshot_path:
+                        continue
+                    full_path = os.path.join(storage_path, step.screenshot_path)
+                    if not os.path.exists(full_path):
+                        continue
+                    with open(full_path, "rb") as f:
+                        screenshot_bytes = f.read()
+
+                    try:
+                        audit = await self._accessibility_auditor.audit_page(
+                            screenshot=screenshot_bytes,
+                            a11y_tree="",  # a11y tree not persisted during navigation
+                            page_url=page_url,
+                            page_title=step.page_title or "",
+                        )
+                        audits.append(audit)
+                    except Exception as e:
+                        logger.warning(
+                            "Accessibility audit failed for %s (non-fatal): %s",
+                            page_url, e,
+                        )
+
+            if not audits:
+                logger.info("No pages audited for accessibility in study %s", study_id)
+                return None
+
+            report = await self._accessibility_auditor.generate_compliance_report(audits)
+            logger.info(
+                "Accessibility audit complete for study %s: %d pages, %.1f%% compliant",
+                study_id, report.get("total_pages", 0),
+                report.get("overall_compliance_percentage", 0.0),
+            )
+
+            # Persist report to filesystem
+            report_dir = f"{storage_path}/studies/{study_id}"
+            os.makedirs(report_dir, exist_ok=True)
+            a11y_path = f"{report_dir}/accessibility_report.json"
+            with open(a11y_path, "w") as f:
+                json.dump(report, f, indent=2)
+            logger.info("Saved accessibility report: %s", a11y_path)
+
+            return report
+
+        except Exception as e:
+            logger.warning("Accessibility audit failed (non-fatal): %s", e)
+            return None
 
     # ------------------------------------------------------------------
     # AI Engine: Heatmaps

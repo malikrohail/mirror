@@ -23,6 +23,7 @@ class TestSynthesizer:
         self, mock_llm_client: AsyncMock, sample_study_synthesis: StudySynthesis
     ) -> Synthesizer:
         mock_llm_client.synthesize_study = AsyncMock(return_value=sample_study_synthesis)
+        mock_llm_client.synthesize_study_with_thinking = AsyncMock(return_value=sample_study_synthesis)
         return Synthesizer(mock_llm_client)
 
     @pytest.mark.asyncio
@@ -52,6 +53,7 @@ class TestSynthesizer:
         self, mock_llm_client: AsyncMock, sample_study_synthesis: StudySynthesis
     ) -> None:
         mock_llm_client.synthesize_study = AsyncMock(return_value=sample_study_synthesis)
+        mock_llm_client.synthesize_study_with_thinking = AsyncMock(return_value=sample_study_synthesis)
         synthesizer = Synthesizer(mock_llm_client)
 
         summaries = [{"persona_name": "Maria", "task_completed": True}]
@@ -64,11 +66,13 @@ class TestSynthesizer:
             all_issues=issues,
         )
 
-        mock_llm_client.synthesize_study.assert_awaited_once_with(
+        # Extended thinking is enabled by default, so synthesize_study_with_thinking is called
+        mock_llm_client.synthesize_study_with_thinking.assert_awaited_once_with(
             study_url="https://test.com",
             tasks=["Task 1", "Task 2"],
             session_summaries=summaries,
             all_issues=issues,
+            thinking_budget_tokens=10000,
         )
 
     def test_synthesis_to_dict(self, sample_study_synthesis: StudySynthesis) -> None:

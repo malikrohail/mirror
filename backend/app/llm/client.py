@@ -14,10 +14,15 @@ import anthropic
 from pydantic import BaseModel
 
 from app.llm.prompts import (
+    accessibility_audit_system_prompt,
+    accessibility_audit_user_prompt,
     fix_suggestion_system_prompt,
     fix_suggestion_user_prompt,
+    flow_analysis_system_prompt,
+    flow_analysis_user_prompt,
     navigation_system_prompt,
     navigation_user_prompt,
+    navigation_tool_use_system_prompt,
     persona_from_description_prompt,
     persona_from_template_prompt,
     persona_generation_system_prompt,
@@ -29,15 +34,22 @@ from app.llm.prompts import (
     session_summary_user_prompt,
     synthesis_system_prompt,
     synthesis_user_prompt,
+    test_planner_system_prompt,
+    test_planner_user_prompt,
 )
 from app.llm.schemas import (
+    AccessibilityAudit,
+    AgenticNavigationDecision,
     FixSuggestion,
+    FlowAnalysis,
     NavigationDecision,
     PersonaProfile,
     ReportContent,
     ScreenshotAnalysis,
     SessionSummary,
+    StudyPlan,
     StudySynthesis,
+    ToolCallRecord,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,7 +68,10 @@ STAGE_MODEL_MAP: dict[str, str] = {
     "synthesis": OPUS_MODEL,
     "report_generation": OPUS_MODEL,
     "session_summary": SONNET_MODEL,
-    "fix_suggestion": SONNET_MODEL,
+    "fix_suggestion": OPUS_MODEL,
+    "accessibility_audit": OPUS_MODEL,
+    "flow_analysis": OPUS_MODEL,
+    "test_planning": OPUS_MODEL,
 }
 
 MAX_RETRIES = 3
@@ -551,6 +566,357 @@ class LLMClient:
         )
         messages = [{"role": "user", "content": user_text}]
         return await self._call_structured("fix_suggestion", system, messages, FixSuggestion)
+
+    # ------------------------------------------------------------------
+    # Extended Thinking Support (Feature 1a)
+    # ------------------------------------------------------------------
+
+    async def _call_with_thinking(
+        self,
+        stage: str,
+        system: str,
+        messages: list[dict[str, Any]],
+        max_tokens: int = 16000,
+        thinking_budget_tokens: int = 10000,
+    ) -> tuple[str, str]:
+        """Make an API call with extended thinking enabled.
+
+        Returns (thinking_text, response_text) tuple.
+        """
+        model = self._get_model(stage)
+
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = await self._client.messages.create(
+                    model=model,
+                    max_tokens=max_tokens,
+                    thinking={
+                        "type": "enabled",
+                        "budget_tokens": thinking_budget_tokens,
+                    },
+                    messages=messages,
+                )
+                self.usage.record(
+                    response.usage.input_tokens,
+                    response.usage.output_tokens,
+                )
+
+                thinking_text = ""
+                response_text = ""
+                for block in response.content:
+                    if block.type == "thinking":
+                        thinking_text += block.thinking
+                    elif block.type == "text":
+                        response_text += block.text
+
+                return thinking_text, response_text
+
+            except anthropic.RateLimitError:
+                delay = BASE_RETRY_DELAY * (2 ** attempt)
+                logger.warning("Rate limited on %s (thinking), retry in %.1fs", stage, delay)
+                await asyncio.sleep(delay)
+            except anthropic.APIStatusError as e:
+                if e.status_code >= 500:
+                    delay = BASE_RETRY_DELAY * (2 ** attempt)
+                    await asyncio.sleep(delay)
+                else:
+                    raise
+
+        raise RuntimeError(f"Extended thinking call failed after {MAX_RETRIES} retries for '{stage}'")
+
+    async def synthesize_study_with_thinking(
+        self,
+        study_url: str,
+        tasks: list[str],
+        session_summaries: list[dict[str, Any]],
+        all_issues: list[dict[str, Any]],
+        thinking_budget_tokens: int = 10000,
+    ) -> StudySynthesis:
+        """Synthesize with extended thinking — returns synthesis with reasoning trace."""
+        system = synthesis_system_prompt()
+        user_text = synthesis_user_prompt(study_url, tasks, session_summaries, all_issues)
+        messages = [
+            {"role": "user", "content": f"{system}\n\n{user_text}"},
+        ]
+
+        thinking_text, response_text = await self._call_with_thinking(
+            "synthesis", system, messages,
+            max_tokens=16000,
+            thinking_budget_tokens=thinking_budget_tokens,
+        )
+
+        synthesis = _parse_json_response(response_text, StudySynthesis)
+        synthesis.reasoning_trace = thinking_text
+        return synthesis
+
+    # ------------------------------------------------------------------
+    # Agentic Navigation with Tool Use (Feature 1b)
+    # ------------------------------------------------------------------
+
+    async def navigate_with_tools(
+        self,
+        persona: dict[str, Any],
+        task_description: str,
+        behavioral_notes: str,
+        screenshot: bytes,
+        a11y_tree: str,
+        page_url: str,
+        page_title: str,
+        step_number: int,
+        history_summary: str,
+        execute_tool_fn: Any = None,
+        max_tool_calls: int = 3,
+    ) -> AgenticNavigationDecision:
+        """Agentic navigation using Anthropic tool_use API.
+
+        Opus reasons about what to do, calls tools to verify/gather info,
+        then returns a final navigation decision.
+        """
+        system = navigation_tool_use_system_prompt(persona, task_description, behavioral_notes)
+        screenshot_b64 = base64.b64encode(screenshot).decode("utf-8")
+
+        tools = [
+            {
+                "name": "click_element",
+                "description": "Click an element on the page by CSS selector",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "selector": {"type": "string", "description": "CSS selector"},
+                        "description": {"type": "string", "description": "What you're clicking"},
+                    },
+                    "required": ["selector", "description"],
+                },
+            },
+            {
+                "name": "type_text",
+                "description": "Type text into an input field",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "selector": {"type": "string", "description": "CSS selector of the input"},
+                        "text": {"type": "string", "description": "Text to type"},
+                    },
+                    "required": ["selector", "text"],
+                },
+            },
+            {
+                "name": "scroll_page",
+                "description": "Scroll the page in a direction",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "direction": {"type": "string", "enum": ["up", "down"]},
+                    },
+                    "required": ["direction"],
+                },
+            },
+            {
+                "name": "check_result",
+                "description": "Take a new screenshot to verify the last action worked",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "reason": {"type": "string", "description": "Why you need to verify"},
+                    },
+                    "required": ["reason"],
+                },
+            },
+            {
+                "name": "read_element",
+                "description": "Read the text content of a specific element",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "selector": {"type": "string", "description": "CSS selector to read"},
+                    },
+                    "required": ["selector"],
+                },
+            },
+        ]
+
+        from app.llm.prompts import navigation_user_prompt
+        user_text = navigation_user_prompt(
+            step_number=step_number,
+            page_url=page_url,
+            page_title=page_title,
+            a11y_tree=a11y_tree,
+            history_summary=history_summary,
+        )
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": "image/png", "data": screenshot_b64},
+                    },
+                    {"type": "text", "text": user_text},
+                ],
+            }
+        ]
+
+        model = self._get_model("navigation")
+        tool_call_records: list[ToolCallRecord] = []
+
+        for _tool_round in range(max_tool_calls):
+            response = await self._client.messages.create(
+                model=model,
+                max_tokens=4096,
+                system=system,
+                messages=messages,
+                tools=tools,
+            )
+            self.usage.record(response.usage.input_tokens, response.usage.output_tokens)
+
+            # Check if the response contains tool use
+            has_tool_use = any(block.type == "tool_use" for block in response.content)
+            if not has_tool_use:
+                break
+
+            # Process tool calls
+            assistant_content = response.content
+            messages.append({"role": "assistant", "content": assistant_content})
+
+            tool_results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    tool_result_text = "Tool executed successfully"
+                    success = True
+                    if execute_tool_fn:
+                        try:
+                            tool_result_text = await execute_tool_fn(block.name, block.input)
+                        except Exception as e:
+                            tool_result_text = f"Tool failed: {e}"
+                            success = False
+
+                    tool_call_records.append(ToolCallRecord(
+                        tool_name=block.name,
+                        tool_input=block.input,
+                        tool_result=tool_result_text,
+                        success=success,
+                    ))
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": tool_result_text,
+                    })
+
+            messages.append({"role": "user", "content": tool_results})
+
+            if response.stop_reason == "end_turn":
+                break
+
+        # Parse final text response into decision
+        final_text = ""
+        for block in response.content:
+            if block.type == "text":
+                final_text += block.text
+
+        try:
+            nav_decision = _parse_json_response(final_text, NavigationDecision)
+        except ValueError:
+            nav_decision = NavigationDecision(
+                think_aloud="I need to continue exploring the page.",
+                action={"type": "scroll", "value": "down", "description": "Scroll to see more content"},
+                confidence=0.5,
+                task_progress=0,
+                emotional_state="neutral",
+            )
+
+        return AgenticNavigationDecision(
+            think_aloud=nav_decision.think_aloud,
+            tool_calls=tool_call_records,
+            final_action=nav_decision.action,
+            ux_issues=nav_decision.ux_issues,
+            confidence=nav_decision.confidence,
+            task_progress=nav_decision.task_progress,
+            emotional_state=nav_decision.emotional_state,
+            reasoning=nav_decision.reasoning,
+        )
+
+    # ------------------------------------------------------------------
+    # Multi-Image Flow Analysis (Feature 1c)
+    # ------------------------------------------------------------------
+
+    async def analyze_flow(
+        self,
+        screenshots: list[bytes],
+        page_urls: list[str],
+        flow_name: str,
+        persona_context: str | None = None,
+    ) -> FlowAnalysis:
+        """Analyze a sequence of screenshots for flow consistency and transitions."""
+        system = flow_analysis_system_prompt()
+        user_text = flow_analysis_user_prompt(flow_name, page_urls, persona_context)
+
+        content_blocks: list[dict[str, Any]] = []
+        for i, (ss_bytes, url) in enumerate(zip(screenshots, page_urls)):
+            ss_b64 = base64.b64encode(ss_bytes).decode("utf-8")
+            content_blocks.append({
+                "type": "image",
+                "source": {"type": "base64", "media_type": "image/png", "data": ss_b64},
+            })
+            content_blocks.append({"type": "text", "text": f"Page {i + 1}: {url}"})
+
+        content_blocks.append({"type": "text", "text": user_text})
+        messages = [{"role": "user", "content": content_blocks}]
+
+        return await self._call_structured(
+            "flow_analysis", system, messages, FlowAnalysis, max_tokens=4096
+        )
+
+    # ------------------------------------------------------------------
+    # Accessibility Deep Audit (Feature 5)
+    # ------------------------------------------------------------------
+
+    async def audit_accessibility(
+        self,
+        screenshot: bytes,
+        a11y_tree: str,
+        page_url: str,
+        page_title: str,
+    ) -> AccessibilityAudit:
+        """Deep accessibility audit using Opus vision."""
+        system = accessibility_audit_system_prompt()
+        user_text = accessibility_audit_user_prompt(page_url, page_title, a11y_tree)
+
+        screenshot_b64 = base64.b64encode(screenshot).decode("utf-8")
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": "image/png", "data": screenshot_b64},
+                    },
+                    {"type": "text", "text": user_text},
+                ],
+            }
+        ]
+
+        return await self._call_structured(
+            "accessibility_audit", system, messages, AccessibilityAudit, max_tokens=4096
+        )
+
+    # ------------------------------------------------------------------
+    # Natural Language Test Builder (Feature 6)
+    # ------------------------------------------------------------------
+
+    async def plan_study(
+        self,
+        description: str,
+        url: str,
+    ) -> StudyPlan:
+        """Generate a study plan from natural language description."""
+        system = test_planner_system_prompt()
+        user_text = test_planner_user_prompt(description, url)
+        messages = [{"role": "user", "content": user_text}]
+
+        return await self._call_structured(
+            "test_planning", system, messages, StudyPlan
+        )
 
 
 # ---------------------------------------------------------------------------
