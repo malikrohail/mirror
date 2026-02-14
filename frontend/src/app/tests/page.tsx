@@ -454,6 +454,7 @@ function IssueDiffRow({ issue }: { issue: IssueDiff }) {
 export default function DashboardPage() {
   const [page] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StudyStatus | null>(null);
+  const [showFailed, setShowFailed] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [compareMode, setCompareMode] = useState(false);
   const [selectedStudyIds, setSelectedStudyIds] = useState<Set<string>>(new Set());
@@ -487,12 +488,15 @@ export default function DashboardPage() {
   };
 
   const allStudies = data?.items ?? [];
-  const studies = statusFilter
-    ? allStudies.filter((s) => s.status === statusFilter)
-    : allStudies;
+  const failedCount = allStudies.filter((s) => s.status === 'failed').length;
+  const studies = allStudies.filter((s) => {
+    if (statusFilter) return s.status === statusFilter;
+    if (!showFailed && s.status === 'failed') return false;
+    return true;
+  });
   const grouped = useMemo(() => groupByUrl(studies), [studies]);
 
-  const hasFilters = statusFilter !== null;
+  const hasFilters = statusFilter !== null || showFailed;
 
   const toggleGroup = (url: string) => {
     setExpanded((prev) => {
@@ -574,10 +578,15 @@ export default function DashboardPage() {
                   ))}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowFailed((v) => !v)}>
+                <Checkbox checked={showFailed} className="pointer-events-none mr-2" />
+                Show Failed
+              </DropdownMenuItem>
               {hasFilters && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setStatusFilter(null)}>
+                  <DropdownMenuItem onClick={() => { setStatusFilter(null); setShowFailed(false); }}>
                     <X className="mr-2 h-4 w-4" />
                     Clear filters
                   </DropdownMenuItem>
@@ -642,6 +651,15 @@ export default function DashboardPage() {
             <p className="px-3 py-6 text-center text-sm text-muted-foreground">No tests match this filter</p>
           )}
         </div>
+
+        {!showFailed && !statusFilter && failedCount > 0 && (
+          <button
+            onClick={() => setShowFailed(true)}
+            className="text-xs text-muted-foreground/40 transition-colors hover:text-muted-foreground"
+          >
+            Show {failedCount} failed
+          </button>
+        )}
       </div>
 
       {/* Right — Schedules */}
