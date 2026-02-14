@@ -436,7 +436,7 @@ class LLMClient:
         messages = [{"role": "user", "content": user_text}]
 
         return await self._call_structured(
-            "report_generation", system, messages, ReportContent, max_tokens=4096
+            "report_generation", system, messages, ReportContent, max_tokens=6000
         )
 
     # ------------------------------------------------------------------
@@ -928,10 +928,11 @@ def _repair_json(text: str) -> str:
 
     Handles:
     - Trailing commas before } or ]
-    - Improperly escaped quotes inside string values (e.g. \"Gerry\")
-    - Single quotes used instead of double quotes
+    - Improperly escaped quotes inside string values
+    - Invalid escape sequences (e.g. \\s, \\p → \\\\s, \\\\p)
     - Unescaped control characters in strings
     - Missing closing brackets
+    - Truncated strings (unterminated quotes)
     """
     # Remove trailing commas before } or ]
     text = re.sub(r",\s*([}\]])", r"\1", text)
@@ -943,21 +944,44 @@ def _repair_json(text: str) -> str:
     # Fix double-escaped quotes: \\"Gerry\\" → \"Gerry\"
     text = re.sub(r'\\\\"', '\\"', text)
 
+    # Fix invalid escape sequences: \s, \p, \a, etc. → \\s, \\p, \\a
+    # Valid JSON escapes are: \", \\, \/, \b, \f, \n, \r, \t, \uXXXX
+    text = re.sub(r'\\([^"\\/bfnrtu])', r'\\\\\1', text)
+
     # Fix unescaped newlines inside JSON string values
-    # Replace literal newlines between quotes with \\n
     def _fix_string_newlines(match: re.Match) -> str:
         content = match.group(0)
         return content.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
 
     text = re.sub(r'"(?:[^"\\]|\\.)*"', _fix_string_newlines, text, flags=re.DOTALL)
 
+    # Fix truncated strings: if there's an unterminated quote, close it
+    # Count unmatched quotes (naive: strip matched pairs)
+    in_string = False
+    last_quote_pos = -1
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if ch == '\\' and in_string:
+            i += 2  # skip escaped char
+            continue
+        if ch == '"':
+            in_string = not in_string
+            if in_string:
+                last_quote_pos = i
+        i += 1
+
+    if in_string and last_quote_pos >= 0:
+        # Truncated inside a string — close it and balance brackets
+        text = text[:len(text)] + '"'
+
     # Balance brackets: count { vs } and [ vs ]
     open_braces = text.count("{") - text.count("}")
     open_brackets = text.count("[") - text.count("]")
-    if open_braces > 0:
-        text += "}" * open_braces
     if open_brackets > 0:
         text += "]" * open_brackets
+    if open_braces > 0:
+        text += "}" * open_braces
 
     return text
 
