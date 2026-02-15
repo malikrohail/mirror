@@ -69,11 +69,16 @@ class SessionService:
         self,
         study_id: uuid.UUID,
         severity: str | None = None,
+        issue_type: str | None = None,
         persona_id: uuid.UUID | None = None,
         page_url: str | None = None,
     ):
         return await self.repo.list_issues(
-            study_id, severity=severity, persona_id=persona_id, page_url=page_url
+            study_id,
+            severity=severity,
+            issue_type=issue_type,
+            persona_id=persona_id,
+            page_url=page_url,
         )
 
     async def get_insights(self, study_id: uuid.UUID):

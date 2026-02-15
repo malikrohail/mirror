@@ -147,6 +147,13 @@ ACTION TYPES:
 - "done": Task completed successfully
 - "give_up": Cannot complete the task, too frustrated or stuck
 
+ISSUE TYPE CLASSIFICATION:
+For each UX issue, classify its type:
+- "ux" — general usability (layout, flow, clarity, readability, consistency, confusing labels)
+- "accessibility" — WCAG/a11y issues (contrast, keyboard nav, screen reader, alt text, focus indicators)
+- "error" — broken functionality (failed clicks, 404s, unresponsive elements, JS errors, dead links)
+- "performance" — slow loads, lag, timeouts, large images, render blocking
+
 OUTPUT FORMAT: Return a JSON object:
 {{
   "think_aloud": "string — persona's inner monologue for this step",
@@ -163,7 +170,8 @@ OUTPUT FORMAT: Return a JSON object:
       "severity": "critical|major|minor|enhancement",
       "heuristic": "which Nielsen heuristic is violated",
       "wcag_criterion": "WCAG criterion or null",
-      "recommendation": "how to fix it"
+      "recommendation": "how to fix it",
+      "issue_type": "ux|accessibility|error|performance"
     }}
   ],
   "confidence": float (0-1),
@@ -247,12 +255,19 @@ OUTPUT FORMAT: Return a JSON object:
       "severity": "critical|major|minor|enhancement",
       "heuristic": "which Nielsen heuristic is violated",
       "wcag_criterion": "WCAG criterion or null",
-      "recommendation": "specific actionable fix"
+      "recommendation": "specific actionable fix",
+      "issue_type": "ux|accessibility|error|performance"
     }
   ],
   "strengths": ["list of things done well"],
   "summary": "2-3 sentence overall assessment"
 }
+
+ISSUE TYPE CLASSIFICATION:
+- "ux" — general usability (layout, flow, clarity, readability, consistency)
+- "accessibility" — WCAG/a11y issues (contrast, keyboard nav, screen reader, alt text)
+- "error" — broken functionality (failed clicks, 404s, unresponsive elements, JS errors)
+- "performance" — slow loads, lag, timeouts, large images, render blocking
 
 Be specific and actionable. Reference exact UI elements. Don't be generic."""
 

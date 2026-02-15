@@ -4,6 +4,21 @@ export const WS_URL =
 
 export const STUDY_STATUSES = ['setup', 'running', 'analyzing', 'complete', 'failed'] as const;
 export const SEVERITIES = ['critical', 'major', 'minor', 'enhancement'] as const;
+export const ISSUE_TYPES = ['ux', 'accessibility', 'error', 'performance'] as const;
+
+export const ISSUE_TYPE_LABELS: Record<string, string> = {
+  ux: 'UX',
+  accessibility: 'Accessibility',
+  error: 'Error',
+  performance: 'Performance',
+};
+
+export const ISSUE_TYPE_COLORS: Record<string, string> = {
+  ux: 'text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-950 dark:border-blue-900',
+  accessibility: 'text-purple-600 bg-purple-50 border-purple-200 dark:text-purple-400 dark:bg-purple-950 dark:border-purple-900',
+  error: 'text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-950 dark:border-red-900',
+  performance: 'text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-950 dark:border-amber-900',
+};
 export const EMOTIONAL_STATES = ['curious', 'confused', 'frustrated', 'satisfied', 'stuck'] as const;
 
 export const SEVERITY_COLORS: Record<string, string> = {

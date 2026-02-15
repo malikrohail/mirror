@@ -5,8 +5,11 @@ import Link from 'next/link';
 import { Eye } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { SeverityBadge } from '@/components/common/severity-badge';
 import { FixPreview } from './fix-preview';
+import { ISSUE_TYPE_LABELS, ISSUE_TYPE_COLORS } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 import type { IssueOut } from '@/types';
 
 interface IssueCardProps {
@@ -24,7 +27,17 @@ export function IssueCard({ issue, studyId, fixCode, fixLanguage }: IssueCardPro
       <CardContent className="space-y-2 p-4">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium">{issue.description}</p>
-          <SeverityBadge severity={issue.severity} />
+          <div className="flex shrink-0 items-center gap-1.5">
+            {issue.issue_type && issue.issue_type !== 'ux' && (
+              <Badge
+                variant="outline"
+                className={cn('text-xs', ISSUE_TYPE_COLORS[issue.issue_type])}
+              >
+                {ISSUE_TYPE_LABELS[issue.issue_type] ?? issue.issue_type}
+              </Badge>
+            )}
+            <SeverityBadge severity={issue.severity} />
+          </div>
         </div>
         {issue.recommendation && (
           <p className="text-xs text-muted-foreground">

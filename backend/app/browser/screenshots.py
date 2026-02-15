@@ -251,7 +251,13 @@ class ScreenshotService:
     async def get_click_position(
         self, page: Page, selector: str
     ) -> tuple[int, int] | None:
-        """Get the center coordinates of an element (for heatmap data)."""
+        """Get the center coordinates of an element (for heatmap data).
+
+        Tries the CSS selector first, then falls back to evaluating
+        the selector via querySelector to handle edge cases where
+        Playwright's locator times out but the element exists.
+        """
+        # Try Playwright locator first
         try:
             box = await page.locator(selector).bounding_box(timeout=3_000)
             if box:
@@ -261,4 +267,25 @@ class ScreenshotService:
                 )
         except Exception:
             pass
+
+        # Fallback: use page.evaluate to get bounding rect directly
+        try:
+            pos = await page.evaluate(
+                """(selector) => {
+                    const el = document.querySelector(selector);
+                    if (!el) return null;
+                    const rect = el.getBoundingClientRect();
+                    if (rect.width === 0 && rect.height === 0) return null;
+                    return {
+                        x: Math.round(rect.left + rect.width / 2),
+                        y: Math.round(rect.top + rect.height / 2)
+                    };
+                }""",
+                selector,
+            )
+            if pos:
+                return (pos["x"], pos["y"])
+        except Exception:
+            pass
+
         return None

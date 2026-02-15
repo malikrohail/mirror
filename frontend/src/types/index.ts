@@ -139,6 +139,7 @@ export interface SessionDetail extends SessionOut {
 // ── Issue ─────────────────────────────────────────────
 
 export type Severity = 'critical' | 'major' | 'minor' | 'enhancement';
+export type IssueType = 'ux' | 'accessibility' | 'error' | 'performance';
 
 export interface IssueOut {
   id: string;
@@ -152,6 +153,7 @@ export interface IssueOut {
   wcag_criterion: string | null;
   recommendation: string | null;
   page_url: string | null;
+  issue_type: IssueType;
   step_number: number | null;
   created_at: string;
 }

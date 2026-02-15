@@ -15,6 +15,13 @@ class IssueSeverity(str, enum.Enum):
     ENHANCEMENT = "enhancement"
 
 
+class IssueType(str, enum.Enum):
+    UX = "ux"
+    ACCESSIBILITY = "accessibility"
+    ERROR = "error"
+    PERFORMANCE = "performance"
+
+
 class Issue(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "issues"
 
@@ -37,6 +44,9 @@ class Issue(Base, UUIDMixin, TimestampMixin):
     wcag_criterion: Mapped[str | None] = mapped_column(String(50), nullable=True)
     recommendation: Mapped[str | None] = mapped_column(Text, nullable=True)
     page_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    issue_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="ux", server_default="ux"
+    )
 
     # Issue tracking (cross-study deduplication)
     first_seen_study_id: Mapped[uuid.UUID | None] = mapped_column(

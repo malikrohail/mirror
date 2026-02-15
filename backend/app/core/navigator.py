@@ -436,15 +436,22 @@ class Navigator:
         click_x: int | None = None
         click_y: int | None = None
 
-        if (
-            decision.action.type == ActionType.click
-            and decision.action.selector
-        ):
-            pos = await self._screenshots.get_click_position(
-                page, decision.action.selector
-            )
-            if pos:
-                click_x, click_y = pos
+        if decision.action.type == ActionType.click:
+            # Try the CSS selector first
+            if decision.action.selector:
+                pos = await self._screenshots.get_click_position(
+                    page, decision.action.selector
+                )
+                if pos:
+                    click_x, click_y = pos
+
+            # Fallback: use viewport center as approximate click position
+            # so heatmap always has data for click actions
+            if click_x is None and click_y is None:
+                viewport = page.viewport_size
+                if viewport:
+                    click_x = viewport["width"] // 2
+                    click_y = viewport["height"] // 2
 
         # 4. ACT (with retry logic — Iteration 2)
         action_error: str | None = None

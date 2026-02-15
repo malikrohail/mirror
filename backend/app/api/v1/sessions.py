@@ -66,6 +66,7 @@ async def get_step(
 async def list_issues(
     study_id: uuid.UUID,
     severity: str | None = None,
+    issue_type: str | None = None,
     persona_id: uuid.UUID | None = None,
     page_url: str | None = None,
     db: AsyncSession = Depends(get_db),
@@ -73,7 +74,11 @@ async def list_issues(
     """List issues for a study with optional filters."""
     svc = SessionService(db)
     return await svc.list_issues(
-        study_id, severity=severity, persona_id=persona_id, page_url=page_url
+        study_id,
+        severity=severity,
+        issue_type=issue_type,
+        persona_id=persona_id,
+        page_url=page_url,
     )
 
 

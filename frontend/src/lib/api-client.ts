@@ -149,10 +149,11 @@ export function getStep(sessionId: string, stepNumber: number): Promise<StepOut>
 
 export function listIssues(
   studyId: string,
-  filters?: { severity?: string; persona_id?: string; page_url?: string },
+  filters?: { severity?: string; issue_type?: string; persona_id?: string; page_url?: string },
 ): Promise<IssueOut[]> {
   const params = new URLSearchParams();
   if (filters?.severity) params.set('severity', filters.severity);
+  if (filters?.issue_type) params.set('issue_type', filters.issue_type);
   if (filters?.persona_id) params.set('persona_id', filters.persona_id);
   if (filters?.page_url) params.set('page_url', filters.page_url);
   const qs = params.toString();

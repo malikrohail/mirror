@@ -6,7 +6,7 @@ import { useIssues } from '@/hooks/use-study';
 import { IssueList } from './issue-list';
 import { FixPanel } from './fix-panel';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SEVERITIES } from '@/lib/constants';
+import { SEVERITIES, ISSUE_TYPES, ISSUE_TYPE_LABELS } from '@/lib/constants';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as api from '@/lib/api-client';
 import type { FixSuggestionOut } from '@/types';
@@ -17,6 +17,7 @@ interface IssuesTabProps {
 
 export function IssuesTab({ studyId }: IssuesTabProps) {
   const [severityFilter, setSeverityFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const { data: issues, isLoading } = useIssues(studyId);
   const { data: fixes } = useQuery({
     queryKey: ['fixes', studyId],
@@ -33,10 +34,11 @@ export function IssuesTab({ studyId }: IssuesTabProps) {
   }, [fixes]);
 
   const filtered = useMemo(() => {
-    if (!issues) return [];
-    if (severityFilter === 'all') return issues;
-    return issues.filter((i) => i.severity === severityFilter);
-  }, [issues, severityFilter]);
+    let result = issues ?? [];
+    if (severityFilter !== 'all') result = result.filter((i) => i.severity === severityFilter);
+    if (typeFilter !== 'all') result = result.filter((i) => i.issue_type === typeFilter);
+    return result;
+  }, [issues, severityFilter, typeFilter]);
 
   if (isLoading) {
     return (
@@ -61,6 +63,19 @@ export function IssuesTab({ studyId }: IssuesTabProps) {
             {SEVERITIES.map((s) => (
               <SelectItem key={s} value={s} className="capitalize">
                 {s}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="All types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All types</SelectItem>
+            {ISSUE_TYPES.map((t) => (
+              <SelectItem key={t} value={t}>
+                {ISSUE_TYPE_LABELS[t]}
               </SelectItem>
             ))}
           </SelectContent>

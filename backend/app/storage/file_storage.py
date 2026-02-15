@@ -67,10 +67,28 @@ class FileStorage:
         return f"/api/v1/screenshots/{path}"
 
     def get_screenshot_full_path(self, path: str) -> Path | None:
-        """Get the full filesystem path for a screenshot."""
-        full = self.base_path / path
+        """Get the full filesystem path for a screenshot.
+
+        Handles both relative paths (studies/...) and tries common
+        path variations to be resilient across environments.
+        """
+        # Strip leading slash if present (e.g., from URL path)
+        clean_path = path.lstrip("/")
+
+        full = self.base_path / clean_path
         if full.exists():
             return full
+
+        # Try without "studies/" prefix in case it's doubled
+        if clean_path.startswith("studies/"):
+            alt = self.base_path / clean_path
+            if alt.exists():
+                return alt
+
+        logger.debug(
+            "Screenshot not found at %s (base_path=%s, requested=%s)",
+            full, self.base_path, path,
+        )
         return None
 
     # Reports

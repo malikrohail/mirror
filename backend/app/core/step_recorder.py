@@ -143,6 +143,9 @@ class DatabaseStepRecorder:
                 wcag_criterion=ux_issue.wcag_criterion,
                 recommendation=ux_issue.recommendation,
                 page_url=page_url,
+                issue_type=ux_issue.issue_type.value
+                if hasattr(ux_issue, "issue_type") and ux_issue.issue_type
+                else "ux",
             )
             self.db.add(issue)
 

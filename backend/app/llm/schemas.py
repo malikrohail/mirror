@@ -41,6 +41,13 @@ class ActionType(str, Enum):
     give_up = "give_up"
 
 
+class IssueType(str, Enum):
+    ux = "ux"
+    accessibility = "accessibility"
+    error = "error"
+    performance = "performance"
+
+
 class FixLanguage(str, Enum):
     css = "css"
     html = "html"
@@ -114,6 +121,10 @@ class UXIssue(BaseModel):
     heuristic: str = Field(..., description="Nielsen heuristic violated")
     wcag_criterion: str | None = Field(None, description="WCAG criterion if applicable")
     recommendation: str
+    issue_type: IssueType = Field(
+        default=IssueType.ux,
+        description="Category: ux, accessibility, error, or performance",
+    )
 
 
 class NavigationDecision(BaseModel):

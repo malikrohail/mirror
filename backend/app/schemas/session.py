@@ -43,6 +43,7 @@ class IssueOut(BaseModel):
     wcag_criterion: str | None = None
     recommendation: str | None = None
     page_url: str | None = None
+    issue_type: str = "ux"
     first_seen_study_id: uuid.UUID | None = None
     times_seen: int = 1
     is_regression: bool = False

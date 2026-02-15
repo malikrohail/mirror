@@ -87,6 +87,7 @@ class SessionRepository:
         self,
         study_id: uuid.UUID,
         severity: str | None = None,
+        issue_type: str | None = None,
         persona_id: uuid.UUID | None = None,
         page_url: str | None = None,
     ) -> list[dict]:
@@ -98,6 +99,8 @@ class SessionRepository:
 
         if severity:
             query = query.where(Issue.severity == severity)
+        if issue_type:
+            query = query.where(Issue.issue_type == issue_type)
         if page_url:
             query = query.where(Issue.page_url == page_url)
         if persona_id:
