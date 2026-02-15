@@ -293,7 +293,16 @@ export function PersonaTable({ templates, onTeamChange, isMyTeam }: PersonaTable
                     )}
                   </td>
                   <td className="px-2 py-3 text-xs text-foreground/40">{model}</td>
-                  <td className="px-2 py-3 text-xs tabular-nums text-foreground/40">${cost.toFixed(2)}</td>
+                  <td className="px-2 py-3 text-xs tabular-nums text-foreground/40">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-default">${cost.toFixed(2)}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Avg. estimated cost per test. May fluctuate slightly.
+                      </TooltipContent>
+                    </Tooltip>
+                  </td>
                   <td className="px-2 py-3 pr-4">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

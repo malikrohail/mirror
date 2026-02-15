@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, MoreVertical, RotateCcw, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, MoreVertical, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api-client';
 import { useDeleteStudy } from '@/hooks/use-study';
@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { StudyProgress } from '@/components/study/study-progress';
 import { LiveStepTimeline } from '@/components/study/live-step-timeline';
 import { ScreencastViewer } from '@/components/study/screencast-viewer';
@@ -32,7 +33,7 @@ import { LiveBrowserView } from '@/components/study/live-browser-view';
 import { ReportPreview } from '@/components/report/report-preview';
 import { ReportActions } from '@/components/report/report-actions';
 import { IssuesTab } from '@/components/results/issues-tab';
-import { IssueList } from '@/components/results/issue-list';
+import type { IssueOut } from '@/types';
 import { useSessionDetail } from '@/hooks/use-session-replay';
 import { ClickHeatmap } from '@/components/heatmap/click-heatmap';
 import { BrowserIllustration, LogIllustration, StepsIllustration } from '@/components/common/empty-illustrations';
@@ -132,10 +133,11 @@ function BrowserWithSteps({
         })()}
       </div>
       {/* Step navigation */}
+      <TooltipProvider>
       <div className="flex items-center shrink-0 border-t border-border px-3 py-2">
         {totalSteps > 0 ? (
           <>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setBrowserStepIndex(Math.max(0, currentIndex - 1))}
                 disabled={currentIndex <= 0}
@@ -143,10 +145,8 @@ function BrowserWithSteps({
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="text-xs tabular-nums text-foreground/50">
-                <span className="font-medium text-foreground">{currentIndex + 1}</span>
-                {' / '}
-                {totalSteps}
+              <span className="text-xs tabular-nums text-foreground/50 whitespace-nowrap">
+                <span className="font-medium text-foreground">{currentIndex + 1}</span>{' / '}{totalSteps}
               </span>
               <button
                 onClick={() => {
@@ -162,16 +162,24 @@ function BrowserWithSteps({
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
-            {steps[currentIndex] && (
-              <span className="ml-3 text-xs text-foreground/40 truncate">
-                {steps[currentIndex].think_aloud || steps[currentIndex].action || ''}
-              </span>
+            {steps[currentIndex] && (steps[currentIndex].think_aloud || steps[currentIndex].action) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <p className="ml-3 text-xs text-foreground/40 line-clamp-4 min-w-0">
+                    {steps[currentIndex].think_aloud || steps[currentIndex].action || ''}
+                  </p>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-sm text-xs">
+                  {steps[currentIndex].think_aloud || steps[currentIndex].action || ''}
+                </TooltipContent>
+              </Tooltip>
             )}
           </>
         ) : (
           <span className="text-xs text-foreground/30">No steps yet</span>
         )}
       </div>
+      </TooltipProvider>
     </div>
   );
 }
@@ -228,10 +236,8 @@ function ReplayWithSteps({ sessionId }: { sessionId: string }) {
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="text-xs tabular-nums text-foreground/50">
-            <span className="font-medium text-foreground">{stepIndex + 1}</span>
-            {' / '}
-            {totalSteps}
+          <span className="text-xs tabular-nums text-foreground/50 whitespace-nowrap">
+            <span className="font-medium text-foreground">{stepIndex + 1}</span>{' / '}{totalSteps}
           </span>
           <button
             onClick={() => setStepIndex(Math.min(totalSteps - 1, stepIndex + 1))}
@@ -241,12 +247,108 @@ function ReplayWithSteps({ sessionId }: { sessionId: string }) {
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
-        {currentStep && (
-          <span className="ml-3 text-xs text-foreground/40 truncate">
-            {currentStep.think_aloud || currentStep.action_type || ''}
-          </span>
+        {currentStep && (currentStep.think_aloud || currentStep.action_type) && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <p className="ml-3 text-xs text-foreground/40 line-clamp-4 min-w-0">
+                {currentStep.think_aloud || currentStep.action_type || ''}
+              </p>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-sm text-xs">
+              {currentStep.think_aloud || currentStep.action_type || ''}
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
+    </div>
+  );
+}
+
+const SEV_TEXT_COLOR: Record<string, string> = {
+  critical: 'text-red-500',
+  major: 'text-amber-500',
+  minor: 'text-blue-400',
+  enhancement: 'text-emerald-400',
+};
+
+const SEV_LABEL: Record<string, string> = {
+  critical: 'Critical',
+  major: 'Regular',
+  minor: 'Minor',
+  enhancement: 'Enhancement',
+};
+
+function GroupedIssueList({ issues }: { issues: IssueOut[] }) {
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+
+  const groups = (['critical', 'major', 'minor', 'enhancement'] as const)
+    .map((sev) => ({ severity: sev, items: issues.filter((i) => i.severity === sev) }))
+    .filter((g) => g.items.length > 0);
+
+  const toggleCollapse = (sev: string) =>
+    setCollapsed((prev) => ({ ...prev, [sev]: !prev[sev] }));
+
+  const toggleCheck = (id: string) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  if (issues.length === 0) {
+    return <p className="text-[14px] text-foreground/30 py-8 text-center">No issues found</p>;
+  }
+
+  return (
+    <div className="space-y-5">
+      {groups.map((group) => {
+        const isCollapsed = collapsed[group.severity] ?? false;
+        return (
+          <div key={group.severity}>
+            <button
+              onClick={() => toggleCollapse(group.severity)}
+              className="flex items-center gap-2 mb-2"
+            >
+              <span className={cn('text-[14px] uppercase tracking-wider', SEV_TEXT_COLOR[group.severity])}>
+                {SEV_LABEL[group.severity]}
+              </span>
+              <span className="text-[14px] text-foreground/20">{group.items.length}</span>
+              <ChevronDown className={cn('h-3.5 w-3.5 text-foreground/20 transition-transform', isCollapsed && '-rotate-90')} />
+            </button>
+            {!isCollapsed && (
+              <div className="ml-4">
+                {group.items.map((issue) => {
+                  const isChecked = checked.has(issue.id);
+                  return (
+                    <div key={issue.id} className="flex items-start gap-2.5 py-[5px]">
+                      <button
+                        onClick={() => toggleCheck(issue.id)}
+                        className={cn(
+                          'mt-[3px] flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+                          isChecked
+                            ? 'border-foreground/30 bg-foreground/10'
+                            : 'border-foreground/15 hover:border-foreground/30',
+                        )}
+                      >
+                        {isChecked && (
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-foreground/50">
+                            <path d="M2 5.5L4 7.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </button>
+                      <p className={cn('text-[14px] text-foreground/70 leading-relaxed', isChecked && 'line-through text-foreground/30')}>
+                        {issue.description}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -266,7 +368,7 @@ export default function StudyRunningPage({
   const [browserStepIndex, setBrowserStepIndex] = useState<number | null>(null);
   const [completeTab, setCompleteTab] = useState<CompleteTab>('findings');
   const [findingsView, setFindingsView] = useState<'issues' | 'report'>('issues');
-  const [severityFilter, setSeverityFilter] = useState<string | null>(null);
+
 
   const [browserMode, setBrowserMode] = useState<'local' | 'cloud'>('local');
 
@@ -567,6 +669,9 @@ export default function StudyRunningPage({
           onClick={() => {
             const params = new URLSearchParams();
             if (study?.url) params.set('url', study.url);
+            if (study?.tasks && study.tasks.length > 0) {
+              params.set('description', study.tasks.map((t) => t.description).join(', '));
+            }
             if (study?.personas && study.personas.length > 0) {
               const templateIds = study.personas.map((p) => p.template_id).filter(Boolean) as string[];
               if (templateIds.length > 0) params.set('personas', templateIds.join(','));
@@ -740,55 +845,14 @@ export default function StudyRunningPage({
               <div style={{ height: '460px' }}>
                 <TabsContent value="findings" className="h-full m-0">
                   <div className="flex h-full flex-col">
-                    {/* Severity filters + Full report toggle + Share actions */}
                     <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border shrink-0">
-                      {/* Severity pills */}
-                      <div className="flex items-center gap-3 text-[12px] flex-1 min-w-0">
-                        {(() => {
-                          const allIssues = issues ?? [];
-                          const counts = {
-                            critical: allIssues.filter((i) => i.severity === 'critical').length,
-                            major: allIssues.filter((i) => i.severity === 'major').length,
-                            minor: allIssues.filter((i) => i.severity === 'minor').length,
-                          };
-                          return (['critical', 'major', 'minor'] as const).map((sev) => {
-                            if (counts[sev] === 0) return null;
-                            const isActive = severityFilter === sev;
-                            const colors = {
-                              critical: 'bg-red-500',
-                              major: 'bg-amber-500',
-                              minor: 'bg-blue-400',
-                            };
-                            return (
-                              <button
-                                key={sev}
-                                onClick={() => {
-                                  setSeverityFilter(isActive ? null : sev);
-                                  setFindingsView('issues');
-                                }}
-                                className={cn(
-                                  'flex items-center gap-1.5 transition-opacity',
-                                  severityFilter && !isActive ? 'opacity-30' : 'opacity-100',
-                                )}
-                              >
-                                <span className={cn('h-2 w-2 rounded-full', colors[sev])} />
-                                <span className="font-medium text-foreground">{counts[sev]}</span>
-                                <span className="text-foreground/40">{sev}</span>
-                              </button>
-                            );
-                          });
-                        })()}
-                      </div>
-                      {/* Full report toggle */}
                       <button
                         onClick={() => setFindingsView(findingsView === 'report' ? 'issues' : 'report')}
-                        className={cn(
-                          'rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors shrink-0',
-                          findingsView === 'report' ? 'bg-foreground/10 text-foreground' : 'text-foreground/40 hover:text-foreground/60'
-                        )}
+                        className="text-[14px] text-foreground/70 transition-colors hover:text-foreground/90"
                       >
-                        {findingsView === 'report' ? 'Show issues' : 'Full report'}
+                        {findingsView === 'report' ? 'See Issues' : 'See Full Report'}
                       </button>
+                      <div className="flex-1" />
                       {/* Share actions */}
                       <div className="shrink-0">
                         <ReportActions studyId={id} markdownContent={reportMarkdown ?? undefined} />
@@ -799,10 +863,7 @@ export default function StudyRunningPage({
                       {findingsView === 'report' ? (
                         <ReportPreview studyId={id} hideActions />
                       ) : (
-                        <IssueList
-                          issues={(issues ?? []).filter((i) => !severityFilter || i.severity === severityFilter)}
-                          studyId={id}
-                        />
+                        <GroupedIssueList issues={issues ?? []} />
                       )}
                     </div>
                   </div>

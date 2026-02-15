@@ -122,7 +122,7 @@ export function PersonaProgressCard({
       className={cn(
         'py-0 gap-0 text-[14px] transition-shadow cursor-pointer',
         completed && 'opacity-75',
-        selected && 'ring-2 ring-primary/40',
+        selected && 'ring-1 ring-foreground/10 bg-foreground/[0.02]',
       )}
       onClick={onSelect}
     >

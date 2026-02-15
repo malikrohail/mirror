@@ -76,7 +76,7 @@ export function ClickHeatmap({ studyId }: ClickHeatmapProps) {
       <div className="flex items-center justify-between">
         <PageSelector pages={pages} selected={selectedPage} onSelect={setSelectedPage} />
         <div className="flex items-center gap-4">
-          <span className="tabular-nums text-sm text-muted-foreground">
+          <span className="tabular-nums text-[14px] font-normal text-foreground/30">
             {filteredPoints.length} clicks
           </span>
           <HeatmapLegend />

@@ -16,7 +16,13 @@ import { Progress } from '@/components/ui/progress';
 import { useGeneratePersona, useGeneratePersonaDraft } from '@/hooks/use-personas';
 import { TypewriterStatus } from '@/components/common/typewriter-status';
 import { cn } from '@/lib/utils';
-import { Sparkles, Loader2, Monitor, Smartphone, Tablet, Check, RotateCcw, CornerDownLeft } from 'lucide-react';
+import { Sparkles, Loader2, Monitor, Smartphone, Tablet, Check, RotateCcw, CornerDownLeft, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { PersonaGenerateDraftResponse, PersonaGenerateRequest, PersonaTemplateOut } from '@/types';
 
 const DEVICE_ICONS: Record<string, React.ReactNode> = {
@@ -58,6 +64,13 @@ const DRAFT_LOADING_MESSAGES = [
   'Preparing editable tester configuration',
 ];
 const TESTER_DESCRIPTION_PLACEHOLDER = 'e.g., A visually impaired university professor who uses assistive technology and expects excellent keyboard navigation';
+const MODEL_OPTIONS = [
+  { value: 'opus-4.6', label: 'Opus 4.6' },
+  { value: 'sonnet-4.5', label: 'Sonnet 4.5' },
+  { value: 'haiku-4.5', label: 'Haiku 4.5' },
+  { value: 'chatgpt', label: 'ChatGPT', comingSoon: true },
+  { value: 'gemini', label: 'Gemini', comingSoon: true },
+] as const;
 const FORM_LABEL_CLASS = 'text-[14px] font-normal text-foreground/70';
 
 function hashSeed(input: string): number {
@@ -368,6 +381,7 @@ export function PersonaBuilderForm({ embedded = false, onSuccess }: PersonaBuild
     cognitive: false,
   });
   const [accessibilityDescription, setAccessibilityDescription] = useState('');
+  const [selectedModel, setSelectedModel] = useState('opus-4.6');
   const generatePersonaDraft = useGeneratePersonaDraft();
   const generatePersona = useGeneratePersona();
   const queryClient = useQueryClient();
@@ -644,6 +658,37 @@ export function PersonaBuilderForm({ embedded = false, onSuccess }: PersonaBuild
                   <p className="text-sm font-medium text-foreground/70">{generatedName}</p>
                 )}
                 <p className="text-sm text-foreground/40">{description}</p>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-[14px] text-foreground/50 hover:text-foreground/70 transition-colors mt-1"
+                    >
+                      {MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label ?? 'Opus 4.6'}
+                      <ChevronDown className="h-2.5 w-2.5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[140px]">
+                    {MODEL_OPTIONS.map((m) => (
+                      <DropdownMenuItem
+                        key={m.value}
+                        disabled={'comingSoon' in m && m.comingSoon}
+                        onClick={() => {
+                          if (!('comingSoon' in m && m.comingSoon)) {
+                            setSelectedModel(m.value);
+                          }
+                        }}
+                      >
+                        <span className={cn(selectedModel === m.value && 'font-medium')}>
+                          {m.label}
+                        </span>
+                        {'comingSoon' in m && m.comingSoon && (
+                          <span className="ml-auto text-[10px] text-muted-foreground">Soon</span>
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
 

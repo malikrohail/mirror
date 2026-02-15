@@ -117,6 +117,7 @@ export function QuickStart({
   const [submitting, setSubmitting] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [expandedPersonaId, setExpandedPersonaId] = useState<string | null>(null);
+  const [personaModels, setPersonaModels] = useState<Record<string, string>>({});
   const [personaFilter, setPersonaFilter] = useState('');
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [filterDevice, setFilterDevice] = useState<DeviceFilter | null>(null);
@@ -167,11 +168,25 @@ export function QuickStart({
   const canGenerate = description.trim().length > 2 && url.trim().length > 0;
   const isValidInput = canGenerate && url.trim().includes('.');
 
+  // Auto-advance to persona selection when all fields are pre-filled (rerun scenario)
+  const hasAutoAdvanced = useRef(false);
+  useEffect(() => {
+    if (
+      !hasAutoAdvanced.current &&
+      initialUrl && initialUrl.trim().length > 0 && initialUrl.trim().includes('.') &&
+      initialDescription && initialDescription.trim().length > 2 &&
+      preSelected && preSelected.length > 0
+    ) {
+      hasAutoAdvanced.current = true;
+      setPhase('select-personas');
+    }
+  }, []);
+
   const urlRef = useRef<HTMLInputElement>(null);
   const descRef = useRef<HTMLTextAreaElement>(null);
 
-  const URL_PLACEHOLDER = 'example.com';
-  const TASK_PLACEHOLDER = 'Sign up for a free trial';
+  const URL_PLACEHOLDER = 'anthropic.com';
+  const TASK_PLACEHOLDER = 'Find the pricing page';
 
   const handleContinue = (autoFill = false) => {
     let currentUrl = url;
@@ -234,6 +249,13 @@ export function QuickStart({
     }
   };
 
+  const MODEL_OPTIONS = [
+    { value: 'opus-4.6', label: 'Opus 4.6' },
+    { value: 'sonnet-4.5', label: 'Sonnet 4.5' },
+    { value: 'haiku-4.5', label: 'Haiku 4.5' },
+    { value: 'chatgpt', label: 'ChatGPT', comingSoon: true },
+    { value: 'gemini', label: 'Gemini', comingSoon: true },
+  ] as const;
   const MAX_PERSONAS = 5;
 
   const togglePersona = (id: string) => {
@@ -360,7 +382,7 @@ export function QuickStart({
                     onUrlChangeProp?.(e.target.value);
                   }}
                   onKeyDown={handleUrlKeyDown}
-                  placeholder="example.com"
+                  placeholder="anthropic.com"
                   className="w-full rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-foreground/70 outline-none placeholder:text-foreground/20 focus:ring-1 focus:ring-ring"
                 />
               </div>
@@ -373,7 +395,7 @@ export function QuickStart({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   onKeyDown={handleTaskKeyDown}
-                  placeholder="e.g. Sign up for a free trial"
+                  placeholder="e.g. Find the pricing page"
                   className="w-full min-h-20 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm outline-none resize-none placeholder:text-foreground/20 focus:ring-1 focus:ring-ring"
                 />
               </div>
@@ -615,6 +637,40 @@ export function QuickStart({
                           ) : (
                             <p className="text-xs text-muted-foreground truncate">{persona.short_description}</p>
                           )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-1 text-[11px] text-foreground/30 hover:text-foreground/50 transition-colors mt-0.5"
+                              >
+                                {MODEL_OPTIONS.find((m) => m.value === (personaModels[persona.id] ?? 'opus-4.6'))?.label ?? 'Opus 4.6'}
+                                <ChevronDown className="h-2.5 w-2.5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="min-w-[140px]" onClick={(e) => e.stopPropagation()}>
+                              {MODEL_OPTIONS.map((m) => (
+                                <DropdownMenuItem
+                                  key={m.value}
+                                  disabled={'comingSoon' in m && m.comingSoon}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!('comingSoon' in m && m.comingSoon)) {
+                                      setPersonaModels((prev) => ({ ...prev, [persona.id]: m.value }));
+                                    }
+                                  }}
+                                >
+                                  <span className={cn(
+                                    (personaModels[persona.id] ?? 'opus-4.6') === m.value && 'font-medium',
+                                  )}>
+                                    {m.label}
+                                  </span>
+                                  {'comingSoon' in m && m.comingSoon && (
+                                    <span className="ml-auto text-[10px] text-muted-foreground">Soon</span>
+                                  )}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                         <div className="flex items-center gap-1">
                           {isSelected && <Check className="h-4 w-4 text-primary" />}
