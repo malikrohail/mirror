@@ -161,7 +161,7 @@ export function NavigationFade({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="min-h-0 flex-1 overflow-auto"
+      className="min-h-0 flex-1 overflow-auto [scrollbar-gutter:stable]"
       style={{
         opacity: isNavigating ? 0.4 : 1,
         transition: isNavigating

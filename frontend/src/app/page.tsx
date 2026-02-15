@@ -390,7 +390,7 @@ export default function HomePage() {
               Case study
             </button>
             <button
-              onClick={() => router.push('/docs')}
+              onClick={() => router.push('/how-it-works')}
               className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
             >
               <HelpCircle className="h-3.5 w-3.5" />
