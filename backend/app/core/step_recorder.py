@@ -7,6 +7,7 @@ database and broadcast via Redis PubSub for real-time WebSocket consumption.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
@@ -65,6 +66,8 @@ class DatabaseStepRecorder:
         self._prev_emotions: dict[str, str] = {}
         self._live_view_url = live_view_url
         self._state_store = state_store
+        # Lock to serialize DB writes — AsyncSession is not safe for concurrent use
+        self._db_lock = asyncio.Lock()
 
     def _get_db_session_id(self, session_id: str) -> uuid.UUID:
         """Resolve navigator session_id string to DB UUID."""
@@ -91,10 +94,14 @@ class DatabaseStepRecorder:
         2. Create Step row in DB
         3. Create Issue rows for each UX issue found
         4. Flush transaction
+
+        Uses a lock to serialize DB writes — background record tasks from
+        the navigator run concurrently and AsyncSession is not safe for
+        concurrent use.
         """
         db_session_id = self._get_db_session_id(session_id)
 
-        # 1. Save screenshot
+        # 1. Save screenshot (filesystem, no DB lock needed)
         screenshot_path = self.storage.save_screenshot(
             study_id=self.study_id,
             session_id=db_session_id,
@@ -102,57 +109,58 @@ class DatabaseStepRecorder:
             image_bytes=screenshot,
         )
 
-        # 2. Create Step row
-        step = Step(
-            session_id=db_session_id,
-            step_number=step_number,
-            page_url=page_url,
-            page_title=page_title,
-            screenshot_path=screenshot_path,
-            think_aloud=decision.think_aloud,
-            action_type=decision.action.type.value,
-            action_selector=decision.action.selector,
-            action_value=decision.action.value,
-            confidence=decision.confidence,
-            task_progress=decision.task_progress,
-            emotional_state=decision.emotional_state.value,
-            click_x=click_x,
-            click_y=click_y,
-            viewport_width=viewport_width,
-            viewport_height=viewport_height,
-        )
-        self.db.add(step)
-        await self.db.flush()
-
-        # 3. Create Issue rows for each UX issue detected
-        for ux_issue in decision.ux_issues:
-            severity_map = {
-                "critical": IssueSeverity.CRITICAL,
-                "major": IssueSeverity.MAJOR,
-                "minor": IssueSeverity.MINOR,
-                "enhancement": IssueSeverity.ENHANCEMENT,
-            }
-            issue = Issue(
-                step_id=step.id,
+        # 2-4. DB writes under lock to prevent concurrent session corruption
+        async with self._db_lock:
+            step = Step(
                 session_id=db_session_id,
-                study_id=self.study_id,
-                element=ux_issue.element,
-                description=ux_issue.description,
-                severity=severity_map.get(ux_issue.severity.value, IssueSeverity.MINOR),
-                heuristic=ux_issue.heuristic,
-                wcag_criterion=ux_issue.wcag_criterion,
-                recommendation=ux_issue.recommendation,
+                step_number=step_number,
                 page_url=page_url,
-                issue_type=ux_issue.issue_type.value
-                if hasattr(ux_issue, "issue_type") and ux_issue.issue_type
-                else "ux",
+                page_title=page_title,
+                screenshot_path=screenshot_path,
+                think_aloud=decision.think_aloud,
+                action_type=decision.action.type.value,
+                action_selector=decision.action.selector,
+                action_value=decision.action.value,
+                confidence=decision.confidence,
+                task_progress=decision.task_progress,
+                emotional_state=decision.emotional_state.value,
+                click_x=click_x,
+                click_y=click_y,
+                viewport_width=viewport_width,
+                viewport_height=viewport_height,
             )
-            self.db.add(issue)
+            self.db.add(step)
+            await self.db.flush()
 
-        await self.db.flush()
-        logger.debug(
-            "Saved step %d for session %s (%d issues)",
-            step_number, session_id, len(decision.ux_issues),
+            for ux_issue in decision.ux_issues:
+                severity_map = {
+                    "critical": IssueSeverity.CRITICAL,
+                    "major": IssueSeverity.MAJOR,
+                    "minor": IssueSeverity.MINOR,
+                    "enhancement": IssueSeverity.ENHANCEMENT,
+                }
+                issue = Issue(
+                    step_id=step.id,
+                    session_id=db_session_id,
+                    study_id=self.study_id,
+                    element=ux_issue.element,
+                    description=ux_issue.description,
+                    severity=severity_map.get(ux_issue.severity.value, IssueSeverity.MINOR),
+                    heuristic=ux_issue.heuristic,
+                    wcag_criterion=ux_issue.wcag_criterion,
+                    recommendation=ux_issue.recommendation,
+                    page_url=page_url,
+                    issue_type=ux_issue.issue_type.value
+                    if hasattr(ux_issue, "issue_type") and ux_issue.issue_type
+                    else "ux",
+                )
+                self.db.add(issue)
+
+            await self.db.flush()
+
+        logger.info(
+            "[step-recorder] Saved step %d for session %s (%d issues, screenshot=%s)",
+            step_number, session_id, len(decision.ux_issues), screenshot_path,
         )
 
     async def publish_step_event(

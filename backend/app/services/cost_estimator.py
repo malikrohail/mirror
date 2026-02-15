@@ -168,6 +168,57 @@ class CostEstimator:
         )
 
     @staticmethod
+    def quick_estimate(num_personas: int, num_tasks: int) -> CostEstimate:
+        """Estimate cost without a saved study — just persona and task counts."""
+        num_sessions = num_personas * num_tasks
+        total_steps = num_sessions * AVG_STEPS_PER_SESSION
+        unique_pages = num_sessions * AVG_UNIQUE_PAGES_PER_SESSION
+
+        # Calculate costs per stage
+        persona_cost = CostEstimator._calc_stage_cost(
+            "persona_generation", num_personas
+        )
+        nav_cost = CostEstimator._calc_stage_cost(
+            "navigation_step", total_steps
+        )
+        analysis_cost = CostEstimator._calc_stage_cost(
+            "screenshot_analysis", unique_pages
+        )
+        synthesis_cost = CostEstimator._calc_stage_cost("synthesis", 1)
+        report_cost = CostEstimator._calc_stage_cost("report", 1)
+
+        total_cost = persona_cost + nav_cost + analysis_cost + synthesis_cost + report_cost
+
+        # Estimate API calls
+        api_calls = num_personas + total_steps + unique_pages + 1 + 1
+
+        # Estimate duration
+        duration = (
+            num_personas * 3  # persona generation
+            + total_steps * AVG_STEP_DURATION_SECONDS  # navigation
+            + unique_pages * 2  # analysis
+            + 10  # synthesis
+            + 5  # report
+        )
+
+        return CostEstimate(
+            estimated_cost_usd=round(total_cost, 4),
+            breakdown=CostBreakdown(
+                persona_generation=round(persona_cost, 4),
+                navigation_steps=round(nav_cost, 4),
+                screenshot_analysis=round(analysis_cost, 4),
+                synthesis=round(synthesis_cost, 4),
+                report=round(report_cost, 4),
+            ),
+            estimated_duration_seconds=duration,
+            estimated_api_calls=api_calls,
+            num_personas=num_personas,
+            num_tasks=num_tasks,
+            estimated_sessions=num_sessions,
+            estimated_total_steps=total_steps,
+        )
+
+    @staticmethod
     def _calc_stage_cost(stage: str, multiplier: int) -> float:
         """Calculate cost for a pipeline stage."""
         est = STAGE_ESTIMATES.get(stage)

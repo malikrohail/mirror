@@ -412,3 +412,19 @@ export interface FixGenerateResponse {
   fixes_generated: number;
   fixes: FixSuggestionOut[];
 }
+
+// ── GitHub PR Export ────────────────────────────────
+
+export interface GitHubPRRequest {
+  repo: string;
+  token: string;
+  issue_ids?: string[];
+}
+
+export interface GitHubPRResponse {
+  pr_url: string;
+  pr_number: number;
+  branch_name: string;
+  files_created: string[];
+  fixes_included: number;
+}

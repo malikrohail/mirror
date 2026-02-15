@@ -54,6 +54,16 @@ async def list_studies(
     )
 
 
+@router.get("/estimate")
+async def quick_estimate(
+    personas: int = Query(1, ge=1, le=10),
+    tasks: int = Query(1, ge=1, le=10),
+):
+    """Lightweight cost/duration estimate without a saved study."""
+    from app.services.cost_estimator import CostEstimator
+    return CostEstimator.quick_estimate(personas, tasks)
+
+
 @router.get("/{study_id}", response_model=StudyOut)
 async def get_study(
     study_id: uuid.UUID,

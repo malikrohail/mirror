@@ -45,8 +45,8 @@ class TestViewportPresets:
 
     def test_desktop_preset_exists(self) -> None:
         assert "desktop" in VIEWPORT_PRESETS
-        assert VIEWPORT_PRESETS["desktop"].width == 1920
-        assert VIEWPORT_PRESETS["desktop"].height == 1080
+        assert VIEWPORT_PRESETS["desktop"].width == 1280
+        assert VIEWPORT_PRESETS["desktop"].height == 720
 
     def test_laptop_preset_exists(self) -> None:
         assert "laptop" in VIEWPORT_PRESETS
@@ -239,7 +239,9 @@ class TestBrowserPool:
     async def test_browserbase_acquire_retries_on_429_then_succeeds(self) -> None:
         """Test Browserbase session creation retries on 429 responses."""
         mock_pw = AsyncMock()
+        mock_page = AsyncMock()
         mock_context = AsyncMock()
+        mock_context.pages = [mock_page]
         mock_browser = AsyncMock()
         mock_browser.contexts = [mock_context]
         mock_pw.chromium.connect_over_cdp = AsyncMock(return_value=mock_browser)
@@ -343,7 +345,7 @@ class TestBrowserPool:
         pool._bb_api_key = "bb_test_key"
 
         not_ready = _mock_http_response(404)
-        get_mock = AsyncMock(side_effect=[not_ready] * 6)
+        get_mock = AsyncMock(side_effect=[not_ready] * 3)
         mock_client = AsyncMock()
         mock_client.get = get_mock
         mock_client_ctx = AsyncMock()
@@ -355,8 +357,8 @@ class TestBrowserPool:
             live_view_url = await pool._fetch_live_view_url("sess_2")
 
         assert live_view_url is None
-        assert get_mock.await_count == 6
-        assert sleep_mock.await_count == 5
+        assert get_mock.await_count == 3  # max_attempts = 3
+        assert sleep_mock.await_count == 2  # sleeps between attempts (N-1)
 
 
 class TestBrowserPoolIteration2:

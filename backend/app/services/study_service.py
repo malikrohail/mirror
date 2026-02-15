@@ -76,6 +76,14 @@ class StudyService:
         if not deleted:
             raise HTTPException(status_code=404, detail="Study not found")
 
+        # Clean up screenshot files from disk
+        import os
+        import shutil
+        storage_path = os.getenv("STORAGE_PATH", "./data")
+        study_dir = os.path.join(storage_path, "studies", str(study_id))
+        if os.path.isdir(study_dir):
+            shutil.rmtree(study_dir, ignore_errors=True)
+
     async def run_study(self, study_id: uuid.UUID, browser_mode: str | None = None) -> str:
         """Start running a study by dispatching to the job queue."""
         study = await self.get_study(study_id)

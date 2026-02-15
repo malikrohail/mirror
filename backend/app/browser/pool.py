@@ -40,7 +40,7 @@ class ViewportPreset:
 
 # Standard viewport presets
 VIEWPORT_PRESETS: dict[str, ViewportPreset] = {
-    "desktop": ViewportPreset(width=1920, height=1080),
+    "desktop": ViewportPreset(width=1280, height=720),
     "laptop": ViewportPreset(width=1366, height=768),
     "mobile": ViewportPreset(
         width=390,
@@ -263,7 +263,7 @@ class BrowserPool:
             if browser:
                 try:
                     ctx = await browser.new_context(
-                        viewport={"width": 1920, "height": 1080},
+                        viewport={"width": 1280, "height": 720},
                         ignore_https_errors=True,
                     )
                     self._warm_contexts.append(ctx)
@@ -569,6 +569,13 @@ class BrowserPool:
         # Use the default context (Browserbase creates one for recording)
         if browser.contexts:
             context = browser.contexts[0]
+            # Ensure viewport is set correctly on the BB default context
+            # BB may not apply the viewport from the session creation call
+            pages = context.pages
+            if pages:
+                await pages[0].set_viewport_size(
+                    {"width": preset.width, "height": preset.height}
+                )
         else:
             context = await browser.new_context(**context_args)
 
@@ -745,7 +752,7 @@ class BrowserPool:
             raise RuntimeError("No browser available for context recycling")
 
         args = context_args or {
-            "viewport": {"width": 1920, "height": 1080},
+            "viewport": {"width": 1280, "height": 720},
             "ignore_https_errors": True,
         }
         new_context = await browser.new_context(**args)
