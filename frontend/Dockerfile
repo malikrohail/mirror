@@ -3,14 +3,17 @@ FROM node:20-alpine AS base
 # --- Install dependencies ---
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci
 
 # --- Build the application ---
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY frontend/ .
+# Docs live at project root — copy to /docs so loadDocs() can find them
+# (page.tsx reads from path.join(cwd, '..', 'docs') = /docs)
+COPY docs/ /docs/
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
@@ -26,6 +29,8 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Copy docs for server component access at runtime
+COPY --from=builder --chown=nextjs:nodejs /docs /docs
 
 USER nextjs
 EXPOSE 3000

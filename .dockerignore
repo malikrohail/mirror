@@ -1,0 +1,14 @@
+# Only frontend/ and docs/ are needed for the frontend Docker build
+backend/
+data/
+.git/
+.env*
+.venv/
+.agents/
+.claude/
+.cursor/
+node_modules/
+frontend/node_modules/
+frontend/.next/
+*.pyc
+__pycache__/
