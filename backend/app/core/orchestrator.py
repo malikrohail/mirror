@@ -41,6 +41,7 @@ from app.db.repositories.study_repo import StudyRepository
 from app.llm.client import LLMClient
 from app.llm.schemas import AccessibilityNeeds, PersonaProfile
 from app.models.insight import Insight, InsightType
+from app.models.issue import Issue
 from app.models.session import SessionStatus
 from app.models.study import StudyStatus
 from app.services.cost_estimator import CostTracker
@@ -308,10 +309,41 @@ class StudyOrchestrator:
             await self._publish_progress(study_id, 95, "report_complete")
 
             # --- Phase 8: Complete ---
-            total_issues = (
+            # Count issues from synthesis AND from DB (inline navigation issues
+            # are saved directly to DB and may not appear in synthesis output)
+            synthesis_issues = (
                 len(synthesis.universal_issues)
                 + len(synthesis.persona_specific_issues)
             )
+            from sqlalchemy import select, func
+            db_issue_count_result = await self.db.execute(
+                select(func.count(Issue.id)).where(Issue.study_id == study_id)
+            )
+            db_issue_count = db_issue_count_result.scalar() or 0
+            total_issues = max(synthesis_issues, db_issue_count)
+
+            # Apply DB-backed score floor: if there are real issues in the DB
+            # but the LLM gave a near-zero score, enforce a minimum.
+            # This catches the case where inline navigation issues exist but
+            # all_issues passed to synthesis was empty.
+            if synthesis.overall_ux_score < 10 and (db_issue_count > 0 or any(
+                r.total_steps > 0 for r in nav_results
+            )):
+                total_steps = sum(r.total_steps for r in nav_results)
+                peak_progress = max(
+                    (s.get("task_progress_percent", 0) for s in session_summaries),
+                    default=0,
+                )
+                floor = 10 + min(peak_progress // 5, 10)
+                if db_issue_count >= 10:
+                    floor = max(floor, 20)  # Many issues = site was clearly navigable
+                logger.warning(
+                    "DB-backed score floor: LLM gave %d, enforcing %d "
+                    "(db_issues=%d, steps=%d, peak_progress=%d%%)",
+                    synthesis.overall_ux_score, floor,
+                    db_issue_count, total_steps, peak_progress,
+                )
+                synthesis.overall_ux_score = max(synthesis.overall_ux_score, floor)
 
             study.overall_score = synthesis.overall_ux_score
             study.executive_summary = synthesis.executive_summary
