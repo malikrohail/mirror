@@ -132,7 +132,7 @@ export function LiveStepTimeline({ steps }: LiveStepTimelineProps) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-4">
         <StepsIllustration />
-        <p className="text-[14px] text-muted-foreground/40">Waiting for steps</p>
+        <p className="text-[14px] text-muted-foreground/40">Preparing test sessions</p>
       </div>
     );
   }
@@ -200,7 +200,7 @@ export function LiveStepTimeline({ steps }: LiveStepTimelineProps) {
                 >
                   {/* Label + mood */}
                   <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-[14px] font-medium text-foreground/80">
-                    <span className="text-muted-foreground/20">#{entry.step_number}</span>
+                    <span className="text-muted-foreground/20">#{entry.step_number + 1}</span>
                     <span className="truncate">{config.label}</span>
                     <TooltipProvider>
                       <Tooltip>

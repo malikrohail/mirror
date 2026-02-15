@@ -16,6 +16,7 @@ export function StudySetupWizard() {
   const previewUrl = trimmedUrl
     ? (trimmedUrl.startsWith('http') ? trimmedUrl : `https://${trimmedUrl}`)
     : '';
+  const preSelectedPersonaIds = searchParams.get('personas')?.split(',').filter(Boolean) ?? [];
 
   return (
     <div>
@@ -43,6 +44,7 @@ export function StudySetupWizard() {
             <QuickStart
               initialUrl={searchParams.get('url') ?? ''}
               initialDescription={searchParams.get('description') ?? ''}
+              preSelectedPersonaIds={preSelectedPersonaIds.length > 0 ? preSelectedPersonaIds : undefined}
               onUrlChange={setQuickStartUrl}
             />
           </div>
