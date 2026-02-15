@@ -1,0 +1,35 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rsync files to VPS
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -avz --delete --exclude='node_modules' --exclude='.next' --exclude='__pycache__' --exclude='.venv' --exclude='data/' --exclude='.git' --exclude='.env' --exclude='.env.*'
+          path: ./
+          remote_path: /opt/mirror/
+          remote_host: ${{ secrets.VPS_HOST }}
+          remote_user: root
+          remote_key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Rebuild and restart containers
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            cd /opt/mirror
+            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose -f docker-compose.prod.yml exec -T backend bash -c 'cd /app && PYTHONPATH=/app alembic upgrade head'
+            echo "Deploy complete. Container status:"
+            docker compose -f docker-compose.prod.yml ps --format "table {{.Name}}\t{{.Status}}"
