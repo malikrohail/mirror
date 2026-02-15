@@ -1,6 +1,42 @@
 # AI & LLM Pipeline
 
-This document describes how Mirror uses Claude (Anthropic's LLM) across its entire usability testing pipeline. It covers the five core pipeline stages, model selection strategy, the navigation agent loop, persona generation, vision-based analysis, configuration, observability, and error handling.
+## How We Use Opus 4.6
+
+Traditional usability testing asks real people to navigate a website while a researcher watches. It costs $12,000+ and takes weeks. Mirror replaces that entire process with Claude Opus 4.6 — and the result is something we didn't fully expect when we started building.
+
+**Opus doesn't just analyze websites. It becomes people.**
+
+When we hand Opus a persona — say, a 72-year-old retired librarian with low tech literacy, high reading speed, and a deep distrust of websites that ask for personal information — it doesn't just acknowledge those traits. It *inhabits* them. It looks at a screenshot through that persona's eyes and says things like: *"I see a big blue button but I don't know what 'Get Started' means. Started with what? I'd rather look for a phone number."* Meanwhile, the same page shown to a 24-year-old developer persona gets: *"Standard SaaS landing page. CTA is obvious. Let me check the pricing first."*
+
+This isn't a gimmick. It's a genuine capability that Opus 4.6's vision and reasoning make possible — and it's the core insight that Mirror is built on.
+
+### What Makes Our Opus Usage Special
+
+**1. Vision Through Behavioral Lenses**
+Every screenshot is sent to Opus with a full persona identity injected into the system prompt — not just a name and age, but five behavioral attributes on a 1-10 scale (tech literacy, patience, reading speed, trust, exploration tendency), frustration triggers, accessibility needs, and derived behavioral rules. The same screenshot produces completely different observations, actions, and issues depending on the persona viewing it. Opus doesn't just *see* the page — it sees it as a specific kind of person would.
+
+**2. Sustained Character Over 20+ Steps**
+This isn't a single-shot prompt. Each persona navigates through 10-30 steps, maintaining consistent character throughout. A low-patience persona grows frustrated faster. A high-exploration persona wanders off-task to browse the footer. A screen-reader user flags every unlabeled button. Opus holds these identities stable across an entire navigation session — making decisions, expressing emotions, and detecting issues that are specific to *that person's* experience.
+
+**3. The Think-Aloud Protocol**
+In real usability testing, participants narrate their thoughts as they use a website ("I'm looking for the login button... is it under this hamburger menu?"). This think-aloud data is the most valuable output of any user test. Opus generates this naturally — first-person inner monologue that reflects the persona's vocabulary, confusion, confidence, and emotional state. It's the closest thing to having a real user talk through their experience, but available on demand.
+
+**4. A 5-Stage Pipeline, Not a Single API Call**
+Mirror isn't a wrapper around one prompt. It's a pipeline of five distinct stages, each using Opus (or a lighter model) for a different cognitive task:
+
+| Stage | What Opus Does | Why It's Hard |
+|-------|---------------|---------------|
+| Persona Generation | Creates internally consistent human profiles from natural language descriptions | Must balance 10+ attributes coherently — a 75-year-old retiree can't have tech_literacy=9 |
+| Navigation Decisions | Looks at a screenshot + accessibility tree and decides what a specific persona would do next | Requires vision + reasoning + character consistency in real-time |
+| Screenshot Analysis | Deep visual UX audit applying Nielsen's 10 heuristics and WCAG 2.1 | Needs expert-level design knowledge applied to arbitrary websites |
+| Cross-Persona Synthesis | Compares how 3-5 different personas experienced the same site | Must identify patterns across sessions — "all personas struggled here" vs "only the elderly persona got lost" |
+| Report Generation | Produces a professional PDF report for stakeholders | Needs to weigh evidence, prioritize recommendations, and write for mixed technical/non-technical audiences |
+
+**5. Model Routing: Opus for Depth, Haiku for Speed**
+Not every call needs Opus. Navigation decisions happen 50-150 times per study and need to be fast — we route those to Haiku 4.5. But the stages that require deep reasoning (synthesis, analysis, persona generation) get Opus 4.6. For larger studies, synthesis uses Opus's extended thinking with a 10,000-token budget, letting the model reason through complex cross-persona patterns before producing its output. This isn't just cost optimization — it's matching model capability to cognitive demand.
+
+**6. What Surprised Us**
+We expected Opus to be good at analyzing screenshots. We didn't expect the behavioral modeling to be this convincing. When a low-trust persona hesitates at a form asking for a phone number, or a low-patience persona gives up after three failed attempts at finding a feature — those aren't scripted behaviors. They emerge from Opus reasoning through the persona's attributes in context. The model genuinely adapts its decision-making based on the injected personality, and the result is usability data that mirrors what we'd see from real human participants.
 
 ---
 

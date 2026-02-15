@@ -80,7 +80,7 @@ export function Sidebar() {
           </Link>
         </div>
         <p className="mt-6 text-sm leading-tight text-muted-foreground">
-          Find UX issues before your users do
+          Our AI testers don&apos;t just analyze websites. They become people.
         </p>
       </div>
 
