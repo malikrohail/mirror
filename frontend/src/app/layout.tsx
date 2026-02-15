@@ -11,7 +11,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'mirror | Find UX issues before your users do',
+  title: 'miror | Find UX issues before your users do',
   description: 'Watch AI personas break your website — so real users don\'t have to.',
 };
 
