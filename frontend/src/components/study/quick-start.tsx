@@ -348,7 +348,7 @@ export function QuickStart({
                 />
               </div>
               <Button
-                onClick={handleContinue}
+                onClick={() => handleContinue()}
                 className="w-full h-12"
               >
                 Continue With Plan
@@ -597,23 +597,23 @@ export function QuickStart({
                           >
                             <div className="border-t border-border space-y-4 px-2.5 pb-3 pt-3">
                               {/* Overview — chips */}
-                              {(profile.tech_literacy || profile.patience_level || profile.device_preference) && (
+                              {(!!profile.tech_literacy || !!profile.patience_level || !!profile.device_preference) && (
                                 <div>
                                   <span className="text-[14px] text-foreground/25">Overview</span>
                                   <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                    {profile.tech_literacy && (
+                                    {!!profile.tech_literacy && (
                                       <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[14px] text-foreground/50">
                                         Tech savvy
                                         <LevelBars level={String(profile.tech_literacy)} />
                                       </span>
                                     )}
-                                    {profile.patience_level && (
+                                    {!!profile.patience_level && (
                                       <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[14px] text-foreground/50">
                                         Patience
                                         <LevelBars level={String(profile.patience_level)} />
                                       </span>
                                     )}
-                                    {profile.device_preference && (
+                                    {!!profile.device_preference && (
                                       <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[14px] text-foreground/50">
                                         {String(profile.device_preference) === 'mobile' ? '📱' : '🖥️'} Uses {String(profile.device_preference)}
                                       </span>

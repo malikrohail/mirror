@@ -38,7 +38,7 @@ function FilterA() {
             <CircleDot className="mr-2 h-4 w-4" />
             Status
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent side="right" avoidCollisions={false} className="w-36">
+          <DropdownMenuSubContent className="w-36">
             <DropdownMenuItem>All</DropdownMenuItem>
             {STATUSES.map((s) => (
               <DropdownMenuItem key={s}>{s}</DropdownMenuItem>
@@ -50,7 +50,7 @@ function FilterA() {
             <Globe className="mr-2 h-4 w-4" />
             URL
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent side="right" avoidCollisions={false} className="w-48">
+          <DropdownMenuSubContent className="w-48">
             <DropdownMenuItem>All</DropdownMenuItem>
             {URLS.map((u) => (
               <DropdownMenuItem key={u}>{u}</DropdownMenuItem>

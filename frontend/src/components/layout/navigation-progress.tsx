@@ -69,7 +69,7 @@ function ProgressBar() {
   const [fading, setFading] = useState(false);
 
   const rafRef = useRef<number>(0);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const phaseRef = useRef<'idle' | 'loading' | 'completing' | 'fading'>('idle');
 
   const cleanup = () => {
