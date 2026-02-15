@@ -130,6 +130,16 @@ class StudyOrchestrator:
             logger.error("Study %s not found", study_id)
             return {"study_id": str(study_id), "status": "failed", "error": "Not found"}
 
+        # Configure Langfuse session context so all LLM calls group under this study
+        self._llm.set_langfuse_context(
+            session_id=str(study_id),
+            tags=["study-run"],
+        )
+        self._fast_llm.set_langfuse_context(
+            session_id=str(study_id),
+            tags=["study-run", "fast-model"],
+        )
+
         try:
             # --- Phase 1: Setup ---
             await self.study_repo.update_status(study_id, StudyStatus.RUNNING)
@@ -292,6 +302,23 @@ class StudyOrchestrator:
                 "cost": cost_breakdown.model_dump(),
             })
 
+            # Push study scores to Langfuse for evals/monitoring
+            self._llm.push_study_scores(
+                trace_name="study-complete",
+                scores={
+                    "overall_ux_score": synthesis.overall_ux_score,
+                    "task_completion_rate": (
+                        sum(1 for r in nav_results if r.task_completed)
+                        / max(len(nav_results), 1)
+                    ),
+                    "total_issues": total_issues,
+                    "total_cost_usd": cost_breakdown.total_cost_usd,
+                    "sessions_completed": sum(1 for r in nav_results if r.task_completed),
+                    "sessions_gave_up": sum(1 for r in nav_results if r.gave_up),
+                    "total_steps": sum(r.total_steps for r in nav_results),
+                },
+            )
+
             logger.info(
                 "Study %s complete: score=%d, issues=%d, cost=$%.4f (savings=$%.4f)",
                 study_id, synthesis.overall_ux_score, total_issues,
@@ -310,6 +337,10 @@ class StudyOrchestrator:
         except asyncio.TimeoutError:
             logger.error("Study %s timed out", study_id)
             await self.study_repo.update_status(study_id, StudyStatus.FAILED)
+            self._llm.push_study_scores(
+                trace_name="study-failed",
+                scores={"study_failed": 1.0, "failure_reason": "timeout"},
+            )
             await self._publish_event(study_id, {
                 "type": "study:error",
                 "study_id": str(study_id),
@@ -320,12 +351,21 @@ class StudyOrchestrator:
         except Exception as e:
             logger.error("Study %s failed: %s", study_id, e, exc_info=True)
             await self.study_repo.update_status(study_id, StudyStatus.FAILED)
+            self._llm.push_study_scores(
+                trace_name="study-failed",
+                scores={"study_failed": 1.0, "failure_reason": str(e)[:200]},
+            )
             await self._publish_event(study_id, {
                 "type": "study:error",
                 "study_id": str(study_id),
                 "error": str(e),
             })
             return {"study_id": str(study_id), "status": "failed", "error": str(e)}
+
+        finally:
+            # Ensure all Langfuse events are flushed regardless of outcome
+            self._llm.flush_langfuse()
+            self._fast_llm.flush_langfuse()
 
     # ------------------------------------------------------------------
     # AI Engine: Persona generation

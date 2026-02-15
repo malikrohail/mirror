@@ -52,6 +52,7 @@ export interface StudyOut {
   browser_mode: string | null;
   browser_cost_usd: number | null;
   total_cost_usd: number | null;
+  error_message?: string | null;
 }
 
 export interface StudySummary {
@@ -65,6 +66,7 @@ export interface StudySummary {
   personas?: PersonaOut[];
   task_count?: number;
   persona_count?: number;
+  total_cost_usd?: number | null;
 }
 
 export interface StudyListResponse {

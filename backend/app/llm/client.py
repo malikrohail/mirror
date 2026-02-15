@@ -140,6 +140,13 @@ class LLMClient:
         self._study_id = study_id
         self._langfuse = _init_langfuse()
 
+        # Langfuse context — set via set_langfuse_context() for richer tracing
+        self._langfuse_session_id: str | None = None
+        self._langfuse_user_id: str | None = None
+        self._langfuse_tags: list[str] = []
+        self._langfuse_persona_name: str | None = None
+        self._last_trace_id: str | None = None
+
     def _get_model(self, stage: str) -> str:
         return self._model_map.get(stage, SONNET_MODEL)
 
@@ -159,15 +166,29 @@ class LLMClient:
         generation = None
         if self._langfuse:
             try:
-                trace = self._langfuse.trace(
-                    name=f"mirror-{stage}",
-                    metadata={"study_id": self._study_id, "stage": stage},
-                )
+                trace_kwargs: dict[str, Any] = {
+                    "name": f"mirror-{stage}",
+                    "metadata": {
+                        "study_id": self._study_id,
+                        "stage": stage,
+                        "persona_name": self._langfuse_persona_name,
+                    },
+                    "tags": [stage, model, "mirror", *self._langfuse_tags],
+                }
+                if self._langfuse_session_id:
+                    trace_kwargs["session_id"] = self._langfuse_session_id
+                if self._langfuse_user_id:
+                    trace_kwargs["user_id"] = self._langfuse_user_id
+                trace = self._langfuse.trace(**trace_kwargs)
+                self._last_trace_id = trace.id
                 generation = trace.generation(
                     name=stage,
                     model=model,
-                    input={"system": system[:500], "messages_count": len(messages)},
-                    metadata={"max_tokens": max_tokens},
+                    input={"system": system[:2000], "messages_count": len(messages)},
+                    metadata={
+                        "max_tokens": max_tokens,
+                        "persona_name": self._langfuse_persona_name,
+                    },
                 )
             except Exception as e:
                 logger.debug("Langfuse trace creation failed: %s", e)
@@ -195,7 +216,7 @@ class LLMClient:
                 if generation:
                     try:
                         generation.end(
-                            output=text[:1000],
+                            output=text[:2000],
                             usage={
                                 "input": response.usage.input_tokens,
                                 "output": response.usage.output_tokens,
@@ -587,6 +608,40 @@ class LLMClient:
         """
         model = self._get_model(stage)
 
+        # Start Langfuse trace if available
+        trace = None
+        generation = None
+        if self._langfuse:
+            try:
+                trace_kwargs: dict[str, Any] = {
+                    "name": f"mirror-{stage}-thinking",
+                    "metadata": {
+                        "study_id": self._study_id,
+                        "stage": stage,
+                        "persona_name": self._langfuse_persona_name,
+                        "extended_thinking": True,
+                        "thinking_budget_tokens": thinking_budget_tokens,
+                    },
+                    "tags": [stage, model, "mirror", "thinking", *self._langfuse_tags],
+                }
+                if self._langfuse_session_id:
+                    trace_kwargs["session_id"] = self._langfuse_session_id
+                if self._langfuse_user_id:
+                    trace_kwargs["user_id"] = self._langfuse_user_id
+                trace = self._langfuse.trace(**trace_kwargs)
+                self._last_trace_id = trace.id
+                generation = trace.generation(
+                    name=stage,
+                    model=model,
+                    input={"messages_count": len(messages)},
+                    metadata={
+                        "max_tokens": max_tokens,
+                        "thinking_budget_tokens": thinking_budget_tokens,
+                    },
+                )
+            except Exception as e:
+                logger.debug("Langfuse trace creation failed (thinking): %s", e)
+
         for attempt in range(MAX_RETRIES):
             try:
                 response = await self._client.messages.create(
@@ -611,6 +666,20 @@ class LLMClient:
                     elif block.type == "text":
                         response_text += block.text
 
+                # End Langfuse generation
+                if generation:
+                    try:
+                        generation.end(
+                            output=response_text[:2000],
+                            usage={
+                                "input": response.usage.input_tokens,
+                                "output": response.usage.output_tokens,
+                            },
+                            metadata={"thinking_chars": len(thinking_text)},
+                        )
+                    except Exception:
+                        pass
+
                 return thinking_text, response_text
 
             except anthropic.RateLimitError:
@@ -622,7 +691,18 @@ class LLMClient:
                     delay = BASE_RETRY_DELAY * (2 ** attempt)
                     await asyncio.sleep(delay)
                 else:
+                    if generation:
+                        try:
+                            generation.end(output=str(e), level="ERROR")
+                        except Exception:
+                            pass
                     raise
+
+        if generation:
+            try:
+                generation.end(output="Max retries exceeded", level="ERROR")
+            except Exception:
+                pass
 
         raise RuntimeError(f"Extended thinking call failed after {MAX_RETRIES} retries for '{stage}'")
 
@@ -919,6 +999,82 @@ class LLMClient:
         return await self._call_structured(
             "test_planning", system, messages, StudyPlan
         )
+
+    # ------------------------------------------------------------------
+    # Langfuse Context & Scoring Helpers
+    # ------------------------------------------------------------------
+
+    def set_langfuse_context(
+        self,
+        session_id: str,
+        user_id: str = "",
+        persona_name: str = "",
+        tags: list[str] | None = None,
+    ) -> None:
+        """Set Langfuse session context for grouping traces.
+
+        Args:
+            session_id: Groups all traces for a study under one Langfuse session.
+            user_id: Optional user identifier for Langfuse user tracking.
+            persona_name: Optional persona name added to trace metadata.
+            tags: Additional tags applied to all subsequent traces.
+        """
+        self._langfuse_session_id = session_id
+        self._langfuse_user_id = user_id or None
+        self._langfuse_persona_name = persona_name or None
+        self._langfuse_tags = tags or []
+
+    def push_study_scores(
+        self,
+        trace_name: str,
+        scores: dict[str, float | int | str],
+    ) -> None:
+        """Push multiple scores to Langfuse on a dedicated trace.
+
+        Creates a new trace and attaches each score as a Langfuse score object.
+        Numeric values are sent as numeric scores; strings as comment-only.
+
+        Args:
+            trace_name: Name for the scoring trace (e.g. "study-complete").
+            scores: Mapping of score name → value.
+        """
+        if not self._langfuse:
+            return
+
+        try:
+            trace_kwargs: dict[str, Any] = {
+                "name": f"mirror-{trace_name}",
+                "metadata": {
+                    "study_id": self._study_id,
+                    "scores": {k: str(v) for k, v in scores.items()},
+                },
+                "tags": ["scores", trace_name, "mirror", *self._langfuse_tags],
+            }
+            if self._langfuse_session_id:
+                trace_kwargs["session_id"] = self._langfuse_session_id
+            if self._langfuse_user_id:
+                trace_kwargs["user_id"] = self._langfuse_user_id
+
+            trace = self._langfuse.trace(**trace_kwargs)
+
+            for name, value in scores.items():
+                if isinstance(value, (int, float)):
+                    trace.score(name=name, value=float(value))
+                else:
+                    trace.score(name=name, value=0, comment=str(value))
+
+            logger.debug("Pushed %d Langfuse scores on trace %s", len(scores), trace_name)
+        except Exception as e:
+            logger.warning("Failed to push Langfuse scores: %s", e)
+
+    def flush_langfuse(self) -> None:
+        """Flush all pending Langfuse events to the server."""
+        if not self._langfuse:
+            return
+        try:
+            self._langfuse.flush()
+        except Exception as e:
+            logger.debug("Langfuse flush failed: %s", e)
 
 
 # ---------------------------------------------------------------------------
