@@ -368,7 +368,27 @@ SCORING GUIDE:
 - 70-89: Good — most personas succeed, some friction points
 - 50-69: Fair — significant issues, some personas fail or give up
 - 30-49: Poor — major usability problems, many personas struggle
-- 0-29: Critical — fundamental usability failures, most personas cannot complete tasks
+- 10-29: Critical — fundamental usability failures, most personas cannot complete tasks
+- 0-9: ONLY if the website does not load at all, or every page is broken/blank
+
+CRITICAL SCORING RULES:
+1. NEVER assign a score of 0 unless the website literally failed to load or every \
+page was completely broken. A score of 0 means "this is not a functioning website."
+2. Score based on OBSERVED UX quality, not just task completion. If a persona \
+navigated 14 steps and found 17 issues, that IS actionable UX data — score the \
+UX quality of those 14 steps.
+3. PARTIAL PROGRESS COUNTS. If a persona reached 70% task progress before stopping, \
+the UX worked for 70% of the flow. Score the portion that was observed.
+4. DISTINGUISH FAILURE TYPES:
+   - Website UX caused the failure (confusing forms, broken buttons) → penalize score
+   - Persona limitation (cannot fill CAPTCHA, provide real DOB/phone, complete 2FA) → \
+do NOT penalize the website. Note the limitation but score based on UX quality observed.
+   - Technical timeout or browser crash → do NOT penalize the website. Score what was observed.
+5. Even a single persona session with steps and issues should receive a meaningful \
+score (minimum 15-25 for a site that loaded and was navigable).
+6. When a persona "gave up", look at WHY. If they navigated successfully through \
+most of the flow and got stuck at a step requiring real personal info (DOB, phone, \
+SSN, credit card), that is a PERSONA LIMITATION, not a website failure.
 
 Be objective, evidence-based, and specific. Every claim must reference specific \
 persona observations."""
@@ -382,14 +402,18 @@ def synthesis_user_prompt(
 ) -> str:
     sessions_text = ""
     for s in session_summaries:
+        progress = s.get('task_progress_percent', 0)
+        failure = s.get('failure_context', '')
         sessions_text += f"""
 --- {s.get('persona_name', 'Unknown')} ---
 Task completed: {s.get('task_completed', False)}
+Task progress: {progress}%
 Total steps: {s.get('total_steps', 0)}
+Gave up: {s.get('gave_up', False)}
 Emotional arc: {' → '.join(s.get('emotional_arc', []))}
 Key struggles: {', '.join(s.get('key_struggles', []))}
 Summary: {s.get('summary', '')}
-"""
+{f'Failure context: {failure}' if failure else ''}"""
 
     issues_text = ""
     for issue in all_issues[:50]:  # Limit to avoid token overflow

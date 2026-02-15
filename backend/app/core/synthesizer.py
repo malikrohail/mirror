@@ -10,6 +10,10 @@ from app.llm.schemas import StudySynthesis
 
 logger = logging.getLogger(__name__)
 
+# Minimum score for a study where at least one persona navigated successfully.
+# A score of 0 should only happen when the site doesn't load at all.
+_MIN_SCORE_WITH_STEPS = 10
+
 
 class Synthesizer:
     """Synthesizes findings across all persona sessions into comparative insights."""
@@ -60,6 +64,9 @@ class Synthesizer:
                     synthesis.overall_ux_score,
                     len(synthesis.reasoning_trace),
                 )
+                synthesis = self._apply_score_floor(
+                    synthesis, session_summaries, all_issues,
+                )
                 return synthesis
             except Exception as e:
                 logger.warning(
@@ -80,6 +87,41 @@ class Synthesizer:
             len(synthesis.struggle_points),
         )
 
+        synthesis = self._apply_score_floor(
+            synthesis, session_summaries, all_issues,
+        )
+        return synthesis
+
+    @staticmethod
+    def _apply_score_floor(
+        synthesis: StudySynthesis,
+        session_summaries: list[dict[str, Any]],
+        all_issues: list[dict[str, Any]],
+    ) -> StudySynthesis:
+        """Enforce a minimum score when there is real navigational evidence.
+
+        A score of 0 is only valid when the website literally doesn't load.
+        If personas took steps and found issues, the site IS functional and
+        deserves a score that reflects the observed UX quality.
+        """
+        total_steps = sum(s.get("total_steps", 0) for s in session_summaries)
+        has_evidence = total_steps > 0 or len(all_issues) > 0
+
+        if has_evidence and synthesis.overall_ux_score < _MIN_SCORE_WITH_STEPS:
+            original = synthesis.overall_ux_score
+            # Calculate a floor based on the evidence:
+            # - More steps and issues = more evidence that the site functions
+            peak_progress = max(
+                (s.get("task_progress_percent", 0) for s in session_summaries),
+                default=0,
+            )
+            # Floor: at least 10, plus bonus for progress made
+            floor = _MIN_SCORE_WITH_STEPS + min(peak_progress // 5, 10)
+            synthesis.overall_ux_score = max(synthesis.overall_ux_score, floor)
+            logger.warning(
+                "Score floor applied: %d → %d (total_steps=%d, issues=%d, peak_progress=%d%%)",
+                original, synthesis.overall_ux_score, total_steps, len(all_issues), peak_progress,
+            )
         return synthesis
 
     @staticmethod

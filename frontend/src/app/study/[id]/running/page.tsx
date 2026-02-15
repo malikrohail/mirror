@@ -39,32 +39,58 @@ import { BrowserIllustration, LogIllustration, StepsIllustration } from '@/compo
 import { PageHeaderBar } from '@/components/layout/page-header-bar';
 import type { HeaderChip } from '@/components/layout/page-header-bar';
 
-function RuntimeClock({ startedAt, stoppedAt }: { startedAt: string; stoppedAt?: string | null }) {
-  const startMs = new Date(startedAt).getTime();
-  const endMs = stoppedAt ? new Date(stoppedAt).getTime() : null;
-
-  const [elapsed, setElapsed] = useState(() =>
-    Math.max(0, Math.floor(((endMs ?? Date.now()) - startMs) / 1000))
-  );
-
-  useEffect(() => {
-    if (endMs) return;
-    const interval = setInterval(() => {
-      setElapsed(Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [startMs, endMs]);
-
-  const h = Math.floor(elapsed / 3600);
-  const m = Math.floor((elapsed % 3600) / 60);
-  const s = elapsed % 60;
-
+function formatDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
   const parts: string[] = [];
   if (h > 0) parts.push(`${h}h`);
   if (m > 0 || h > 0) parts.push(`${m}m`);
-  parts.push(`${s}s`);
+  parts.push(`${sec}s`);
+  return parts.join(' ');
+}
 
-  return <span className="tabular-nums">{parts.join(' ')}</span>;
+function RuntimeClock({
+  startedAt,
+  durationSeconds,
+  isStopped,
+}: {
+  startedAt: string;
+  durationSeconds?: number | null;
+  isStopped: boolean;
+}) {
+  // If the study is complete/failed and we have a persisted duration, use it directly.
+  // This prevents any drift or timezone issues.
+  const fixedDuration = isStopped && durationSeconds != null ? durationSeconds : null;
+
+  const startMs = new Date(startedAt).getTime();
+
+  const [elapsed, setElapsed] = useState(() =>
+    fixedDuration != null
+      ? fixedDuration
+      : Math.max(0, (Date.now() - startMs) / 1000)
+  );
+
+  useEffect(() => {
+    // If we have a fixed duration (persisted), use it and stop ticking
+    if (fixedDuration != null) {
+      setElapsed(fixedDuration);
+      return;
+    }
+    // If stopped but no persisted duration, calculate from timestamps
+    if (isStopped) {
+      setElapsed(Math.max(0, (Date.now() - startMs) / 1000));
+      return;
+    }
+    // Otherwise, tick every second
+    const interval = setInterval(() => {
+      setElapsed(Math.max(0, (Date.now() - startMs) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [startMs, fixedDuration, isStopped]);
+
+  return <span className="tabular-nums">{formatDuration(elapsed)}</span>;
 }
 
 type RunningTab = 'steps' | 'browser' | 'log';
@@ -500,18 +526,34 @@ export default function StudyRunningPage({
       ),
     });
   }
-  if (study?.created_at) {
+  {
+    // Use started_at (when the study began running) if available, fall back to created_at
+    const runtimeStart = study?.started_at ?? study?.created_at;
+    if (runtimeStart) {
+      headerChips.push({
+        label: 'Runtime',
+        value: (
+          <RuntimeClock
+            startedAt={runtimeStart}
+            durationSeconds={study?.duration_seconds}
+            isStopped={!!(isComplete || isFailed)}
+          />
+        ),
+        tooltip: 'Elapsed time since the test started running',
+      });
+    }
+  }
+  {
+    // Cost: prefer persisted value from API for completed studies, otherwise use real-time WS cost
+    const costUsd = (isComplete && study?.total_cost_usd != null)
+      ? study.total_cost_usd
+      : (activeStudy?.cost?.total_cost_usd ?? 0);
     headerChips.push({
-      label: 'Runtime',
-      value: <RuntimeClock startedAt={study.created_at} stoppedAt={(isComplete || isFailed) ? study.updated_at : null} />,
-      tooltip: 'Elapsed time since the test started',
+      label: 'Cost',
+      value: <span className="tabular-nums">${costUsd.toFixed(2)}</span>,
+      tooltip: 'Total API cost for this test (LLM + browser)',
     });
   }
-  headerChips.push({
-    label: 'Cost',
-    value: <span className="tabular-nums">${(activeStudy?.cost?.total_cost_usd ?? 0).toFixed(2)}</span>,
-    tooltip: 'Total API cost for this test (LLM + browser)',
-  });
 
   const headerRight = (
     <DropdownMenu>

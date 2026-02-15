@@ -1,7 +1,8 @@
 import enum
 import uuid
+from datetime import datetime
 
-from sqlalchemy import Float, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import ENUM, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,6 +32,10 @@ class Study(Base, UUIDMixin, TimestampMixin):
     )
     overall_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     executive_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Timing
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Cost tracking
     llm_input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)

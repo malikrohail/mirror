@@ -274,11 +274,13 @@ class CostTracker:
         self._screenshot_count = 0
         self._storage_bytes = 0
 
-    def record_llm_usage(self, input_tokens: int, output_tokens: int) -> None:
-        """Record token usage from an LLM call."""
+    def record_llm_usage(
+        self, input_tokens: int, output_tokens: int, *, api_calls: int = 1,
+    ) -> None:
+        """Record token usage from LLM call(s)."""
         self._llm_input_tokens += input_tokens
         self._llm_output_tokens += output_tokens
-        self._llm_api_calls += 1
+        self._llm_api_calls += api_calls
 
     def set_browser_mode(self, mode: str) -> None:
         """Set the browser mode used for this study."""

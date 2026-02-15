@@ -158,12 +158,29 @@ export const useStudyStore = create<StudyStore>()(
     const log = get().addLog;
 
     switch (msg.type) {
-      case 'study:progress':
+      case 'study:progress': {
         log('info', `Study progress: ${msg.percent}% — phase: ${msg.phase}`);
+        const progressCost = msg.cost
+          ? {
+              llm_cost_usd: msg.cost.total_cost_usd,
+              browser_cost_usd: 0,
+              total_cost_usd: msg.cost.total_cost_usd,
+              savings_vs_cloud_usd: 0,
+              browser_mode: current.cost?.browser_mode ?? 'unknown',
+              llm_api_calls: msg.cost.llm_api_calls,
+              llm_total_tokens: msg.cost.llm_total_tokens,
+            }
+          : current.cost;
         set({
-          activeStudy: { ...current, percent: msg.percent, phase: msg.phase },
+          activeStudy: {
+            ...current,
+            percent: msg.percent,
+            phase: msg.phase,
+            cost: progressCost,
+          },
         });
         break;
+      }
 
       case 'session:step': {
         const step = msg as WsSessionStep;

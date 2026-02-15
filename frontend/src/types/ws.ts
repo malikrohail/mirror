@@ -19,6 +19,11 @@ export interface WsStudyProgress {
   study_id: string;
   percent: number;
   phase: 'navigating' | 'analyzing' | 'synthesizing';
+  cost?: {
+    total_cost_usd: number;
+    llm_api_calls: number;
+    llm_total_tokens: number;
+  };
 }
 
 export interface WsSessionStep {

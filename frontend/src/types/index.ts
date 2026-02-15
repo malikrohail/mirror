@@ -40,6 +40,8 @@ export interface StudyOut {
   executive_summary: string | null;
   created_at: string;
   updated_at: string;
+  started_at: string | null;
+  duration_seconds: number | null;
   tasks: TaskOut[];
   personas: PersonaOut[];
 

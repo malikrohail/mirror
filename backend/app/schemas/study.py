@@ -54,6 +54,8 @@ class StudyOut(BaseModel):
     executive_summary: str | None = None
     created_at: datetime
     updated_at: datetime
+    started_at: datetime | None = None
+    duration_seconds: float | None = None
     tasks: list[TaskOut] = []
     personas: list[PersonaOut] = []
 

@@ -12,7 +12,9 @@ import asyncio
 import json
 import logging
 import os
+import time
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 import redis.asyncio as aioredis
@@ -143,7 +145,10 @@ class StudyOrchestrator:
 
         try:
             # --- Phase 1: Setup ---
+            self._run_start_monotonic = time.monotonic()
+            study.started_at = datetime.now(timezone.utc)
             await self.study_repo.update_status(study_id, StudyStatus.RUNNING)
+            await self.db.commit()
             await LiveSessionStateStore(self.redis).clear_study(str(study_id))
             await self._publish_progress(study_id, 5, "starting")
 
@@ -167,6 +172,8 @@ class StudyOrchestrator:
             pool, persona_profiles = await asyncio.gather(
                 pool_task, persona_task
             )
+            # Track browser mode for cost calculation
+            self._cost_tracker.set_browser_mode("cloud" if pool.is_cloud else "local")
             await self._publish_progress(study_id, 12, "personas_ready")
 
             # Sitemap is optional — don't block navigation on it.
@@ -308,6 +315,19 @@ class StudyOrchestrator:
 
             study.overall_score = synthesis.overall_ux_score
             study.executive_summary = synthesis.executive_summary
+
+            # Persist runtime duration
+            run_duration = time.monotonic() - self._run_start_monotonic
+            study.duration_seconds = round(run_duration, 1)
+
+            # Transfer LLM token usage from all clients to cost tracker
+            for llm_client in (self._llm, self._fast_llm):
+                usage = llm_client.usage
+                if usage.calls > 0:
+                    self._cost_tracker.record_llm_usage(
+                        usage.input_tokens, usage.output_tokens,
+                        api_calls=usage.calls,
+                    )
 
             # Persist cost breakdown to study record
             cost_breakdown = self._cost_tracker.get_breakdown()
@@ -1155,19 +1175,57 @@ class StudyOrchestrator:
                 for s in result.steps
                 if s.emotional_state in ("confused", "frustrated")
             ]
+            # Get the peak task progress achieved during the session
+            peak_progress = max(
+                (s.task_progress for s in result.steps), default=0
+            )
+            # Determine why the task wasn't completed
+            failure_context = ""
+            if not result.task_completed and result.steps:
+                last_step = result.steps[-1]
+                if result.gave_up:
+                    failure_context = (
+                        f"Gave up at step {result.total_steps} on page: "
+                        f"{last_step.page_url}. Last thought: {last_step.think_aloud[:120]}"
+                    )
+                elif result.error:
+                    failure_context = f"Technical error: {result.error[:150]}"
+                else:
+                    failure_context = (
+                        f"Stopped at step {result.total_steps}. "
+                        f"Last page: {last_step.page_url}"
+                    )
+
+            # Build a richer summary
+            if result.task_completed:
+                summary = (
+                    f"{result.persona_name} completed the task in "
+                    f"{result.total_steps} steps."
+                )
+            elif peak_progress >= 50:
+                summary = (
+                    f"{result.persona_name} made significant progress "
+                    f"({peak_progress}%) in {result.total_steps} steps but "
+                    f"did not finish. {failure_context}"
+                )
+            else:
+                summary = (
+                    f"{result.persona_name} navigated {result.total_steps} "
+                    f"steps (reaching {peak_progress}% progress) but did not "
+                    f"complete the task. {failure_context}"
+                )
+
             summaries.append({
                 "persona_name": result.persona_name,
                 "session_id": result.session_id,
                 "task_completed": result.task_completed,
                 "total_steps": result.total_steps,
                 "gave_up": result.gave_up,
+                "task_progress_percent": peak_progress,
                 "emotional_arc": emotional_arc,
                 "key_struggles": key_struggles[:5],
-                "summary": (
-                    f"{result.persona_name} "
-                    f"{'completed' if result.task_completed else 'did not complete'} "
-                    f"the task in {result.total_steps} steps."
-                ),
+                "summary": summary,
+                "failure_context": failure_context,
                 "overall_difficulty": (
                     "easy" if result.total_steps <= 8 else
                     "moderate" if result.total_steps <= 18 else
@@ -1191,15 +1249,46 @@ class StudyOrchestrator:
         percent = ((completed + failed) / total) * 70  # 70% for navigation, 30% for analysis
         await self._publish_progress(study_id, percent, "navigating")
 
+    def _get_running_cost(self) -> dict[str, float]:
+        """Get the current estimated cost from all LLM clients."""
+        total_input = 0
+        total_output = 0
+        total_calls = 0
+        for llm_client in (self._llm, self._fast_llm):
+            usage = llm_client.usage
+            total_input += usage.input_tokens
+            total_output += usage.output_tokens
+            total_calls += usage.calls
+        # Use blended pricing (70% Sonnet, 30% Opus) for real-time estimate
+        from app.services.cost_estimator import PRICING
+        sonnet = PRICING.get("claude-sonnet-4-5-20250929", {"input": 3.0, "output": 15.0})
+        opus = PRICING.get("claude-opus-4-6", {"input": 15.0, "output": 75.0})
+        input_cost = (
+            (total_input * 0.7 / 1_000_000) * sonnet["input"]
+            + (total_input * 0.3 / 1_000_000) * opus["input"]
+        )
+        output_cost = (
+            (total_output * 0.7 / 1_000_000) * sonnet["output"]
+            + (total_output * 0.3 / 1_000_000) * opus["output"]
+        )
+        return {
+            "total_cost_usd": round(input_cost + output_cost, 4),
+            "llm_api_calls": total_calls,
+            "llm_total_tokens": total_input + total_output,
+        }
+
     async def _publish_progress(self, study_id: uuid.UUID, percent: float, phase: str):
         """Publish study progress to Redis."""
         await self.redis.set(f"study:{study_id}:progress", str(percent))
-        await self._publish_event(study_id, {
+        event: dict[str, Any] = {
             "type": "study:progress",
             "study_id": str(study_id),
             "percent": percent,
             "phase": phase,
-        })
+        }
+        # Attach running cost so the frontend can update in real-time
+        event["cost"] = self._get_running_cost()
+        await self._publish_event(study_id, event)
 
     async def _publish_event(self, study_id: uuid.UUID, event: dict):
         """Publish an event to the Redis PubSub channel for this study."""
