@@ -19,7 +19,7 @@ export default function ReportPage({
   const [view, setView] = useState<ReportView>('dashboard');
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 px-[100px] pt-[40px] pb-[100px]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild>

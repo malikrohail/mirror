@@ -54,7 +54,7 @@ export function DataTable<T>({ columns, data, keyFn, onRowClick, hrefFn, selecte
   return (
     <div className="overflow-hidden rounded-lg border border-border">
       {/* Header */}
-      <div className="flex items-center gap-4 border-b border-border bg-muted/30 px-3 py-2 text-sm font-medium text-foreground/30">
+      <div className="flex items-center gap-4 border-b border-border bg-muted/30 px-3 py-2 text-[11px] uppercase tracking-wider font-medium text-foreground/30">
         {columns.map((col) => (
           <span
             key={col.key}

@@ -1,16 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { getReportMdUrl } from '@/lib/api-client';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportActions } from './report-actions';
 
 interface ReportPreviewProps {
   studyId: string;
+  hideActions?: boolean;
 }
 
-export function ReportPreview({ studyId }: ReportPreviewProps) {
+export function ReportPreview({ studyId, hideActions }: ReportPreviewProps) {
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,15 +51,18 @@ export function ReportPreview({ studyId }: ReportPreviewProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <ReportActions studyId={studyId} markdownContent={markdown ?? undefined} />
-      <Card>
-        <CardContent className="p-6">
-          <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
-            {markdown}
+    <div>
+      {!hideActions && (
+        <>
+          <div className="flex items-center gap-2 px-4 py-1.5">
+            <ReportActions studyId={studyId} markdownContent={markdown ?? undefined} />
           </div>
-        </CardContent>
-      </Card>
+          <div className="border-t border-border" />
+        </>
+      )}
+      <div className={hideActions ? 'prose prose-sm dark:prose-invert max-w-none break-words' : 'p-4 prose prose-sm dark:prose-invert max-w-none break-words'}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown ?? ''}</ReactMarkdown>
+      </div>
     </div>
   );
 }

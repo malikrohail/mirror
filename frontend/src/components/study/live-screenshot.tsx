@@ -11,7 +11,7 @@ export function LiveScreenshot({ screenshotUrl, alt = 'Live screenshot' }: LiveS
   if (!screenshotUrl) {
     return (
       <div className="flex aspect-video items-center justify-center rounded-lg border bg-muted">
-        <p className="text-sm text-muted-foreground">Waiting for screenshot...</p>
+        <p className="text-sm text-muted-foreground">Waiting for screenshot</p>
       </div>
     );
   }

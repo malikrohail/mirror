@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Monitor, Smartphone, Tablet, Accessibility, Plus, ArrowUp, ArrowDown, Users, Play, X, MoreHorizontal, UserMinus } from 'lucide-react';
+import { Monitor, Smartphone, Tablet, Accessibility, Plus, ArrowUp, ArrowDown, Users, Play, X, MoreVertical, UserMinus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -101,9 +101,9 @@ export function PersonaTable({ templates, onTeamChange, isMyTeam }: PersonaTable
   const hasSelection = selected.size > 0;
 
   const addToTeam = useCallback((ids: string[]) => {
-    const existing: string[] = JSON.parse(localStorage.getItem('mirror-my-team') ?? '[]');
+    const existing: string[] = JSON.parse(localStorage.getItem('miror-my-team') ?? '[]');
     const merged = Array.from(new Set([...existing, ...ids]));
-    localStorage.setItem('mirror-my-team', JSON.stringify(merged));
+    localStorage.setItem('miror-my-team', JSON.stringify(merged));
     const names = ids.map((id) => templates.find((t) => t.id === id)?.name).filter(Boolean);
     toast.success(`Added ${names.join(', ')} to your team`);
     onTeamChange?.();
@@ -114,9 +114,9 @@ export function PersonaTable({ templates, onTeamChange, isMyTeam }: PersonaTable
   }, [router]);
 
   const removeFromTeam = useCallback((ids: string[]) => {
-    const existing: string[] = JSON.parse(localStorage.getItem('mirror-my-team') ?? '[]');
+    const existing: string[] = JSON.parse(localStorage.getItem('miror-my-team') ?? '[]');
     const updated = existing.filter((id) => !ids.includes(id));
-    localStorage.setItem('mirror-my-team', JSON.stringify(updated));
+    localStorage.setItem('miror-my-team', JSON.stringify(updated));
     const names = ids.map((id) => templates.find((t) => t.id === id)?.name).filter(Boolean);
     toast.success(`Removed ${names.join(', ')} from your team`);
     onTeamChange?.();
@@ -175,7 +175,7 @@ export function PersonaTable({ templates, onTeamChange, isMyTeam }: PersonaTable
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/30 text-left text-xs text-foreground/40 uppercase">
+            <tr className="border-b border-border bg-muted/30 text-left text-xs text-foreground/30 uppercase">
               <th className="py-2.5 pl-4 pr-1 w-8"></th>
               {COLUMNS.map((col) => (
                 <th
@@ -246,10 +246,10 @@ export function PersonaTable({ templates, onTeamChange, isMyTeam }: PersonaTable
                         <span className="text-lg shrink-0">{t.emoji}</span>
                       )}
                       <div className="min-w-0">
-                        <p className="font-medium text-sm">{t.name}</p>
+                        <p className="text-[14px] text-foreground/70">{t.name}</p>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <p className="text-xs text-foreground/40 truncate">{t.short_description}</p>
+                            <p className="text-[14px] text-foreground/30 truncate">{t.short_description}</p>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" align="start" className="max-w-xs">
                             <p className="text-xs">{t.short_description}</p>
@@ -258,10 +258,10 @@ export function PersonaTable({ templates, onTeamChange, isMyTeam }: PersonaTable
                       </div>
                     </div>
                   </td>
-                  <td className="px-2 py-3 tabular-nums text-foreground/60">{age ?? '—'}</td>
-                  <td className="px-2 py-3 text-foreground/60">{occupation}</td>
+                  <td className="px-2 py-3 tabular-nums text-foreground/40">{age ?? '—'}</td>
+                  <td className="px-2 py-3 text-foreground/40">{occupation}</td>
                   <td className="px-2 py-3">
-                    <span className="inline-flex items-center gap-1 text-foreground/50">
+                    <span className="inline-flex items-center gap-1 text-foreground/40">
                       {DEVICE_ICONS[device] ?? null} {capitalize(device)}
                     </span>
                   </td>
@@ -275,7 +275,7 @@ export function PersonaTable({ templates, onTeamChange, isMyTeam }: PersonaTable
                     {accessibilityNeeds.length > 0 ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span className="inline-flex items-center gap-1 text-xs text-foreground/50 cursor-default">
+                          <span className="inline-flex items-center gap-1 text-xs text-foreground/40 cursor-default">
                             <Accessibility className="h-3 w-3" />
                             {accessibilityNeeds.length} needs
                           </span>
@@ -292,16 +292,16 @@ export function PersonaTable({ templates, onTeamChange, isMyTeam }: PersonaTable
                       <span className="text-foreground/20">—</span>
                     )}
                   </td>
-                  <td className="px-2 py-3 text-xs text-foreground/50">{model}</td>
-                  <td className="px-2 py-3 text-xs tabular-nums text-foreground/50">${cost.toFixed(2)}</td>
+                  <td className="px-2 py-3 text-xs text-foreground/40">{model}</td>
+                  <td className="px-2 py-3 text-xs tabular-nums text-foreground/40">${cost.toFixed(2)}</td>
                   <td className="px-2 py-3 pr-4">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button className="flex h-6 w-6 items-center justify-center rounded-md text-foreground/15 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-foreground/5 hover:text-foreground/40">
-                          {isMyTeam ? <MoreHorizontal className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                          {isMyTeam ? <MoreVertical className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuContent align="end" className="w-52">
                         {!isMyTeam && (
                           <DropdownMenuItem onClick={() => addToTeam([t.id])}>
                             <Users className="mr-2 h-4 w-4" />
@@ -310,7 +310,7 @@ export function PersonaTable({ templates, onTeamChange, isMyTeam }: PersonaTable
                         )}
                         <DropdownMenuItem onClick={() => initiateTest([t.id])}>
                           <Play className="mr-2 h-4 w-4" />
-                          Initiate test
+                          Add to test
                         </DropdownMenuItem>
                         {isMyTeam && (
                           <DropdownMenuItem onClick={() => removeFromTeam([t.id])} className="text-destructive focus:text-destructive">
@@ -332,20 +332,20 @@ export function PersonaTable({ templates, onTeamChange, isMyTeam }: PersonaTable
       {hasSelection && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
           <div className="flex items-center gap-3 rounded-full border border-border bg-background px-4 py-2 shadow-lg">
-            <span className="text-sm font-medium text-muted-foreground">
+            <span className="text-sm font-medium text-foreground/50">
               {selected.size} of {templates.length} selected
             </span>
-            <Button size="sm" className="rounded-full" onClick={() => { addToTeam(Array.from(selected)); clearSelection(); }}>
-              <Users className="mr-1.5 h-3.5 w-3.5" />
+            <Button size="sm" className="rounded-full !gap-1.5" onClick={() => { addToTeam(Array.from(selected)); clearSelection(); }}>
+              <Users className="!size-3.5" />
               Add to team
             </Button>
-            <Button size="sm" className="rounded-full" onClick={() => initiateTest(Array.from(selected))}>
-              <Play className="mr-1.5 h-3.5 w-3.5" />
-              Initiate test
+            <Button size="sm" className="rounded-full !gap-1.5" onClick={() => initiateTest(Array.from(selected))}>
+              <Play className="!size-3.5" />
+              Add to test
             </Button>
             <button
               onClick={clearSelection}
-              className="rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
+              className="rounded-full p-1 text-foreground/50 transition-colors hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </button>

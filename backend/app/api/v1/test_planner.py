@@ -1,5 +1,10 @@
 """Natural language test planner endpoint — converts descriptions into study plans."""
 
+from __future__ import annotations
+
+import logging
+import re
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,58 +12,89 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.test_planner import TestPlanner
 from app.dependencies import get_db
 from app.llm.client import LLMClient
-from app.llm.schemas import PlannedPersona, PlannedTask, StudyPlan
+from app.llm.schemas import StudyPlan
 from app.services.persona_service import PersonaService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Request / Response schemas
+# Request / Response schemas  (must match the frontend StudyPlanResponse)
 # ---------------------------------------------------------------------------
 
 class StudyPlanRequest(BaseModel):
-    """Request body for the study planner endpoint."""
-
-    description: str = Field(
-        ...,
-        min_length=1,
-        description="Plain-English description of what to test",
-    )
-    url: str = Field(
-        ...,
-        min_length=1,
-        description="Target website URL to test",
-    )
+    description: str = Field(..., min_length=1)
+    url: str = Field(..., min_length=1)
 
 
 class PlannedTaskOut(BaseModel):
-    """A task in the generated study plan."""
-
     description: str
-    success_criteria: str
-
-    model_config = {"from_attributes": True}
+    order_index: int = 0
 
 
 class PlannedPersonaOut(BaseModel):
-    """A persona recommendation in the generated study plan."""
-
-    name: str
-    description: str
     template_id: str | None = None
-
-    model_config = {"from_attributes": True}
+    name: str
+    emoji: str = "👤"
+    reason: str = ""
 
 
 class StudyPlanResponse(BaseModel):
-    """Response from the study planner endpoint."""
-
+    url: str
     tasks: list[PlannedTaskOut]
     personas: list[PlannedPersonaOut]
-    device_recommendation: str
-    estimated_duration_minutes: int
-    rationale: str
+    summary: str
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_STOP_WORDS = frozenset(
+    "a an the and or of for to in on with is are was were be been "
+    "that this it its by from at as into user users".split()
+)
+
+
+def _keywords(text: str) -> set[str]:
+    """Extract meaningful lowercase keywords from text."""
+    words = set(re.findall(r"[a-z]+", text.lower()))
+    return words - _STOP_WORDS
+
+
+def _match_persona_to_template(
+    persona_name: str,
+    persona_desc: str,
+    templates: list,
+) -> tuple[str | None, str, str]:
+    """Match an LLM-generated persona to the best template.
+
+    Returns (template_id, emoji, template_name).
+    """
+    persona_kw = _keywords(persona_name) | _keywords(persona_desc)
+    if not persona_kw:
+        return None, "👤", persona_name
+
+    best_id: str | None = None
+    best_emoji: str = "👤"
+    best_name: str = persona_name
+    best_score: int = 0
+
+    for t in templates:
+        template_kw = _keywords(t.name) | _keywords(t.short_description)
+        overlap = len(persona_kw & template_kw)
+        if overlap > best_score:
+            best_score = overlap
+            best_id = str(t.id)
+            best_emoji = t.emoji or "👤"
+            best_name = t.name
+
+    # Require at least 2 keyword overlaps for a match
+    if best_score < 2:
+        return None, "👤", persona_name
+
+    return best_id, best_emoji, best_name
 
 
 # ---------------------------------------------------------------------------
@@ -76,35 +112,41 @@ async def plan_study(body: StudyPlanRequest, db: AsyncSession = Depends(get_db))
         url=body.url,
     )
 
-    # Match personas to templates by name
+    # Load persona templates for matching
     svc = PersonaService(db)
     templates = await svc.list_templates()
-    template_map = {t.name.lower(): str(t.id) for t in templates}
 
-    personas = []
+    personas: list[PlannedPersonaOut] = []
     for p in plan.personas:
-        matched_id = template_map.get(p.name.lower())
-        if not matched_id:
-            for tname, tid in template_map.items():
-                if tname in p.name.lower() or p.name.lower() in tname:
-                    matched_id = tid
-                    break
+        tid, emoji, matched_name = _match_persona_to_template(
+            p.name, p.description, templates,
+        )
         personas.append(PlannedPersonaOut(
-            name=p.name,
-            description=p.description,
-            template_id=matched_id,
+            template_id=tid,
+            name=matched_name if tid else p.name,
+            emoji=emoji,
+            reason=p.description,
         ))
 
-    return StudyPlanResponse(
-        tasks=[
-            PlannedTaskOut(
-                description=t.description,
-                success_criteria=t.success_criteria,
+    # If no personas matched, fall back to first 3 templates
+    if not any(p.template_id for p in personas) and templates:
+        logger.warning("No personas matched templates — falling back to defaults")
+        personas = [
+            PlannedPersonaOut(
+                template_id=str(t.id),
+                name=t.name,
+                emoji=t.emoji or "👤",
+                reason=t.short_description,
             )
-            for t in plan.tasks
+            for t in templates[:3]
+        ]
+
+    return StudyPlanResponse(
+        url=body.url,
+        tasks=[
+            PlannedTaskOut(description=t.description, order_index=i)
+            for i, t in enumerate(plan.tasks)
         ],
         personas=personas,
-        device_recommendation=plan.device_recommendation,
-        estimated_duration_minutes=plan.estimated_duration_minutes,
-        rationale=plan.rationale,
+        summary=plan.rationale,
     )

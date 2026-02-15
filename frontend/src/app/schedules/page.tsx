@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { Calendar, Play, Pause, Trash2, Copy, ExternalLink, Clock, Globe, Plus, Zap, RefreshCw } from 'lucide-react';
+import { ScheduleIllustration } from '@/components/common/empty-illustrations';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -125,7 +126,7 @@ export default function SchedulesPage() {
   const schedules = data?.items ?? [];
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 px-[100px] pt-[40px] pb-[100px]">
       <div className="flex items-center justify-between">
         <div />
         <CreateDialog />
@@ -133,10 +134,12 @@ export default function SchedulesPage() {
       {schedules.length > 0 ? (
         <div className="space-y-3">{schedules.map(s => <ScheduleRow key={s.id} s={s} />)}</div>
       ) : (
-        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-          <Calendar className="h-12 w-12 text-muted-foreground" />
-          <h3 className="text-lg font-medium">No schedules yet</h3>
-          <p className="text-sm text-muted-foreground">Create a schedule to continuously monitor your website.</p>
+        <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+          <ScheduleIllustration />
+          <div>
+            <p className="text-sm font-medium">No schedules yet</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Create a schedule to continuously monitor your website.</p>
+          </div>
           <CreateDialog />
         </div>
       )}

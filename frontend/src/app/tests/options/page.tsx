@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { cn, scoreColor, scoreLabel } from '@/lib/utils';
 import {
   ChevronRight, Globe, Clock, Users, CheckCircle2, XCircle,
   Loader2, ArrowUpRight, BarChart3, TrendingUp, TrendingDown,
@@ -77,12 +77,14 @@ function StatusLabel({ status }: { status: MockTest['status'] }) {
 
 function ScoreBadge({ score, prev }: { score: number | null; prev?: number | null }) {
   if (score === null) return <span className="text-foreground/20">—</span>;
-  const color = score >= 80 ? 'text-green-600' : score >= 60 ? 'text-amber-600' : 'text-red-500';
+  const colors = scoreColor(score);
   const delta = prev != null && prev > 0 ? score - prev : null;
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className={cn('font-semibold tabular-nums', color)}>{score}</span>
-      <span className="text-foreground/20 font-normal">/100</span>
+      <span className={cn('font-semibold tabular-nums', colors.text)}>{score}</span>
+      <span className={cn('text-[10px] font-medium uppercase tracking-wide opacity-60', colors.text)}>
+        {scoreLabel(score)}
+      </span>
       {delta !== null && delta !== 0 && (
         <span className={cn('text-xs tabular-nums', delta > 0 ? 'text-green-600' : 'text-red-500')}>
           {delta > 0 ? '+' : ''}{delta}
@@ -203,7 +205,7 @@ function OptionC() {
               <span className="text-[13px] text-foreground/30">{tests.length} {tests.length === 1 ? 'test' : 'tests'}</span>
               <div className="ml-auto">
                 {latestScore !== null && (
-                  <span className="text-[13px] text-foreground/40">Best: <span className="font-medium text-foreground">{latestScore}/100</span></span>
+                  <span className="text-[13px] text-foreground/40">Best: <span className={cn('font-medium', scoreColor(latestScore).text)}>{latestScore}</span> <span className={cn('text-[10px] font-medium uppercase tracking-wide opacity-60', scoreColor(latestScore).text)}>{scoreLabel(latestScore)}</span></span>
                 )}
               </div>
             </div>

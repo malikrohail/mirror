@@ -44,6 +44,7 @@ async def list_studies(
         summary = StudySummary.model_validate(s)
         summary.task_count = len(s.tasks) if s.tasks else 0
         summary.persona_count = len(s.personas) if s.personas else 0
+        summary.first_task = s.tasks[0].description if s.tasks else None
         items.append(summary)
     return StudyList(
         items=items,

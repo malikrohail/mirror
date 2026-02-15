@@ -78,6 +78,7 @@ class StudySummary(BaseModel):
     created_at: datetime
     task_count: int = 0
     persona_count: int = 0
+    first_task: str | None = None
 
     model_config = {"from_attributes": True}
 

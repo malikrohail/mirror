@@ -2,9 +2,10 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  Plus, Search, ChevronRight, ListFilter,
+  Plus, Search, ChevronRight, ListFilter, ClipboardList,
   CircleDot, X, Calendar, Play, Pause, Trash2, Copy,
   ExternalLink, Clock, Globe, Zap, RefreshCw,
   GitCompare, CheckCircle, AlertCircle, MinusCircle,
@@ -19,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Tooltip as ShadTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
@@ -37,12 +39,13 @@ import { usePersonaTemplates } from '@/hooks/use-personas';
 import { useCompareStudies } from '@/hooks/use-comparison';
 import { DataTable } from '@/components/common/data-table';
 import { EmptyState } from '@/components/common/empty-state';
+import { TestsIllustration, ScheduleIllustration } from '@/components/common/empty-illustrations';
 import { ErrorState } from '@/components/common/error-state';
 import { PageSkeleton } from '@/components/common/page-skeleton';
 import { PageHeaderBar } from '@/components/layout/page-header-bar';
 import { formatDistanceToNow } from '@/lib/format';
 import { API_BASE, SEVERITY_COLORS, TERMS } from '@/lib/constants';
-import { cn } from '@/lib/utils';
+import { cn, scoreColor, scoreLabel, studyName } from '@/lib/utils';
 import type { StudySummary, StudyStatus, ScheduleOut, IssueDiff } from '@/types';
 
 // ── Helpers ────────────────────────────────────────────
@@ -139,7 +142,62 @@ function ExpandedScoreChart({ url }: { url: string }) {
   );
 }
 
-// ── URL Group (strip header + test rows) ────────────────
+// ── Favicon with globe fallback ──────────────────────────
+
+function SiteFavicon({ url, className }: { url: string; className?: string }) {
+  const [failed, setFailed] = useState(false);
+
+  let hostname: string;
+  try { hostname = new URL(url).hostname; } catch { return <Globe className={cn('h-4 w-4 text-foreground/30', className)} />; }
+
+  if (failed) return <Globe className={cn('h-4 w-4 text-foreground/30', className)} />;
+
+  return (
+    <img
+      src={`https://www.google.com/s2/favicons?domain=${hostname}&sz=32`}
+      alt=""
+      className={cn('h-4 w-4 rounded-sm', className)}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+// ── Shared row cells ─────────────────────────────────────
+
+function StatusDotInline({ status }: { status: string }) {
+  if (status === 'running') {
+    return (
+      <span className="relative inline-flex h-1.5 w-1.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
+      </span>
+    );
+  }
+  if (status === 'analyzing') {
+    return (
+      <span className="relative inline-flex h-1.5 w-1.5">
+        <span className="absolute inline-flex h-full w-full animate-pulse rounded-full bg-yellow-400 opacity-75" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-yellow-500" />
+      </span>
+    );
+  }
+  if (status === 'complete') return <span className="inline-flex h-1.5 w-1.5 rounded-full bg-green-500" />;
+  return <span className="inline-flex h-1.5 w-1.5 rounded-full bg-red-400" />;
+}
+
+function ScoreCell({ score }: { score: number | null | undefined }) {
+  if (score == null || score <= 0) return <span className="text-foreground/20">&mdash;</span>;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={cn('font-semibold', scoreColor(score).text)}>{Math.round(score)}</span>
+      <span className={cn('text-[10px] font-medium uppercase tracking-wide opacity-60', scoreColor(score).text)}>
+        {scoreLabel(score)}
+      </span>
+    </span>
+  );
+}
+
+// ── URL Group (grid rows, Option B) ─────────────────────
 
 function UrlGroup({
   url,
@@ -168,12 +226,12 @@ function UrlGroup({
           collapsed ? 'rounded-lg' : 'rounded-t-lg',
         )}
       >
-        <Globe className="h-4 w-4 text-foreground/30" />
-        <span className="text-[14px] font-medium text-foreground">{url.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
+        <SiteFavicon url={url} />
+        <span className="text-[14px] text-foreground">{url.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
         <span className="text-[13px] text-foreground/30">{studies.length} {studies.length === 1 ? 'test' : 'tests'}</span>
         <ChevronRight className={cn('ml-auto h-3.5 w-3.5 text-foreground/30 transition-transform', collapsed ? 'rotate-90' : '-rotate-90')} />
       </button>
-      {/* Test rows */}
+      {/* Test rows — CSS grid */}
       {!collapsed && (
       <div className="overflow-hidden rounded-b-lg border border-t-0 border-border">
         {studies.map((study, i) => {
@@ -183,7 +241,7 @@ function UrlGroup({
           const checkDisabled = !isSelected && selectedStudyIds.size >= 2;
 
           return (
-            <div key={study.id} className="group/row relative border-b border-border/50 last:border-b-0">
+            <div key={study.id} className="group/row relative border-b border-border/50 last:border-b-0 hover:bg-muted/20 transition-colors">
               {isComplete && (
                 <div
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleStudy(study.id); }}
@@ -202,44 +260,147 @@ function UrlGroup({
               )}
               <Link
                 href={studyHref(study)}
-                className="flex items-center gap-4 pl-10 pr-4 py-2.5 text-[13px] hover:bg-muted/20 transition-colors"
+                className="flex items-center pl-10 py-2.5 text-[13px]"
               >
-                <span className="w-6 shrink-0 text-center text-foreground/20 tabular-nums">#{studies.length - i}</span>
-                <span className="inline-flex items-center gap-1.5">
-                  {study.status === 'running' ? (
-                    <span className="relative inline-flex h-2 w-2">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
-                    </span>
-                  ) : study.status === 'analyzing' ? (
-                    <span className="relative inline-flex h-2 w-2">
-                      <span className="absolute inline-flex h-full w-full animate-pulse rounded-full bg-yellow-400 opacity-75" />
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-yellow-500" />
-                    </span>
-                  ) : study.status === 'complete' ? (
-                    <span className="inline-flex h-2 w-2 rounded-full bg-green-500" />
-                  ) : (
-                    <span className="inline-flex h-2 w-2 rounded-full bg-red-400" />
-                  )}
-                  <span className={cn('capitalize', statusColor(study.status))}>{study.status}</span>
-                </span>
-                <span className="inline-flex items-center gap-1 text-foreground/40">
-                  <Users className="h-3 w-3" />
-                  {study.persona_count ?? study.personas?.length ?? 0}
-                </span>
-                <div className="tabular-nums">
-                  {study.overall_score != null && study.overall_score > 0
-                    ? <span className="font-medium text-foreground">{Math.round(study.overall_score)}/100</span>
-                    : <span className="text-foreground/20">—</span>}
+                <div className="grid flex-1 items-center" style={{ gridTemplateColumns: '80px 1fr 100px 50px 80px 60px' }}>
+                  <span className="text-foreground/30">{studyName(study.url, studies.length - i)}</span>
+                  <span className="text-foreground/70 truncate pr-4">{study.first_task ?? ''}</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <StatusDotInline status={study.status} />
+                    <span className={cn('capitalize', statusColor(study.status))}>{study.status}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-foreground/40">
+                    <Users className="h-3 w-3" />
+                    {study.persona_count ?? study.personas?.length ?? 0}
+                  </span>
+                  <span className="tabular-nums"><ScoreCell score={study.overall_score} /></span>
+                  <span className="text-right text-foreground/30">{fmtShort(study.created_at)}</span>
                 </div>
-                <span className="ml-auto text-foreground/30">{fmtShort(study.created_at)}</span>
-                <ChevronRight className="h-3.5 w-3.5 -mr-1 text-foreground/30 opacity-0 group-hover/row:opacity-100 transition-opacity" />
+                <ChevronRight className="mx-4 h-3.5 w-3.5 shrink-0 text-foreground/15 opacity-0 group-hover/row:opacity-100 transition-opacity" />
               </Link>
             </div>
           );
         })}
       </div>
       )}
+    </div>
+  );
+}
+
+// ── Flat table view (Option E) ──────────────────────────
+
+function FlatTable({
+  studies,
+  selectedStudyIds,
+  onToggleStudy,
+}: {
+  studies: StudySummary[];
+  selectedStudyIds: Set<string>;
+  onToggleStudy: (id: string) => void;
+}) {
+  // Compute sequential index per URL
+  const withIndex = useMemo(() => {
+    const counts = new Map<string, number>();
+    // Sort oldest first to assign sequential numbers
+    const sorted = [...studies].sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const indexMap = new Map<string, number>();
+    for (const s of sorted) {
+      const n = (counts.get(s.url) ?? 0) + 1;
+      counts.set(s.url, n);
+      indexMap.set(s.id, n);
+    }
+    // Return in original order (newest first) with the index
+    return studies.map((s) => ({ study: s, idx: indexMap.get(s.id) ?? 1 }));
+  }, [studies]);
+
+  const router = useRouter();
+
+  if (studies.length === 0) {
+    return <p className="py-6 text-center text-sm text-muted-foreground">No tests match this filter</p>;
+  }
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border">
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="border-b border-border bg-muted/30 text-left text-[11px] uppercase tracking-wider text-foreground/30">
+            <th className="py-2 pl-10 pr-2 font-medium">Website</th>
+            <th className="px-2 py-2 font-medium">Test</th>
+            <th className="px-2 py-2 font-medium">Task</th>
+            <th className="px-2 py-2 font-medium">Status</th>
+            <th className="px-2 py-2 pr-6 text-right font-medium">Testers</th>
+            <th className="pl-6 pr-2 py-2 font-medium">Score</th>
+            <th className="px-2 py-2 text-right font-medium">Date</th>
+            <th className="w-10" />
+          </tr>
+        </thead>
+        <tbody>
+          {withIndex.map(({ study, idx }) => {
+            const isComplete = study.status === 'complete';
+            const isSelected = selectedStudyIds.has(study.id);
+            const checkDisabled = !isSelected && selectedStudyIds.size >= 2;
+            let hostname: string;
+            try { hostname = new URL(study.url).hostname.replace(/^www\./, ''); } catch { hostname = study.url; }
+
+            return (
+              <tr
+                key={study.id}
+                onClick={() => router.push(studyHref(study))}
+                className="group/row cursor-pointer border-b border-border/50 last:border-b-0 hover:bg-muted/20 transition-colors"
+              >
+                <td className="py-2.5 pl-4 pr-2">
+                  <div className="flex items-center gap-2">
+                    {isComplete ? (
+                      <div
+                        onClick={(e) => { e.stopPropagation(); onToggleStudy(study.id); }}
+                        className={cn(
+                          'flex items-center justify-center transition-opacity cursor-pointer',
+                          isSelected ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
+                          checkDisabled && 'cursor-not-allowed opacity-30 pointer-events-none',
+                        )}
+                      >
+                        <Checkbox checked={isSelected} disabled={checkDisabled} tabIndex={-1} />
+                      </div>
+                    ) : (
+                      <TooltipProvider delayDuration={0}>
+                        <ShadTooltip>
+                          <TooltipTrigger asChild>
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity"
+                            >
+                              <Checkbox disabled tabIndex={-1} />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">Test must be complete to compare</TooltipContent>
+                        </ShadTooltip>
+                      </TooltipProvider>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 text-foreground/30">
+                      <SiteFavicon url={study.url} className="h-3.5 w-3.5" />
+                      {hostname}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-2 py-2.5 text-foreground/30">{studyName(study.url, idx)}</td>
+                <td className="px-2 py-2.5 text-foreground/70 truncate max-w-[180px]">{study.first_task ?? ''}</td>
+                <td className="px-2 py-2.5">
+                  <span className="inline-flex items-center gap-1.5">
+                    <StatusDotInline status={study.status} />
+                    <span className={cn('capitalize', statusColor(study.status))}>{study.status}</span>
+                  </span>
+                </td>
+                <td className="px-2 pr-6 py-2.5 text-right text-foreground/40">{study.persona_count ?? study.personas?.length ?? 0}</td>
+                <td className="pl-6 pr-2 py-2.5 tabular-nums"><ScoreCell score={study.overall_score} /></td>
+                <td className="px-2 py-2.5 text-right text-foreground/30">{fmtShort(study.created_at)}</td>
+                <td className="py-2.5 px-2 pr-4">
+                  <ChevronRight className="h-3.5 w-3.5 text-foreground/15 opacity-0 group-hover/row:opacity-100 transition-opacity" />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -375,9 +536,12 @@ function SchedulesPanel() {
           {schedules.map(s => <ScheduleCard key={s.id} s={s} />)}
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-8 text-center">
-          <Calendar className="h-8 w-8 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">No schedules yet</p>
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-8 text-center">
+          <ScheduleIllustration />
+          <div>
+            <p className="text-sm font-medium">No schedules yet</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Set up recurring tests to monitor your site</p>
+          </div>
           <CreateScheduleDialog />
         </div>
       )}
@@ -420,6 +584,7 @@ export default function DashboardPage() {
   const [compareMode, setCompareMode] = useState(false);
   const [selectedStudyIds, setSelectedStudyIds] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'grouped' | 'flat'>('grouped');
   const [compareSheetOpen, setCompareSheetOpen] = useState(false);
   const compare = useCompareStudies();
   const { data, isLoading, isError, error, refetch } = useStudies(page, 50);
@@ -477,10 +642,10 @@ export default function DashboardPage() {
 
   const headerChips = allStudies.length > 0
     ? [
-        { label: 'Tests', value: data?.total ?? allStudies.length },
-        { label: 'Websites', value: uniqueUrls },
+        { label: 'Tests', value: data?.total ?? allStudies.length, tooltip: 'Total number of usability tests run' },
+        { label: 'Websites', value: uniqueUrls, tooltip: 'Unique websites tested' },
         ...(latestStudy
-          ? [{ label: 'Last run', value: formatDistanceToNow(latestStudy.created_at) }]
+          ? [{ label: 'Last run', value: formatDistanceToNow(latestStudy.created_at), tooltip: 'Time since your most recent test' }]
           : []),
       ]
     : [];
@@ -489,7 +654,7 @@ export default function DashboardPage() {
 
   if (isError) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center p-6">
+      <div className="flex min-h-[60vh] items-center justify-center px-[100px] pt-[40px] pb-[100px]">
         <ErrorState
           title="Failed to load tests"
           message={error?.message}
@@ -501,16 +666,16 @@ export default function DashboardPage() {
 
   if (allStudies.length === 0) {
     return (
-      <div className="space-y-6 p-6">
+      <div className="space-y-6 px-[100px] pt-[40px] pb-[100px]">
         <EmptyState
-          icon={<Search className="h-12 w-12" />}
+          illustration={<TestsIllustration />}
           title="No tests yet"
           description="Run your first test to get started."
           action={
-            <Button asChild>
+            <Button variant="outline" size="sm" asChild>
               <Link href="/">
-                <Plus className="mr-2 h-4 w-4" />
-                New Test
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Run your first test
               </Link>
             </Button>
           }
@@ -523,13 +688,15 @@ export default function DashboardPage() {
     <div>
       {headerChips.length > 0 && (
         <PageHeaderBar
+          icon={ClipboardList}
+          title="My tests"
           chips={headerChips}
           right={
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" className="h-[30px] text-sm">
                   New Test
-                  <ChevronRight className="ml-1.5 h-3 w-3 rotate-90" />
+                  <ChevronRight className="ml-0.5 h-3 w-3 rotate-90" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -545,13 +712,28 @@ export default function DashboardPage() {
           }
         />
       )}
-    <div className="flex gap-6 p-6">
+    <div className="flex gap-6 px-[100px] pt-[40px] pb-[100px]">
       {/* Left — Test history */}
-      <div className="min-w-0 flex-1 basis-1/2 space-y-4">
+      <div className="min-w-0 flex-1 basis-1/2 space-y-2.5">
         {/* Filter bar */}
         <div className="flex items-center gap-2">
           <p className="text-[14px] uppercase text-foreground/30">Test history</p>
           <div className="flex-1" />
+
+          {/* Group by URL chip */}
+          <button
+            onClick={() => setViewMode(viewMode === 'grouped' ? 'flat' : 'grouped')}
+            className={cn(
+              'flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 text-[14px] transition-colors',
+              viewMode === 'grouped'
+                ? 'border-foreground/20 bg-foreground/5 text-foreground/70'
+                : 'border-border text-foreground/70 hover:text-foreground',
+            )}
+          >
+            {viewMode === 'grouped' ? 'Grouped by URL' : 'Group by URL'}
+            {viewMode === 'grouped' && <X className="h-3 w-3" />}
+          </button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className={cn(
@@ -564,13 +746,13 @@ export default function DashboardPage() {
                 Filter
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
+            <DropdownMenuContent align="end" sideOffset={4} className="w-48">
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
                   <CircleDot className="mr-2 h-4 w-4" />
                   Status
                 </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-36">
+                <DropdownMenuSubContent sideOffset={2} alignOffset={-4} className="w-36">
                   <DropdownMenuItem onClick={() => setStatusFilter(null)}>
                     <span className={statusFilter === null ? 'font-medium' : ''}>All</span>
                   </DropdownMenuItem>
@@ -586,7 +768,7 @@ export default function DashboardPage() {
                   <Globe className="mr-2 h-4 w-4" />
                   URL
                 </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-48">
+                <DropdownMenuSubContent sideOffset={2} alignOffset={-4} className="w-48">
                   <DropdownMenuItem onClick={() => setUrlFilter(null)}>
                     <span className={urlFilter === null ? 'font-medium' : ''}>All</span>
                   </DropdownMenuItem>
@@ -600,7 +782,7 @@ export default function DashboardPage() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setShowFailed((v) => !v)}>
                 <Checkbox checked={showFailed} className="pointer-events-none mr-2" />
-                Show Failed
+                Show failed
               </DropdownMenuItem>
               {hasFilters && (
                 <>
@@ -614,15 +796,24 @@ export default function DashboardPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button
-            variant={compareMode ? 'default' : 'outline'}
-            size="sm"
-            className="h-[30px] text-sm"
-            onClick={() => compareMode ? exitCompareMode() : setCompareMode(true)}
-          >
-            <GitCompare className="mr-1.5 h-3.5 w-3.5" />
-            {compareMode ? 'Exit Compare' : 'Compare'}
-          </Button>
+          <TooltipProvider delayDuration={0}>
+            <ShadTooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-[30px] text-sm pointer-events-none opacity-50"
+                    disabled
+                  >
+                    <GitCompare className="mr-1.5 h-3.5 w-3.5" />
+                    Compare
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Coming soon</TooltipContent>
+            </ShadTooltip>
+          </TooltipProvider>
 
           {statusFilter && (
             <button
@@ -644,29 +835,37 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Grouped — strip headers + test rows */}
-        {grouped.length > 0 ? (
-          <div className="space-y-4">
-            {grouped.map(([url, groupStudies]) => (
-              <UrlGroup
-                key={url}
-                url={url}
-                studies={groupStudies}
-                collapsed={collapsed.has(url)}
-                onToggleCollapse={() => setCollapsed((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(url)) next.delete(url);
-                  else next.add(url);
-                  return next;
-                })}
-                compareMode={compareMode}
-                selectedStudyIds={selectedStudyIds}
-                onToggleStudy={toggleStudySelection}
-              />
-            ))}
-          </div>
+        {/* Test rows — grouped (B) or flat table (E) */}
+        {viewMode === 'grouped' ? (
+          grouped.length > 0 ? (
+            <div className="space-y-2.5">
+              {grouped.map(([url, groupStudies]) => (
+                <UrlGroup
+                  key={url}
+                  url={url}
+                  studies={groupStudies}
+                  collapsed={collapsed.has(url)}
+                  onToggleCollapse={() => setCollapsed((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(url)) next.delete(url);
+                    else next.add(url);
+                    return next;
+                  })}
+                  compareMode={compareMode}
+                  selectedStudyIds={selectedStudyIds}
+                  onToggleStudy={toggleStudySelection}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="py-6 text-center text-sm text-muted-foreground">No tests match this filter</p>
+          )
         ) : (
-          <p className="py-6 text-center text-sm text-muted-foreground">No tests match this filter</p>
+          <FlatTable
+            studies={studies}
+            selectedStudyIds={selectedStudyIds}
+            onToggleStudy={toggleStudySelection}
+          />
         )}
 
         {!statusFilter && failedCount > 0 && (
@@ -684,21 +883,29 @@ export default function DashboardPage() {
       {selectedStudyIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
           <div className="flex items-center gap-3 rounded-full border border-border bg-background px-4 py-2 shadow-lg">
-            <span className="text-sm font-medium text-muted-foreground">
+            <span className="text-sm font-medium text-foreground/50">
               {selectedStudyIds.size} of 2 selected
             </span>
-            <Button
-              size="sm"
-              disabled={selectedStudyIds.size !== 2}
-              onClick={runComparison}
-              className="rounded-full"
-            >
-              <GitCompare className="mr-1.5 h-3.5 w-3.5" />
-              Compare
-            </Button>
+            <TooltipProvider delayDuration={0}>
+              <ShadTooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      size="sm"
+                      disabled
+                      className="rounded-full pointer-events-none opacity-50"
+                    >
+                      <GitCompare className="mr-1.5 h-3.5 w-3.5" />
+                      Compare
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Coming soon</TooltipContent>
+              </ShadTooltip>
+            </TooltipProvider>
             <button
               onClick={exitCompareMode}
-              className="rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
+              className="rounded-full p-1 text-foreground/50 transition-colors hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </button>

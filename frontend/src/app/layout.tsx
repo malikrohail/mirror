@@ -3,6 +3,7 @@ import { Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/layout/providers';
 import { Sidebar } from '@/components/layout/sidebar';
+import { NavigationFade } from '@/components/layout/navigation-progress';
 
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
@@ -10,7 +11,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Mirror — AI Usability Testing',
+  title: 'mirror | Find UX issues before your users do',
   description: 'Watch AI personas break your website — so real users don\'t have to.',
 };
 
@@ -26,16 +27,16 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Red+Hat+Display:wght@400;500;600;700&display=swap"
         />
       </head>
       <body className={`${geistMono.variable} font-sans antialiased`}>
         <Providers>
           <div className="flex h-screen overflow-hidden">
             <Sidebar />
-            <main className="min-h-0 flex-1 overflow-auto">
+            <NavigationFade>
               {children}
-            </main>
+            </NavigationFade>
           </div>
         </Providers>
       </body>

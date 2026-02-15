@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { PersonaProgressCard } from '@/components/study/persona-progress-card';
 import { LiveStepTimeline } from '@/components/study/live-step-timeline';
-import { cn } from '@/lib/utils';
+import { cn, scoreColor, scoreLabel } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -271,9 +271,10 @@ export default function TimelineDemoPage() {
         <div className="grid grid-cols-4 gap-3">
           <div className="rounded-lg border border-border p-4">
             <p className="text-[13px] text-muted-foreground/60">Overall score</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">
-              72<span className="text-sm font-normal text-muted-foreground/40">/100</span>
-            </p>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className={cn('text-2xl font-semibold tabular-nums', scoreColor(72).text)}>72</span>
+              <span className={cn('text-sm font-medium uppercase tracking-wide opacity-60', scoreColor(72).text)}>{scoreLabel(72)}</span>
+            </div>
           </div>
           <div className="rounded-lg border border-border p-4">
             <p className="text-[13px] text-muted-foreground/60">Issues found</p>

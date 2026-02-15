@@ -54,6 +54,27 @@ export const TERMS = {
   pluralCap: 'Tests',
 } as const;
 
+/**
+ * Standard table text color hierarchy (Option 2 — "Task hero").
+ * Primary content column is the most readable; identifiers stay quiet.
+ */
+export const TABLE_COLORS = {
+  /** Table header text: quiet uppercase labels */
+  header: 'text-foreground/30',
+  /** Identifier/name column: quiet, scannable */
+  identifier: 'text-foreground/30',
+  /** Primary content/description: hero — most readable column */
+  primary: 'text-foreground/70',
+  /** Count metadata (testers, age, cost, etc.) */
+  meta: 'text-foreground/40',
+  /** Date and secondary metadata */
+  secondary: 'text-foreground/30',
+  /** Empty/placeholder values (dashes, n/a) */
+  placeholder: 'text-foreground/20',
+  /** Hover reveal elements (chevrons, action buttons) */
+  hoverReveal: 'text-foreground/15',
+} as const;
+
 export const AUTOPLAY_INTERVAL = 2000;
 export const WS_RECONNECT_INTERVAL = 3000;
 export const MAX_RECONNECT_ATTEMPTS = 10;
