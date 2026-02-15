@@ -111,52 +111,63 @@ class DatabaseStepRecorder:
 
         # 2-4. DB writes under lock to prevent concurrent session corruption
         async with self._db_lock:
-            step = Step(
-                session_id=db_session_id,
-                step_number=step_number,
-                page_url=page_url,
-                page_title=page_title,
-                screenshot_path=screenshot_path,
-                think_aloud=decision.think_aloud,
-                action_type=decision.action.type.value,
-                action_selector=decision.action.selector,
-                action_value=decision.action.value,
-                confidence=decision.confidence,
-                task_progress=decision.task_progress,
-                emotional_state=decision.emotional_state.value,
-                click_x=click_x,
-                click_y=click_y,
-                viewport_width=viewport_width,
-                viewport_height=viewport_height,
-            )
-            self.db.add(step)
-            await self.db.flush()
-
-            for ux_issue in decision.ux_issues:
-                severity_map = {
-                    "critical": IssueSeverity.CRITICAL,
-                    "major": IssueSeverity.MAJOR,
-                    "minor": IssueSeverity.MINOR,
-                    "enhancement": IssueSeverity.ENHANCEMENT,
-                }
-                issue = Issue(
-                    step_id=step.id,
+            try:
+                step = Step(
                     session_id=db_session_id,
-                    study_id=self.study_id,
-                    element=ux_issue.element,
-                    description=ux_issue.description,
-                    severity=severity_map.get(ux_issue.severity.value, IssueSeverity.MINOR),
-                    heuristic=ux_issue.heuristic,
-                    wcag_criterion=ux_issue.wcag_criterion,
-                    recommendation=ux_issue.recommendation,
+                    step_number=step_number,
                     page_url=page_url,
-                    issue_type=ux_issue.issue_type.value
-                    if hasattr(ux_issue, "issue_type") and ux_issue.issue_type
-                    else "ux",
+                    page_title=page_title,
+                    screenshot_path=screenshot_path,
+                    think_aloud=decision.think_aloud,
+                    action_type=decision.action.type.value,
+                    action_selector=decision.action.selector,
+                    action_value=decision.action.value,
+                    confidence=decision.confidence,
+                    task_progress=decision.task_progress,
+                    emotional_state=decision.emotional_state.value,
+                    click_x=click_x,
+                    click_y=click_y,
+                    viewport_width=viewport_width,
+                    viewport_height=viewport_height,
                 )
-                self.db.add(issue)
+                self.db.add(step)
+                await self.db.flush()
 
-            await self.db.flush()
+                for ux_issue in decision.ux_issues:
+                    severity_map = {
+                        "critical": IssueSeverity.CRITICAL,
+                        "major": IssueSeverity.MAJOR,
+                        "minor": IssueSeverity.MINOR,
+                        "enhancement": IssueSeverity.ENHANCEMENT,
+                    }
+                    # Truncate fields that may exceed DB column limits
+                    heuristic = (ux_issue.heuristic or "")[:500]
+                    wcag = (ux_issue.wcag_criterion or "")[:255]
+                    issue = Issue(
+                        step_id=step.id,
+                        session_id=db_session_id,
+                        study_id=self.study_id,
+                        element=ux_issue.element,
+                        description=ux_issue.description,
+                        severity=severity_map.get(ux_issue.severity.value, IssueSeverity.MINOR),
+                        heuristic=heuristic,
+                        wcag_criterion=wcag,
+                        recommendation=ux_issue.recommendation,
+                        page_url=page_url,
+                        issue_type=ux_issue.issue_type.value
+                        if hasattr(ux_issue, "issue_type") and ux_issue.issue_type
+                        else "ux",
+                    )
+                    self.db.add(issue)
+
+                await self.db.flush()
+            except Exception as e:
+                # Rollback so subsequent steps can still be saved
+                logger.error(
+                    "DB flush failed for step %d of session %s: %s — rolling back",
+                    step_number, session_id, e,
+                )
+                await self.db.rollback()
 
         logger.info(
             "[step-recorder] Saved step %d for session %s (%d issues, screenshot=%s)",

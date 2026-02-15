@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     BROWSER_PROFILE_PATH: str = ""  # Persistent browser profile dir
 
     # Hybrid mode & production (Iteration 5)
-    DEFAULT_BROWSER_MODE: str = "local"  # Default browser mode
+    DEFAULT_BROWSER_MODE: str = "cloud"  # Default browser mode (cloud = Browserbase with CAPTCHA solving)
     HYBRID_FAILOVER_ENABLED: bool = True
     HYBRID_CRASH_THRESHOLD: int = 2  # Local crashes before failover to cloud
     MEMORY_MIN_FREE_MB: int = 500  # Minimum free memory for new sessions

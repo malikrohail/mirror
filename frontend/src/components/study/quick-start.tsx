@@ -150,7 +150,7 @@ export function QuickStart({
 
   const [browserMode, setBrowserMode] = useState<'local' | 'cloud'>(() => {
     if (typeof window === 'undefined') return 'local';
-    return (localStorage.getItem('miror-browser-mode') as 'local' | 'cloud') || 'local';
+    return (localStorage.getItem('miror-browser-mode') as 'local' | 'cloud') || 'cloud';
   });
   const toggleBrowserMode = () => {
     const next = browserMode === 'local' ? 'cloud' : 'local';
@@ -240,7 +240,7 @@ export function QuickStart({
         tasks,
         persona_template_ids: personaIds,
       });
-      const bm = localStorage.getItem('miror-browser-mode') || 'local';
+      const bm = localStorage.getItem('miror-browser-mode') || 'cloud';
       await runStudy.mutateAsync({ studyId: study.id, browserMode: bm });
       router.replace(`/study/${study.id}/running`);
     } catch (err) {
