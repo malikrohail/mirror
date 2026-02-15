@@ -13,9 +13,11 @@ import type { FixSuggestionOut } from '@/types';
 
 interface IssuesTabProps {
   studyId: string;
+  hideSeverityFilter?: boolean;
+  severityOverride?: string | null;
 }
 
-export function IssuesTab({ studyId }: IssuesTabProps) {
+export function IssuesTab({ studyId, hideSeverityFilter, severityOverride }: IssuesTabProps) {
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const { data: issues, isLoading } = useIssues(studyId);
@@ -33,12 +35,14 @@ export function IssuesTab({ studyId }: IssuesTabProps) {
     return map;
   }, [fixes]);
 
+  const activeSeverity = severityOverride ?? (severityFilter !== 'all' ? severityFilter : null);
+
   const filtered = useMemo(() => {
     let result = issues ?? [];
-    if (severityFilter !== 'all') result = result.filter((i) => i.severity === severityFilter);
+    if (activeSeverity) result = result.filter((i) => i.severity === activeSeverity);
     if (typeFilter !== 'all') result = result.filter((i) => i.issue_type === typeFilter);
     return result;
-  }, [issues, severityFilter, typeFilter]);
+  }, [issues, activeSeverity, typeFilter]);
 
   if (isLoading) {
     return (
@@ -53,37 +57,59 @@ export function IssuesTab({ studyId }: IssuesTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Select value={severityFilter} onValueChange={setSeverityFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="All severities" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All severities</SelectItem>
-            {SEVERITIES.map((s) => (
-              <SelectItem key={s} value={s} className="capitalize">
-                {s}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="All types" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All types</SelectItem>
-            {ISSUE_TYPES.map((t) => (
-              <SelectItem key={t} value={t}>
-                {ISSUE_TYPE_LABELS[t]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <span className="tabular-nums text-sm text-muted-foreground">
-          {filtered.length} issue{filtered.length !== 1 ? 's' : ''}
-        </span>
-      </div>
+      {!hideSeverityFilter && (
+        <div className="flex items-center gap-3">
+          <Select value={severityFilter} onValueChange={setSeverityFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All severities" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All severities</SelectItem>
+              {SEVERITIES.map((s) => (
+                <SelectItem key={s} value={s} className="capitalize">
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              {ISSUE_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {ISSUE_TYPE_LABELS[t]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="tabular-nums text-sm text-muted-foreground">
+            {filtered.length} issue{filtered.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
+      {hideSeverityFilter && (
+        <div className="flex items-center gap-3">
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              {ISSUE_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {ISSUE_TYPE_LABELS[t]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="tabular-nums text-sm text-muted-foreground">
+            {filtered.length} issue{filtered.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
       <IssueList issues={filtered} studyId={studyId} fixesByIssueId={fixesByIssueId} />
       <FixPanel studyId={studyId} />
     </div>

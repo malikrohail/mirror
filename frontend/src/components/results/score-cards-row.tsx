@@ -1,6 +1,7 @@
 'use client';
 
 import { ScoreCard } from './score-card';
+import { scoreLabel } from '@/lib/utils';
 import type { StudyOut, IssueOut, SessionOut } from '@/types';
 
 interface ScoreCardsRowProps {
@@ -25,7 +26,8 @@ export function ScoreCardsRow({ study, issues, sessions }: ScoreCardsRowProps) {
     <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
       <ScoreCard
         label="Overall Score"
-        value={`${Math.round(score)}/100`}
+        value={Math.round(score)}
+        description={scoreLabel(score)}
         variant={getScoreVariant(score)}
       />
       <ScoreCard

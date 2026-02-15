@@ -7,7 +7,7 @@ import { PersonaBuilderForm } from '@/components/persona/persona-builder-form';
 
 export default function PersonaBuilderPage() {
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 px-[100px] pt-[40px] pb-[100px]">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/personas" aria-label="Back to persona library">

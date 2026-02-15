@@ -16,6 +16,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { StepsIllustration } from '@/components/common/empty-illustrations';
 import type { StepHistoryEntry } from '@/stores/study-store';
 
 const ACTION_CONFIG: Record<string, { icon: React.ElementType; color: string; label: string }> = {
@@ -129,8 +130,9 @@ export function LiveStepTimeline({ steps }: LiveStepTimelineProps) {
 
   if (steps.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center p-4">
-        <p className="text-[14px] text-muted-foreground/40">Waiting for steps...</p>
+      <div className="flex h-full flex-col items-center justify-center gap-2 p-4">
+        <StepsIllustration />
+        <p className="text-[14px] text-muted-foreground/40">Waiting for steps</p>
       </div>
     );
   }

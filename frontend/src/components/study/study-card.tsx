@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { formatDistanceToNow } from '@/lib/format';
+import { scoreColor, scoreLabel } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/common/status-badge';
 import type { StudySummary } from '@/types';
@@ -29,8 +30,13 @@ export function StudyCard({ study }: StudyCardProps) {
               {(study.personas?.length ?? 0)} persona{(study.personas?.length ?? 0) !== 1 ? 's' : ''}
             </span>
             {study.overall_score !== null && (
-              <span className="tabular-nums font-medium text-foreground">
-                Score: {Math.round(study.overall_score)}
+              <span className="inline-flex items-center gap-1.5 tabular-nums">
+                <span className={`font-semibold ${scoreColor(study.overall_score).text}`}>
+                  {Math.round(study.overall_score)}
+                </span>
+                <span className={`text-[10px] font-medium uppercase tracking-wide opacity-60 ${scoreColor(study.overall_score).text}`}>
+                  {scoreLabel(study.overall_score)}
+                </span>
               </span>
             )}
           </div>

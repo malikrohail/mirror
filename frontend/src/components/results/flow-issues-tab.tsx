@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ArrowRight, GitCompareArrows, AlertTriangle, TrendingDown, Info, Loader2 } from 'lucide-react';
+import { ArrowRight, AlertTriangle, TrendingDown, Info, GitCompareArrows } from 'lucide-react';
+import { FlowIllustration } from '@/components/common/empty-illustrations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -77,11 +78,14 @@ export function FlowIssuesTab({ studyId }: FlowIssuesTabProps) {
   if (!flows || flows.length === 0) {
     return (
       <Card>
-        <CardContent className="flex flex-col items-center justify-center gap-3 py-12">
-          <GitCompareArrows className="h-10 w-10 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            No flow analysis data available yet. Flow analysis is generated after a study completes when multi-page navigation is detected.
-          </p>
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+          <FlowIllustration />
+          <div>
+            <p className="text-sm font-medium">No flow analysis yet</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Flow analysis is generated after a study completes with multi-page navigation.
+            </p>
+          </div>
         </CardContent>
       </Card>
     );

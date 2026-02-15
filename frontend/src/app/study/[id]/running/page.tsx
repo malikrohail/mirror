@@ -3,12 +3,12 @@
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MoreVertical, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoreVertical, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api-client';
 import { useDeleteStudy } from '@/hooks/use-study';
 import { useStudyStore } from '@/stores/study-store';
-import { cn } from '@/lib/utils';
+import { cn, scoreColor, scoreLabel, studyName } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -30,9 +30,12 @@ import { LiveStepTimeline } from '@/components/study/live-step-timeline';
 import { ScreencastViewer } from '@/components/study/screencast-viewer';
 import { LiveBrowserView } from '@/components/study/live-browser-view';
 import { ReportPreview } from '@/components/report/report-preview';
+import { ReportActions } from '@/components/report/report-actions';
 import { IssuesTab } from '@/components/results/issues-tab';
-import { SessionReplay } from '@/components/session/session-replay';
+import { IssueList } from '@/components/results/issue-list';
+import { useSessionDetail } from '@/hooks/use-session-replay';
 import { ClickHeatmap } from '@/components/heatmap/click-heatmap';
+import { BrowserIllustration, LogIllustration, StepsIllustration } from '@/components/common/empty-illustrations';
 import { PageHeaderBar } from '@/components/layout/page-header-bar';
 import type { HeaderChip } from '@/components/layout/page-header-bar';
 
@@ -65,7 +68,162 @@ function RuntimeClock({ startedAt, stoppedAt }: { startedAt: string; stoppedAt?:
 }
 
 type RunningTab = 'steps' | 'browser' | 'log';
-type CompleteTab = 'issues' | 'replay' | 'heatmap' | 'report';
+type CompleteTab = 'findings' | 'replay' | 'heatmap';
+
+function BrowserWithSteps({
+  selectedPersona,
+  selectedPolled,
+  selectedSessionId,
+  browserStepIndex,
+  setBrowserStepIndex,
+  renderBrowserView,
+}: {
+  selectedPersona: { step_history?: { step_number: number; screenshot_url: string; think_aloud?: string; action?: string }[]; step_number?: number } | null | undefined;
+  selectedPolled: api.LiveSessionState | null | undefined;
+  selectedSessionId: string | null;
+  browserStepIndex: number | null;
+  setBrowserStepIndex: (i: number | null) => void;
+  renderBrowserView: () => React.ReactNode;
+}) {
+  const steps = selectedPersona?.step_history ?? [];
+  const totalSteps = steps.length || selectedPolled?.step_number || selectedPersona?.step_number || 0;
+  const currentIndex = browserStepIndex ?? totalSteps - 1;
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {(() => {
+          if (browserStepIndex != null && steps[browserStepIndex]?.screenshot_url) {
+            return (
+              <img
+                src={steps[browserStepIndex].screenshot_url}
+                alt={`Step ${steps[browserStepIndex].step_number}`}
+                className="h-full w-full object-cover object-top"
+              />
+            );
+          }
+          return renderBrowserView();
+        })()}
+      </div>
+      {/* Step navigation */}
+      <div className="flex items-center shrink-0 border-t border-border px-3 py-2">
+        {totalSteps > 0 ? (
+          <>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setBrowserStepIndex(Math.max(0, currentIndex - 1))}
+                disabled={currentIndex <= 0}
+                className="p-0.5 rounded text-foreground/40 hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-xs tabular-nums text-foreground/50">
+                <span className="font-medium text-foreground">{currentIndex + 1}</span>
+                {' / '}
+                {totalSteps}
+              </span>
+              <button
+                onClick={() => {
+                  if (currentIndex >= totalSteps - 1) {
+                    setBrowserStepIndex(null);
+                  } else {
+                    setBrowserStepIndex(currentIndex + 1);
+                  }
+                }}
+                disabled={browserStepIndex == null}
+                className="p-0.5 rounded text-foreground/40 hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+            {steps[currentIndex] && (
+              <span className="ml-3 text-xs text-foreground/40 truncate">
+                {steps[currentIndex].think_aloud || steps[currentIndex].action || ''}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="text-xs text-foreground/30">No steps yet</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReplayWithSteps({ sessionId }: { sessionId: string }) {
+  const { data: session, isLoading } = useSessionDetail(sessionId);
+  const [stepIndex, setStepIndex] = useState<number>(0);
+
+  const steps = session?.steps ?? [];
+  const totalSteps = steps.length;
+  const currentStep = steps[stepIndex];
+
+  // Reset to first step when session changes
+  useEffect(() => {
+    setStepIndex(0);
+  }, [sessionId]);
+
+  if (isLoading || totalSteps === 0) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2">
+        <StepsIllustration />
+        <p className="text-[14px] text-muted-foreground/40">
+          {isLoading ? 'Loading replay' : 'No steps recorded'}
+        </p>
+      </div>
+    );
+  }
+
+  const screenshotSrc = currentStep?.screenshot_path
+    ? api.getScreenshotUrl(currentStep.screenshot_path)
+    : null;
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex-1 min-h-0 overflow-hidden bg-muted/20">
+        {screenshotSrc ? (
+          <img
+            src={screenshotSrc}
+            alt={`Step ${currentStep.step_number}`}
+            className="h-full w-full object-cover object-top"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <p className="text-sm text-foreground/20">No screenshot</p>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center shrink-0 border-t border-border px-3 py-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setStepIndex(Math.max(0, stepIndex - 1))}
+            disabled={stepIndex <= 0}
+            className="p-0.5 rounded text-foreground/40 hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="text-xs tabular-nums text-foreground/50">
+            <span className="font-medium text-foreground">{stepIndex + 1}</span>
+            {' / '}
+            {totalSteps}
+          </span>
+          <button
+            onClick={() => setStepIndex(Math.min(totalSteps - 1, stepIndex + 1))}
+            disabled={stepIndex >= totalSteps - 1}
+            className="p-0.5 rounded text-foreground/40 hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        {currentStep && (
+          <span className="ml-3 text-xs text-foreground/40 truncate">
+            {currentStep.think_aloud || currentStep.action_type || ''}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function StudyRunningPage({
   params,
@@ -78,13 +236,16 @@ export default function StudyRunningPage({
   const queryClient = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [runningTab, setRunningTab] = useState<RunningTab>('browser');
-  const [completeTab, setCompleteTab] = useState<CompleteTab>('issues');
+  const [runningTab, setRunningTab] = useState<RunningTab>('steps');
+  const [browserStepIndex, setBrowserStepIndex] = useState<number | null>(null);
+  const [completeTab, setCompleteTab] = useState<CompleteTab>('findings');
+  const [findingsView, setFindingsView] = useState<'issues' | 'report'>('issues');
+  const [severityFilter, setSeverityFilter] = useState<string | null>(null);
 
   const [browserMode, setBrowserMode] = useState<'local' | 'cloud'>('local');
 
   useEffect(() => {
-    const stored = localStorage.getItem('mirror-browser-mode');
+    const stored = localStorage.getItem('miror-browser-mode');
     if (stored === 'cloud') setBrowserMode('cloud');
   }, []);
 
@@ -126,6 +287,12 @@ export default function StudyRunningPage({
     enabled: !!id && study?.status === 'complete',
   });
 
+  const { data: reportMarkdown } = useQuery({
+    queryKey: ['report-md', id],
+    queryFn: () => fetch(api.getReportMdUrl(id)).then((r) => r.ok ? r.text() : ''),
+    enabled: !!id && study?.status === 'complete',
+  });
+
   // Fetch all studies to compute test name (e.g. "Claude4")
   const { data: allStudies } = useQuery({
     queryKey: ['studies-all'],
@@ -135,16 +302,14 @@ export default function StudyRunningPage({
 
   const testName = (() => {
     if (!study?.url) return null;
-    const hostname = study.url.replace(/^https?:\/\//, '').split('/')[0].split('.')[0];
-    const label = hostname.toLowerCase();
-    if (!allStudies?.items) return `${label}-1`;
+    if (!allStudies?.items) return studyName(study.url, 1);
     const normalize = (u: string) => u.replace(/^https?:\/\//, '').replace(/\/+$/, '');
     const studyNorm = normalize(study.url);
     const sameUrl = allStudies.items
       .filter((s) => normalize(s.url) === studyNorm)
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     const idx = sameUrl.findIndex((s) => s.id === id);
-    return `${label}-${idx >= 0 ? idx + 1 : 1}`;
+    return studyName(study.url, idx >= 0 ? idx + 1 : 1);
   })();
 
   // Auto-select first session
@@ -262,27 +427,19 @@ export default function StudyRunningPage({
     }
 
     return (
-      <div className="flex h-full items-center justify-center bg-muted/30">
+      <div className="flex h-full flex-col items-center justify-center gap-2 bg-muted/30">
+        <BrowserIllustration />
         <p className="text-sm text-muted-foreground/50">
-          {browserActive ? 'Loading browser...' : 'Waiting to start...'}
+          {browserActive ? 'Loading browser' : 'Waiting to start'}
         </p>
       </div>
     );
   };
 
   const headerChips: HeaderChip[] = [];
-  if (testName) headerChips.push({ label: 'Test', value: testName });
-  if (study?.url) headerChips.push({ label: 'Website', value: <span className="truncate">{study.url.replace(/^https?:\/\//, '')}</span> });
-  if (sessions && sessions.length > 0) {
-    headerChips.push({
-      label: 'Testers',
-      value: isComplete || isFailed
-        ? sessions.length
-        : sessions.filter((s) => s.status === 'running' || s.status === 'pending').length,
-    });
-  }
   headerChips.push({
     label: 'Status',
+    tooltip: 'Current test status',
     value: (
       <span className="inline-flex items-center gap-1">
         {isRunning ? (
@@ -320,19 +477,21 @@ export default function StudyRunningPage({
     const d = new Date(study.updated_at);
     const day = d.getDate();
     const suffix = day % 10 === 1 && day !== 11 ? 'st' : day % 10 === 2 && day !== 12 ? 'nd' : day % 10 === 3 && day !== 13 ? 'rd' : 'th';
-    headerChips.push({ label: 'Date', value: `${d.toLocaleDateString('en-US', { month: 'long' })} ${day}${suffix}, ${d.getFullYear()}` });
+    headerChips.push({ label: 'Date', value: `${d.toLocaleDateString('en-US', { month: 'short' })} ${day}${suffix}, ${d.getFullYear()}`, tooltip: 'When this test completed' });
   } else {
     headerChips.push({
       label: 'Progress',
+      tooltip: 'Overall test completion progress',
       value: (
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-flex items-center gap-0.5">
+          <span className="inline-flex items-center gap-[3px]">
             {Array.from({ length: 10 }).map((_, idx) => (
               <span
                 key={idx}
-                className={`inline-block h-1.5 w-2.5 rounded-sm transition-colors duration-300 ${
-                  idx < Math.round((percent / 100) * 10) ? 'bg-green-500' : 'bg-muted'
-                }`}
+                className={cn(
+                  'inline-block w-[3px] h-[10px] rounded-full transition-colors duration-300',
+                  idx < Math.round((percent / 100) * 10) ? 'bg-green-500' : 'bg-foreground/15',
+                )}
               />
             ))}
           </span>
@@ -345,11 +504,13 @@ export default function StudyRunningPage({
     headerChips.push({
       label: 'Runtime',
       value: <RuntimeClock startedAt={study.created_at} stoppedAt={(isComplete || isFailed) ? study.updated_at : null} />,
+      tooltip: 'Elapsed time since the test started',
     });
   }
   headerChips.push({
     label: 'Cost',
     value: <span className="tabular-nums">${(activeStudy?.cost?.total_cost_usd ?? 0).toFixed(2)}</span>,
+    tooltip: 'Total API cost for this test (LLM + browser)',
   });
 
   const headerRight = (
@@ -361,10 +522,24 @@ export default function StudyRunningPage({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem
-          onClick={() => setConfirmDelete(true)}
-          className="text-destructive focus:text-destructive"
+          onClick={() => {
+            const params = new URLSearchParams();
+            if (study?.url) params.set('url', study.url);
+            if (study?.personas && study.personas.length > 0) {
+              const templateIds = study.personas.map((p) => p.template_id).filter(Boolean) as string[];
+              if (templateIds.length > 0) params.set('personas', templateIds.join(','));
+            }
+            router.push(`/study/new?${params.toString()}`);
+          }}
         >
-          <Trash2 className="mr-2 h-4 w-4" />
+          <RotateCcw />
+          Rerun test
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() => setConfirmDelete(true)}
+        >
+          <Trash2 />
           Delete test
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -373,93 +548,129 @@ export default function StudyRunningPage({
 
   return (
     <div>
-      <PageHeaderBar chips={headerChips} right={headerRight} />
+      <PageHeaderBar
+        icon={study?.url ? (
+          <img
+            src={`https://www.google.com/s2/favicons?domain=${new URL(study.url.startsWith('http') ? study.url : `https://${study.url}`).hostname}&sz=64`}
+            alt=""
+            className="h-5 w-5 rounded-sm"
+          />
+        ) : undefined}
+        title={testName || 'Test results'}
+        chips={headerChips}
+        right={headerRight}
+      />
 
-      {/* Goals */}
-      {study?.tasks && study.tasks.length > 0 && (
-        <div className="px-6 pt-3 pb-4">
-          <p className="text-[14px] uppercase text-foreground/30 mb-1.5">Tasks</p>
-          <div className="flex flex-wrap gap-2">
-            {study.tasks.map((task, i) => (
-              <span key={i} className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-[13px] text-foreground">
-                {task.description.charAt(0).toUpperCase() + task.description.slice(1)}
+      <div className="px-[100px] pt-[40px] pb-[100px]">
+      {/* Study summary — big score hero + compact details */}
+      <div className="flex gap-6 items-start pb-4">
+        {/* Big score */}
+        <div className="flex flex-col items-center justify-center rounded-xl border border-border p-5 min-w-[100px]">
+          {isComplete && study?.overall_score != null ? (
+            <>
+              <span className={cn('text-4xl font-bold tabular-nums', scoreColor(study.overall_score).text)}>
+                {Math.round(study.overall_score)}
               </span>
-            ))}
-          </div>
+              <span className={cn('text-xs font-medium uppercase tracking-wider mt-1', scoreColor(study.overall_score).text)}>
+                {scoreLabel(study.overall_score)}
+              </span>
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-1.5">
+                {Array.from({ length: 9 }).map((_, i) => {
+                  const row = Math.floor(i / 3);
+                  const col = i % 3;
+                  return (
+                    <span
+                      key={i}
+                      className="h-2 w-2 rounded-full bg-foreground/40"
+                      style={{
+                        animation: 'gridPulse 1.5s ease-in-out infinite',
+                        animationDelay: `${(row + col) * 0.15}s`,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+              <style>{`
+                @keyframes gridPulse {
+                  0%, 100% { transform: scale(0.5); opacity: 0.2; }
+                  50% { transform: scale(1.2); opacity: 0.8; }
+                }
+              `}</style>
+              <span className="text-xs font-medium uppercase tracking-wider mt-2 text-foreground/15">In progress</span>
+            </>
+          )}
         </div>
-      )}
 
-      {/* Overview — only when complete */}
-      {isComplete && study?.executive_summary && (
-        <div className="px-6 pb-4">
-          <p className="text-[14px] uppercase text-foreground/30 mb-1.5">Overview</p>
-          <p className="text-[14px] text-foreground/70 leading-relaxed">{study.executive_summary}</p>
-        </div>
-      )}
+        {/* Details */}
+        <div className="flex-1 space-y-3">
+          <div>
+            {study?.tasks && study.tasks.length > 0 && (
+              <p className="text-[16px] text-foreground">
+                {study.tasks.map((task) => task.description.charAt(0).toUpperCase() + task.description.slice(1)).join(', ')}
+              </p>
+            )}
+            {study?.url && (
+              <p className="text-[14px] text-foreground/50 mt-0.5">
+                {study.url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+              </p>
+            )}
+          </div>
 
-      {/* Summary cards — only when complete */}
-      {isComplete && (
-        <div className="px-6 pb-4">
-          <p className="text-[14px] uppercase text-foreground/30 mb-1.5">Metrics</p>
-        <div className="grid grid-cols-4 gap-3">
-          {/* Overall score */}
-          <div className="rounded-lg border border-border p-4">
-            <p className="text-[13px] text-muted-foreground/60">Overall score</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">
-              {study?.overall_score != null ? Math.round(study.overall_score) : '—'}
-              <span className="text-sm font-normal text-muted-foreground/40">/100</span>
-            </p>
-          </div>
-          {/* Issues found */}
-          <div className="rounded-lg border border-border p-4">
-            <p className="text-[13px] text-muted-foreground/60">Issues found</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">
-              {issues?.length ?? '—'}
-            </p>
-          </div>
-          {/* Task completion */}
-          <div className="rounded-lg border border-border p-4">
-            <p className="text-[13px] text-muted-foreground/60">Task completion</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">
-              {completeSessions
-                ? `${Math.round((completeSessions.filter((s) => s.task_completed).length / completeSessions.length) * 100)}%`
-                : '—'}
-            </p>
-          </div>
-          {/* Average mood */}
-          <div className="rounded-lg border border-border p-4">
-            <p className="text-[13px] text-muted-foreground/60">Average mood</p>
-            <p className="mt-1 text-2xl font-semibold">
-              {(() => {
-                // Derive mood from emotional_arc, then session status as fallback
-                const allSessions = completeSessions ?? sessions ?? [];
-                const moods = allSessions.map((s) => {
-                  if (s.emotional_arc) {
-                    const entries = Object.entries(s.emotional_arc);
-                    if (entries.length > 0) return entries[entries.length - 1][1];
-                  }
-                  // Fallback: infer from session status
-                  if (s.status === 'gave_up') return 'frustrated';
-                  if (s.status === 'failed') return 'confused';
-                  if (s.status === 'complete') return 'satisfied';
-                  return 'neutral';
-                });
-                if (moods.length === 0) return '—';
-                const scores: Record<string, number> = { frustrated: 1, stuck: 1, anxious: 2, confused: 2, neutral: 3, curious: 4, confident: 4, satisfied: 5, delighted: 5, excited: 5 };
-                const avg = moods.reduce((sum, m) => sum + (scores[m] ?? 3), 0) / moods.length;
-                if (avg >= 4.5) return 'Delighted';
-                if (avg >= 3.5) return 'Satisfied';
-                if (avg >= 2.5) return 'Neutral';
-                return 'Frustrated';
-              })()}
-            </p>
-          </div>
+          {study?.executive_summary && (
+            <p className="text-[14px] text-foreground/70 leading-relaxed">{study.executive_summary}</p>
+          )}
+
+          {isComplete && (
+            <div className="flex items-center gap-3 text-[14px]">
+              <span>
+                <span className="text-foreground/40">Issues</span>
+                <span className="font-medium text-foreground ml-1.5">{issues?.length ?? 0}</span>
+              </span>
+              <span className="text-foreground/20">·</span>
+              <span>
+                <span className="text-foreground/40">Completion</span>
+                <span className="font-medium text-foreground ml-1.5">
+                  {completeSessions
+                    ? `${Math.round((completeSessions.filter((s) => s.task_completed).length / completeSessions.length) * 100)}%`
+                    : '0%'}
+                </span>
+              </span>
+              <span className="text-foreground/20">·</span>
+              <span>
+                <span className="text-foreground/40">Mood</span>
+                <span className="font-medium text-foreground ml-1.5">
+                  {(() => {
+                    const allSessions = completeSessions ?? sessions ?? [];
+                    const moods = allSessions.map((s) => {
+                      if (s.emotional_arc) {
+                        const entries = Object.entries(s.emotional_arc);
+                        if (entries.length > 0) return entries[entries.length - 1][1];
+                      }
+                      if (s.status === 'gave_up') return 'frustrated';
+                      if (s.status === 'failed') return 'confused';
+                      if (s.status === 'complete') return 'satisfied';
+                      return 'neutral';
+                    });
+                    if (moods.length === 0) return 'Neutral';
+                    const scores: Record<string, number> = { frustrated: 1, stuck: 1, anxious: 2, confused: 2, neutral: 3, curious: 4, confident: 4, satisfied: 5, delighted: 5, excited: 5 };
+                    const avg = moods.reduce((sum, m) => sum + (scores[m] ?? 3), 0) / moods.length;
+                    if (avg >= 4.5) return 'Delighted';
+                    if (avg >= 3.5) return 'Satisfied';
+                    if (avg >= 2.5) return 'Neutral';
+                    return 'Frustrated';
+                  })()}
+                </span>
+              </span>
+            </div>
+          )}
         </div>
-        </div>
-      )}
+      </div>
 
       {/* Content — fixed two-column layout: persona cards + tabbed panel */}
-      <div className="flex items-start gap-4 px-6 pb-6 mt-1.5">
+      <div className="flex items-start gap-4 mt-1.5">
         {/* Left: persona cards */}
         <div className="w-[720px] shrink-0">
           <p className="text-[14px] uppercase text-foreground/30 mb-1.5">Testers</p>
@@ -477,46 +688,103 @@ export default function StudyRunningPage({
           <div className="overflow-hidden rounded-lg border border-border bg-background">
           {isComplete ? (
             <Tabs value={completeTab} onValueChange={(v) => setCompleteTab(v as CompleteTab)}>
-              <div className="border-b border-border">
+              <div className="border-b border-border bg-muted/30">
                 <TabsList variant="line" className="px-3">
-                  <TabsTrigger value="issues">Issues</TabsTrigger>
+                  <TabsTrigger value="findings">Findings</TabsTrigger>
                   <TabsTrigger value="replay">Replay</TabsTrigger>
                   <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
-                  <TabsTrigger value="report">Report</TabsTrigger>
                 </TabsList>
               </div>
               <div style={{ height: '460px' }}>
-                <TabsContent value="issues" className="h-full m-0">
-                  <div className="h-full overflow-y-auto p-4">
-                    <IssuesTab studyId={id} />
+                <TabsContent value="findings" className="h-full m-0">
+                  <div className="flex h-full flex-col">
+                    {/* Severity filters + Full report toggle + Share actions */}
+                    <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border shrink-0">
+                      {/* Severity pills */}
+                      <div className="flex items-center gap-3 text-[12px] flex-1 min-w-0">
+                        {(() => {
+                          const allIssues = issues ?? [];
+                          const counts = {
+                            critical: allIssues.filter((i) => i.severity === 'critical').length,
+                            major: allIssues.filter((i) => i.severity === 'major').length,
+                            minor: allIssues.filter((i) => i.severity === 'minor').length,
+                          };
+                          return (['critical', 'major', 'minor'] as const).map((sev) => {
+                            if (counts[sev] === 0) return null;
+                            const isActive = severityFilter === sev;
+                            const colors = {
+                              critical: 'bg-red-500',
+                              major: 'bg-amber-500',
+                              minor: 'bg-blue-400',
+                            };
+                            return (
+                              <button
+                                key={sev}
+                                onClick={() => {
+                                  setSeverityFilter(isActive ? null : sev);
+                                  setFindingsView('issues');
+                                }}
+                                className={cn(
+                                  'flex items-center gap-1.5 transition-opacity',
+                                  severityFilter && !isActive ? 'opacity-30' : 'opacity-100',
+                                )}
+                              >
+                                <span className={cn('h-2 w-2 rounded-full', colors[sev])} />
+                                <span className="font-medium text-foreground">{counts[sev]}</span>
+                                <span className="text-foreground/40">{sev}</span>
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+                      {/* Full report toggle */}
+                      <button
+                        onClick={() => setFindingsView(findingsView === 'report' ? 'issues' : 'report')}
+                        className={cn(
+                          'rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors shrink-0',
+                          findingsView === 'report' ? 'bg-foreground/10 text-foreground' : 'text-foreground/40 hover:text-foreground/60'
+                        )}
+                      >
+                        {findingsView === 'report' ? 'Show issues' : 'Full report'}
+                      </button>
+                      {/* Share actions */}
+                      <div className="shrink-0">
+                        <ReportActions studyId={id} markdownContent={reportMarkdown ?? undefined} />
+                      </div>
+                    </div>
+                    {/* Content */}
+                    <div className="flex-1 min-h-0 overflow-y-auto p-4">
+                      {findingsView === 'report' ? (
+                        <ReportPreview studyId={id} hideActions />
+                      ) : (
+                        <IssueList
+                          issues={(issues ?? []).filter((i) => !severityFilter || i.severity === severityFilter)}
+                          studyId={id}
+                        />
+                      )}
+                    </div>
                   </div>
                 </TabsContent>
                 <TabsContent value="replay" className="h-full m-0">
-                  <div className="h-full overflow-y-auto p-4">
-                    {completeSessions && completeSessions.length > 0 ? (
-                      <SessionReplay sessionId={selectedSessionId ?? completeSessions[0].id} />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <p className="text-sm text-muted-foreground/50">No sessions available</p>
-                      </div>
-                    )}
-                  </div>
+                  {completeSessions && completeSessions.length > 0 ? (
+                    <ReplayWithSteps sessionId={selectedSessionId ?? completeSessions[0].id} />
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center gap-2">
+                      <StepsIllustration />
+                      <p className="text-[14px] text-muted-foreground/40">No sessions available</p>
+                    </div>
+                  )}
                 </TabsContent>
                 <TabsContent value="heatmap" className="h-full m-0">
                   <div className="h-full overflow-y-auto p-4">
                     <ClickHeatmap studyId={id} />
                   </div>
                 </TabsContent>
-                <TabsContent value="report" className="h-full m-0">
-                  <div className="h-full overflow-y-auto p-4">
-                    <ReportPreview studyId={id} />
-                  </div>
-                </TabsContent>
               </div>
             </Tabs>
           ) : (
             <Tabs value={runningTab} onValueChange={(v) => setRunningTab(v as RunningTab)}>
-              <div className="border-b border-border">
+              <div className="border-b border-border bg-muted/30">
                 <TabsList variant="line" className="px-3">
                   <TabsTrigger value="steps">Steps</TabsTrigger>
                   <TabsTrigger value="browser">Browser</TabsTrigger>
@@ -528,14 +796,22 @@ export default function StudyRunningPage({
                   <LiveStepTimeline steps={selectedPersona?.step_history ?? []} />
                 </TabsContent>
                 <TabsContent value="browser" className="h-full m-0">
-                  <div className="h-full overflow-hidden">
-                    {renderBrowserView()}
-                  </div>
+                  <BrowserWithSteps
+                    selectedPersona={selectedPersona}
+                    selectedPolled={selectedPolled}
+                    selectedSessionId={selectedSessionId}
+                    browserStepIndex={browserStepIndex}
+                    setBrowserStepIndex={setBrowserStepIndex}
+                    renderBrowserView={renderBrowserView}
+                  />
                 </TabsContent>
                 <TabsContent value="log" className="h-full m-0">
                   <div className="h-full overflow-y-auto p-3 font-mono text-xs">
                     {logs.length === 0 ? (
-                      <p className="text-muted-foreground/40">Waiting for logs...</p>
+                      <div className="flex h-full flex-col items-center justify-center gap-2">
+                        <LogIllustration />
+                        <p className="text-muted-foreground/40">Waiting for logs</p>
+                      </div>
                     ) : (
                       logs.map((entry, i) => (
                         <div key={i} className="flex gap-2 py-0.5">
@@ -559,6 +835,7 @@ export default function StudyRunningPage({
           )}
           </div>
         </div>
+      </div>
       </div>
 
       {/* Delete confirmation */}

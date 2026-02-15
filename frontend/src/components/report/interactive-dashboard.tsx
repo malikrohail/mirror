@@ -18,6 +18,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { IssuesIllustration } from '@/components/common/empty-illustrations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,7 +27,7 @@ import { SEVERITY_COLORS, EMOTION_ICONS } from '@/lib/constants';
 import { getReportPdfUrl, getReportMdUrl } from '@/lib/api-client';
 import { useStudy, useSessions, useIssues, useInsights } from '@/hooks/use-study';
 import { usePersonaTemplates } from '@/hooks/use-personas';
-import { cn } from '@/lib/utils';
+import { cn, scoreColor, scoreLabel } from '@/lib/utils';
 import type {
   StudyOut,
   SessionOut,
@@ -486,10 +487,12 @@ export function InteractiveDashboard({ studyId }: InteractiveDashboardProps) {
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className={cn('text-4xl font-bold tabular-nums', gradeColor)}>
+                  <span className={cn('text-4xl font-bold tabular-nums', scoreColor(score).text)}>
                     <AnimatedScore target={score} />
                   </span>
-                  <span className="text-xs text-muted-foreground">/100</span>
+                  <span className={cn('text-xs font-medium uppercase tracking-wide opacity-60', scoreColor(score).text)}>
+                    {scoreLabel(score)}
+                  </span>
                 </div>
               </div>
 
@@ -543,9 +546,13 @@ export function InteractiveDashboard({ studyId }: InteractiveDashboardProps) {
           </CardHeader>
           <CardContent>
             {issueList.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                No issues found. Great job!
-              </p>
+              <div className="flex flex-col items-center gap-3 py-8 text-center">
+                <IssuesIllustration />
+                <div>
+                  <p className="text-sm font-medium">No issues found</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Great job! No usability issues were detected.</p>
+                </div>
+              </div>
             ) : (
               <DonutChart segments={donutSegments} />
             )}

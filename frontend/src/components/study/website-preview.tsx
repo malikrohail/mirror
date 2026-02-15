@@ -22,8 +22,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/common/empty-state';
+import { BrowserIllustration } from '@/components/common/empty-illustrations';
 
-const FAVORITES_KEY = 'mirror-browser-favorites';
+const FAVORITES_KEY = 'miror-browser-favorites';
 
 function isValidUrl(str: string): boolean {
   try {
@@ -203,11 +205,12 @@ export function WebsitePreview({ url, onUrlChange, viewMode: externalViewMode, o
   const renderContent = () => {
     if (!validUrl) {
       return (
-        <div className="flex flex-1 flex-col items-center justify-center">
-          <Globe className="mb-3 h-12 w-12 text-muted-foreground/30" />
-          <p className="text-sm text-muted-foreground">
-            Enter a URL to preview the website
-          </p>
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState
+            illustration={<BrowserIllustration />}
+            title="No website loaded"
+            description="Enter a URL to preview the website"
+          />
         </div>
       );
     }
@@ -259,9 +262,9 @@ export function WebsitePreview({ url, onUrlChange, viewMode: externalViewMode, o
   };
 
   return (
-    <div className={`flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card transition-all ${viewMode === 'mobile' ? 'max-w-[420px] mx-auto' : ''}`}>
+    <div className={`flex h-[660px] flex-col overflow-hidden rounded-xl border border-border bg-card transition-all ${viewMode === 'mobile' ? 'max-w-[420px] mx-auto' : ''}`}>
       {/* Browser toolbar */}
-      <div className="flex h-[46px] shrink-0 items-center gap-1.5 border-b border-border bg-muted/50 px-3">
+      <div className="flex h-[42px] shrink-0 items-center gap-1.5 border-b border-border bg-muted/50 px-3">
         <button className="rounded p-1 text-muted-foreground/60 hover:bg-muted" disabled>
           <ChevronLeft className="h-4 w-4" />
         </button>

@@ -66,6 +66,7 @@ export interface StudySummary {
   personas?: PersonaOut[];
   task_count?: number;
   persona_count?: number;
+  first_task?: string | null;
   total_cost_usd?: number | null;
 }
 

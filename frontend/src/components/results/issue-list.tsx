@@ -1,6 +1,8 @@
 'use client';
 
 import { IssueCard } from './issue-card';
+import { EmptyState } from '@/components/common/empty-state';
+import { IssuesIllustration } from '@/components/common/empty-illustrations';
 import type { IssueOut, FixSuggestionOut } from '@/types';
 
 interface IssueListProps {
@@ -11,7 +13,13 @@ interface IssueListProps {
 
 export function IssueList({ issues, studyId, fixesByIssueId }: IssueListProps) {
   if (issues.length === 0) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">No issues found.</p>;
+    return (
+      <EmptyState
+        illustration={<IssuesIllustration />}
+        title="No issues found"
+        description="No usability issues were detected for this filter."
+      />
+    );
   }
 
   return (

@@ -1,95 +1,248 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sparkles,
   Loader2,
   Check,
-  Pencil,
-  Play,
   X,
-  Plus,
   Globe,
+  Monitor,
+  Smartphone,
+  Tablet,
+  Settings,
+  CornerDownLeft,
+  Clock,
+  ChevronDown,
+  Search,
+  ListFilter,
+  Tag,
+  Cpu,
+  Gauge,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useCreateStudy, useRunStudy } from '@/hooks/use-study';
-import * as api from '@/lib/api-client';
+import { usePersonaTemplates } from '@/hooks/use-personas';
 import { TERMS } from '@/lib/constants';
-import type { StudyPlanResponse, StudyPlanTask, StudyPlanPersona } from '@/types';
 
-type QuickStartPhase = 'input' | 'loading' | 'review' | 'modify';
+type QuickStartPhase = 'input' | 'select-personas';
 
-export function QuickStart() {
+interface QuickStartProps {
+  initialUrl?: string;
+  initialDescription?: string;
+  /** Pre-selected persona IDs (e.g. from "Add to test" action) */
+  preSelectedPersonaIds?: string[];
+  /** Called whenever the URL input value changes */
+  onUrlChange?: (url: string) => void;
+}
+
+type LevelRange = 'low' | 'mid' | 'high';
+type DeviceFilter = 'desktop' | 'mobile' | 'tablet';
+
+const LEVEL_OPTIONS: { value: LevelRange; label: string }[] = [
+  { value: 'low', label: 'Low' },
+  { value: 'mid', label: 'Medium' },
+  { value: 'high', label: 'High' },
+];
+
+const DEVICE_OPTIONS: { value: DeviceFilter; label: string; icon: React.ReactNode }[] = [
+  { value: 'desktop', label: 'Desktop', icon: <Monitor className="mr-2 h-4 w-4" /> },
+  { value: 'mobile', label: 'Mobile', icon: <Smartphone className="mr-2 h-4 w-4" /> },
+  { value: 'tablet', label: 'Tablet', icon: <Tablet className="mr-2 h-4 w-4" /> },
+];
+
+function levelToNumber(value: unknown): number | null {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const map: Record<string, number> = { low: 3, moderate: 5, medium: 5, high: 8 };
+    return map[value.toLowerCase()] ?? null;
+  }
+  return null;
+}
+
+function getLevelRange(val: number | null): LevelRange | null {
+  if (val === null) return null;
+  if (val <= 3) return 'low';
+  if (val <= 6) return 'mid';
+  return 'high';
+}
+
+function LevelBars({ level }: { level: string }) {
+  const filled = level === 'high' ? 4 : level === 'moderate' ? 3 : level === 'low' ? 1 : 2;
+  return (
+    <span className="inline-flex items-center gap-[2px]">
+      {Array.from({ length: 5 }, (_, i) => (
+        <span
+          key={i}
+          className={cn(
+            'h-[10px] w-[3px] rounded-[1px]',
+            i < filled ? 'bg-foreground/40' : 'bg-foreground/10',
+          )}
+        />
+      ))}
+    </span>
+  );
+}
+
+export function QuickStart({
+  initialUrl = '',
+  initialDescription = '',
+  preSelectedPersonaIds: preSelected,
+  onUrlChange: onUrlChangeProp,
+}: QuickStartProps = {}) {
   const router = useRouter();
   const [phase, setPhase] = useState<QuickStartPhase>('input');
-  const [description, setDescription] = useState('');
-  const [url, setUrl] = useState('');
-  const [plan, setPlan] = useState<StudyPlanResponse | null>(null);
-  const [editableTasks, setEditableTasks] = useState<StudyPlanTask[]>([]);
-  const [editablePersonas, setEditablePersonas] = useState<StudyPlanPersona[]>([]);
+  const [description, setDescription] = useState(initialDescription);
+  const [url, setUrl] = useState(initialUrl);
+  const [selectedPersonaIds, setSelectedPersonaIds] = useState<Set<string>>(
+    () => new Set(preSelected ?? []),
+  );
   const [submitting, setSubmitting] = useState(false);
+  const [expandedPersonaId, setExpandedPersonaId] = useState<string | null>(null);
+  const [personaFilter, setPersonaFilter] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  const [filterDevice, setFilterDevice] = useState<DeviceFilter | null>(null);
+  const [filterTech, setFilterTech] = useState<LevelRange | null>(null);
+  const [filterPatience, setFilterPatience] = useState<LevelRange | null>(null);
+  const [filterAccessibility, setFilterAccessibility] = useState(false);
 
+  const hasFilters = filterCategory !== null || filterDevice !== null || filterTech !== null || filterPatience !== null || filterAccessibility;
+  const clearAllFilters = () => {
+    setFilterCategory(null);
+    setFilterDevice(null);
+    setFilterTech(null);
+    setFilterPatience(null);
+    setFilterAccessibility(false);
+  };
+
+
+
+
+  // Sync pre-selected personas when prop changes (e.g. "Add to test" on same page)
+  useEffect(() => {
+    if (preSelected && preSelected.length > 0) {
+      setSelectedPersonaIds((prev) => {
+        const next = new Set(prev);
+        for (const id of preSelected) next.add(id);
+        return next;
+      });
+    }
+  }, [preSelected?.join(',')]);
+
+  const { data: personas } = usePersonaTemplates();
+  const categories = [...new Set((personas ?? []).map((p) => p.category).filter(Boolean))];
   const createStudy = useCreateStudy();
   const runStudy = useRunStudy();
 
-  const canGenerate = description.trim().length > 10 && url.trim().length > 0;
+  const [browserMode, setBrowserMode] = useState<'local' | 'cloud'>(() => {
+    if (typeof window === 'undefined') return 'local';
+    return (localStorage.getItem('miror-browser-mode') as 'local' | 'cloud') || 'local';
+  });
+  const toggleBrowserMode = () => {
+    const next = browserMode === 'local' ? 'cloud' : 'local';
+    setBrowserMode(next);
+    localStorage.setItem('miror-browser-mode', next);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'miror-browser-mode', newValue: next }));
+    toast.success(`Browser mode: ${next === 'local' ? 'Local' : 'Cloud'}`);
+  };
 
-  const handleGenerate = async () => {
-    if (!canGenerate) return;
-    setPhase('loading');
+  const canGenerate = description.trim().length > 2 && url.trim().length > 0;
+  const isValidInput = canGenerate && url.trim().includes('.');
+
+  const urlRef = useRef<HTMLInputElement>(null);
+  const descRef = useRef<HTMLTextAreaElement>(null);
+
+  const URL_PLACEHOLDER = 'example.com';
+  const TASK_PLACEHOLDER = 'Sign up for a free trial';
+
+  const handleContinue = (autoFill = false) => {
+    let currentUrl = url;
+    let currentDesc = description;
+
+    if (autoFill) {
+      if (currentUrl.trim().length === 0) {
+        currentUrl = URL_PLACEHOLDER;
+        setUrl(currentUrl);
+        onUrlChangeProp?.(currentUrl);
+      }
+      if (currentDesc.trim().length <= 2) {
+        currentDesc = TASK_PLACEHOLDER;
+        setDescription(currentDesc);
+      }
+    }
+
+    if (currentUrl.trim().length === 0) {
+      urlRef.current?.focus();
+    } else if (!currentUrl.trim().includes('.')) {
+      toast.error('Enter a valid URL', { description: 'The website needs a domain extension (e.g. .com, .co, .ai)' });
+      urlRef.current?.focus();
+    } else if (currentDesc.trim().length <= 2) {
+      descRef.current?.focus();
+    } else {
+      setPhase('select-personas');
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && isValidInput && phase === 'input') {
+      e.preventDefault();
+      handleContinue();
+    }
+  };
+
+  const MAX_PERSONAS = 5;
+
+  const togglePersona = (id: string) => {
+    setSelectedPersonaIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        if (next.size >= MAX_PERSONAS) {
+          toast.error(`Maximum ${MAX_PERSONAS} testers allowed`);
+          return prev;
+        }
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSubmitPlan = async () => {
+    if (selectedPersonaIds.size === 0) {
+      toast.error('Select at least one tester');
+      return;
+    }
+    setSubmitting(true);
     try {
       const normalizedUrl = url.trim().startsWith('http')
         ? url.trim()
         : `https://${url.trim()}`;
-      const result = await api.generateStudyPlan({
-        description: description.trim(),
-        url: normalizedUrl,
-      });
-      setPlan(result);
-      setEditableTasks(result.tasks);
-      setEditablePersonas(result.personas);
-      setPhase('review');
-    } catch (err) {
-      toast.error('Failed to generate plan', {
-        description: err instanceof Error ? err.message : 'Unknown error',
-      });
-      setPhase('input');
-    }
-  };
-
-  const handleAcceptAndRun = async () => {
-    if (!plan) return;
-    setSubmitting(true);
-    try {
-      const tasks = editableTasks.slice(0, 10).map((t, i) => ({
-        description: t.description,
-        order_index: i,
-      }));
-      const personaIds = editablePersonas
-        .map((p) => p.template_id)
-        .filter((id): id is string => id != null && id.length > 0);
-
-      if (personaIds.length === 0) {
-        toast.error('No valid personas matched. Try manual setup instead.');
-        setSubmitting(false);
-        return;
-      }
+      const tasks = [{ description: description.trim(), order_index: 0 }];
+      const personaIds = Array.from(selectedPersonaIds);
 
       const study = await createStudy.mutateAsync({
-        url: plan.url,
+        url: normalizedUrl,
         tasks,
         persona_template_ids: personaIds,
       });
-      const browserMode = localStorage.getItem('mirror-browser-mode') || 'local';
-      await runStudy.mutateAsync({ studyId: study.id, browserMode });
-      router.push(`/study/${study.id}/running`);
+      const bm = localStorage.getItem('miror-browser-mode') || 'local';
+      await runStudy.mutateAsync({ studyId: study.id, browserMode: bm });
+      router.replace(`/study/${study.id}/running`);
     } catch (err) {
       toast.error(`Failed to create ${TERMS.singular}`, {
         description: err instanceof Error ? err.message : 'Unknown error',
@@ -98,56 +251,61 @@ export function QuickStart() {
     }
   };
 
-  const handleModify = () => {
-    setPhase('modify');
-  };
-
-  const handleSaveModifications = () => {
-    setPhase('review');
-  };
-
-  const handleReset = () => {
-    setPhase('input');
-    setPlan(null);
-    setEditableTasks([]);
-    setEditablePersonas([]);
-  };
-
-  const addTask = () => {
-    setEditableTasks((prev) => [
-      ...prev,
-      { description: '', order_index: prev.length },
-    ]);
-  };
-
-  const removeTask = (index: number) => {
-    if (editableTasks.length <= 1) return;
-    setEditableTasks((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const updateTask = (index: number, description: string) => {
-    setEditableTasks((prev) =>
-      prev.map((t, i) => (i === index ? { ...t, description } : t)),
-    );
-  };
-
-  const removePersona = (index: number) => {
-    if (editablePersonas.length <= 1) return;
-    setEditablePersonas((prev) => prev.filter((_, i) => i !== index));
-  };
-
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="border-b pb-4">
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="flex h-[42px] items-center justify-between px-4 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          <CardTitle className="text-base">Quick Start</CardTitle>
+          <h3 className="text-[14px] uppercase text-foreground/30">Run a test</h3>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Describe what you want to test and we will generate a plan for you.
-        </p>
-      </CardHeader>
-      <CardContent className="pt-4">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="group/icon flex h-6 w-6 items-center justify-center rounded-md text-foreground/20 transition-colors hover:bg-muted hover:text-foreground/50"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={toggleBrowserMode}>
+              {browserMode === 'local' ? <Globe /> : <Monitor />}
+              {browserMode === 'local' ? 'Switch to cloud browser' : 'Switch to local browser'}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled className="opacity-50 cursor-default">
+              <Clock />
+              Schedule a test
+              <span className="ml-auto text-[10px] text-muted-foreground">Coming soon</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Underline Tabs Stepper */}
+        <div className="border-b border-border">
+          <div className="flex">
+            {(['Describe test plan', 'Select testers'] as const).map((label, i) => {
+              const isCurrent = (i === 0 && phase === 'input') || (i === 1 && phase === 'select-personas');
+
+              return (
+                <button
+                  key={label}
+                  onClick={() => {
+                    if (i === 0) setPhase('input');
+                    else handleContinue(true);
+                  }}
+                  className={cn(
+                    'relative flex-1 py-2.5 text-[14px] text-center transition-colors',
+                    isCurrent ? 'text-foreground/70' : 'text-foreground/30',
+                  )}
+                >
+                  {label}
+                  {isCurrent && <div className="absolute bottom-0 left-3 right-3 h-[2px] bg-foreground rounded-t-full" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+      <div className="p-4">
         <AnimatePresence mode="wait">
           {/* Phase: Input */}
           {phase === 'input' && (
@@ -157,272 +315,402 @@ export function QuickStart() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.2 }}
-              className="space-y-4"
+              className="space-y-3"
             >
               <div>
-                <label className="block text-sm font-medium text-foreground/70 mb-1.5">
-                  Website URL
+                <label className="block text-[11px] font-mono uppercase tracking-wider text-foreground/25 mb-1.5">
+                  your website
                 </label>
-                <div className="relative">
-                  <Globe className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="example.com"
-                    className="pl-9"
-                  />
-                </div>
+                <input
+                  ref={urlRef}
+                  type="text"
+                  value={url}
+                  onChange={(e) => {
+                    setUrl(e.target.value);
+                    onUrlChangeProp?.(e.target.value);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="example.com"
+                  className="w-full rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-foreground/70 outline-none placeholder:text-foreground/20 focus:ring-1 focus:ring-ring"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground/70 mb-1.5">
-                  Describe what you want to test...
+                <label className="block text-[11px] font-mono uppercase tracking-wider text-foreground/25 mb-1.5">
+                  tester&apos;s task
                 </label>
-                <Textarea
+                <textarea
+                  ref={descRef}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g. I want to test if new users can easily find the pricing page, understand the different plans, and successfully sign up for a free trial."
-                  className="min-h-24 resize-none"
+                  onKeyDown={handleKeyDown}
+                  placeholder="e.g. Sign up for a free trial"
+                  className="w-full min-h-20 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm outline-none resize-none placeholder:text-foreground/20 focus:ring-1 focus:ring-ring"
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Be specific about goals, user flows, or pain points you suspect.
-                </p>
               </div>
               <Button
-                onClick={handleGenerate}
-                disabled={!canGenerate}
-                className="w-full"
+                onClick={handleContinue}
+                className="w-full h-12"
               >
-                <Sparkles className="mr-2 h-4 w-4" />
-                Generate Plan
+                Continue With Plan
+                <CornerDownLeft className="ml-2 h-4 w-4 opacity-40" />
               </Button>
+
+              {/* Persisted selections from persona step */}
+              {selectedPersonaIds.size > 0 && (
+                <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
+                  <div className="flex items-center -space-x-2">
+                    {(personas ?? [])
+                      .filter((p) => selectedPersonaIds.has(p.id))
+                      .map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => togglePersona(p.id)}
+                          className="group/avatar relative h-6 w-6 rounded-full border border-border overflow-hidden shrink-0 hover:z-10"
+                        >
+                          {p.avatar_url ? (
+                            <img src={p.avatar_url} alt={p.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="flex h-full w-full items-center justify-center bg-foreground/5 text-[10px]">
+                              {p.emoji}
+                            </span>
+                          )}
+                          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                            <X className="h-2.5 w-2.5 text-white" />
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                  <span>
+                    <span className="text-foreground/40">~</span>{' '}
+                    {selectedPersonaIds.size * 2} min &middot; ${(selectedPersonaIds.size * 0.5).toFixed(2)}
+                  </span>
+                </div>
+              )}
             </motion.div>
           )}
 
-          {/* Phase: Loading */}
-          {phase === 'loading' && (
+          {/* Phase: Select Personas */}
+          {phase === 'select-personas' && (
             <motion.div
-              key="loading"
+              key="select-personas"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.2 }}
-              className="flex flex-col items-center gap-4 py-12"
+              className="space-y-4"
             >
-              <div className="relative">
-                <div className="h-12 w-12 rounded-full border-2 border-primary/20" />
-                <Loader2 className="absolute inset-0 h-12 w-12 animate-spin text-primary" />
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-medium">Generating your test plan...</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  AI is analyzing the URL and crafting tasks + personas
-                </p>
-              </div>
-            </motion.div>
-          )}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground/20" />
+                  <input
+                    type="text"
+                    value={personaFilter}
+                    onChange={(e) => setPersonaFilter(e.target.value)}
+                    placeholder="Search"
+                    className="w-full h-[34px] rounded-md border border-border bg-muted/30 pl-8 pr-3 text-sm text-foreground/70 outline-none placeholder:text-foreground/20 focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className={cn(
+                      'flex h-[34px] items-center gap-1.5 rounded-md border px-2.5 text-sm font-medium transition-colors shrink-0',
+                      hasFilters
+                        ? 'border-foreground/20 bg-foreground/5 text-foreground'
+                        : 'border-border text-muted-foreground hover:text-foreground',
+                    )}>
+                      <ListFilter className="h-3.5 w-3.5" />
+                      Filter
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <Tag className="mr-2 h-4 w-4" />
+                        Category
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="w-40">
+                        <DropdownMenuItem onClick={() => setFilterCategory(null)}>
+                          <span className={filterCategory === null ? 'font-medium' : ''}>All</span>
+                        </DropdownMenuItem>
+                        {categories.map((cat) => (
+                          <DropdownMenuItem key={cat} onClick={() => setFilterCategory(cat)}>
+                            <span className={filterCategory === cat ? 'font-medium' : ''}>{cat}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
 
-          {/* Phase: Review */}
-          {(phase === 'review' && plan) && (
-            <motion.div
-              key="review"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              className="space-y-5"
-            >
-              {/* Summary */}
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="text-sm text-foreground/80">{plan.summary}</p>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <Monitor className="mr-2 h-4 w-4" />
+                        Device
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="w-36">
+                        <DropdownMenuItem onClick={() => setFilterDevice(null)}>
+                          <span className={filterDevice === null ? 'font-medium' : ''}>All</span>
+                        </DropdownMenuItem>
+                        {DEVICE_OPTIONS.map((opt) => (
+                          <DropdownMenuItem key={opt.value} onClick={() => setFilterDevice(opt.value)}>
+                            {opt.icon}
+                            <span className={filterDevice === opt.value ? 'font-medium' : ''}>{opt.label}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <Cpu className="mr-2 h-4 w-4" />
+                        Tech Literacy
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="w-36">
+                        <DropdownMenuItem onClick={() => setFilterTech(null)}>
+                          <span className={filterTech === null ? 'font-medium' : ''}>All</span>
+                        </DropdownMenuItem>
+                        {LEVEL_OPTIONS.map((opt) => (
+                          <DropdownMenuItem key={opt.value} onClick={() => setFilterTech(opt.value)}>
+                            <span className={filterTech === opt.value ? 'font-medium' : ''}>{opt.label}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <Gauge className="mr-2 h-4 w-4" />
+                        Patience
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="w-36">
+                        <DropdownMenuItem onClick={() => setFilterPatience(null)}>
+                          <span className={filterPatience === null ? 'font-medium' : ''}>All</span>
+                        </DropdownMenuItem>
+                        {LEVEL_OPTIONS.map((opt) => (
+                          <DropdownMenuItem key={opt.value} onClick={() => setFilterPatience(opt.value)}>
+                            <span className={filterPatience === opt.value ? 'font-medium' : ''}>{opt.label}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+
+                    <DropdownMenuSeparator />
+
+                    <DropdownMenuItem onClick={() => setFilterAccessibility((v) => !v)}>
+                      <Checkbox checked={filterAccessibility} className="pointer-events-none mr-2" />
+                      Accessibility needs
+                    </DropdownMenuItem>
+
+                    {hasFilters && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={clearAllFilters}>
+                          <X className="mr-2 h-4 w-4" />
+                          Clear all filters
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
-              {/* Generated Tasks */}
-              <div>
-                <h3 className="mb-2 text-sm font-medium text-foreground/70">
-                  Tasks ({editableTasks.length})
-                </h3>
-                <div className="space-y-2">
-                  {editableTasks.map((task, i) => (
+              <div className="space-y-1.5 max-h-[340px] overflow-y-auto no-scrollbar">
+                {(personas ?? [])
+                  .filter((p) => {
+                    const profile = p.default_profile as Record<string, unknown> | undefined;
+                    if (personaFilter.trim()) {
+                      const q = personaFilter.toLowerCase();
+                      const matchesSearch =
+                        p.name.toLowerCase().includes(q) ||
+                        p.short_description.toLowerCase().includes(q) ||
+                        p.category?.toLowerCase().includes(q) ||
+                        (profile?.occupation && String(profile.occupation).toLowerCase().includes(q));
+                      if (!matchesSearch) return false;
+                    }
+                    if (filterCategory && p.category !== filterCategory) return false;
+                    if (filterDevice && profile && String(profile.device_preference) !== filterDevice) return false;
+                    if (filterTech && profile && getLevelRange(levelToNumber(profile.tech_literacy)) !== filterTech) return false;
+                    if (filterPatience && profile && getLevelRange(levelToNumber(profile.patience_level)) !== filterPatience) return false;
+                    if (filterAccessibility && profile) {
+                      const needs = profile.accessibility_needs;
+                      if (!Array.isArray(needs) || needs.length === 0) return false;
+                    }
+                    return true;
+                  })
+                  .map((persona, i) => {
+                  const isSelected = selectedPersonaIds.has(persona.id);
+                  const isExpanded = expandedPersonaId === persona.id;
+                  const profile = persona.default_profile as Record<string, unknown> | undefined;
+                  return (
                     <motion.div
-                      key={i}
+                      key={persona.id}
                       initial={{ opacity: 0, x: -8 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="flex items-start gap-2.5 rounded-lg border p-3"
+                      transition={{ delay: i * 0.02 }}
+                      onClick={() => togglePersona(persona.id)}
+                      className={cn(
+                        'rounded-lg border overflow-hidden transition-all cursor-pointer',
+                        isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-foreground/20',
+                      )}
                     >
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-medium text-primary-foreground">
-                        {i + 1}
-                      </span>
-                      <p className="text-sm text-foreground">{task.description}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Recommended Personas */}
-              <div>
-                <h3 className="mb-2 text-sm font-medium text-foreground/70">
-                  Recommended Personas ({editablePersonas.length})
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {editablePersonas.map((persona, i) => (
-                    <motion.div
-                      key={persona.template_id ?? `persona-${i}`}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: i * 0.05 }}
-                    >
-                      <div className="group relative rounded-lg border p-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{persona.emoji}</span>
-                          <div>
-                            <p className="text-sm font-medium">{persona.name}</p>
-                            <p className="text-xs text-muted-foreground line-clamp-1">
-                              {persona.reason}
+                      {/* Header row */}
+                      <div className="flex items-center gap-2.5 p-2.5">
+                        {persona.avatar_url ? (
+                          <img src={persona.avatar_url} alt={persona.name} className="h-8 w-8 rounded-lg object-cover shrink-0" />
+                        ) : (
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/5 text-base shrink-0">
+                            {persona.emoji}
+                          </span>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-medium truncate">{persona.name}</p>
+                          {isExpanded && profile && (profile.occupation || profile.age) ? (
+                            <p className="text-[14px] text-foreground/40 truncate">
+                              {profile.occupation ? String(profile.occupation) : ''}
+                              {profile.age ? `, ${String(profile.age)}yo` : ''}
                             </p>
-                          </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground truncate">{persona.short_description}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {isSelected && <Check className="h-4 w-4 text-primary" />}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedPersonaId(isExpanded ? null : persona.id);
+                            }}
+                            className="flex h-6 w-6 items-center justify-center rounded-md text-foreground/20 hover:text-foreground/50 hover:bg-muted"
+                          >
+                            <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', isExpanded && 'rotate-180')} />
+                          </button>
                         </div>
                       </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
 
-              {/* Estimate */}
-              <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
-                <span className="text-muted-foreground">Estimated</span>
-                <span>
-                  <span className="text-foreground/40">~</span>{' '}
-                  {editablePersonas.length * 2} min &middot; ${(editablePersonas.length * 0.5).toFixed(2)}
-                </span>
+                      {/* Expanded details */}
+                      <AnimatePresence>
+                        {isExpanded && profile && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="border-t border-border space-y-4 px-2.5 pb-3 pt-3">
+                              {/* Overview — chips */}
+                              {(profile.tech_literacy || profile.patience_level || profile.device_preference) && (
+                                <div>
+                                  <span className="text-[14px] text-foreground/25">Overview</span>
+                                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                    {profile.tech_literacy && (
+                                      <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[14px] text-foreground/50">
+                                        Tech savvy
+                                        <LevelBars level={String(profile.tech_literacy)} />
+                                      </span>
+                                    )}
+                                    {profile.patience_level && (
+                                      <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[14px] text-foreground/50">
+                                        Patience
+                                        <LevelBars level={String(profile.patience_level)} />
+                                      </span>
+                                    )}
+                                    {profile.device_preference && (
+                                      <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[14px] text-foreground/50">
+                                        {String(profile.device_preference) === 'mobile' ? '📱' : '🖥️'} Uses {String(profile.device_preference)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* About */}
+                              <div>
+                                <span className="text-[14px] text-foreground/25">About</span>
+                                <p className="text-[14px] text-foreground/60 mt-1">{persona.short_description}</p>
+                              </div>
+
+                              {/* Frustrations */}
+                              {Array.isArray(profile.frustration_triggers) && profile.frustration_triggers.length > 0 && (
+                                <div>
+                                  <span className="text-[14px] text-foreground/25">Frustrations</span>
+                                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                    {(profile.frustration_triggers as string[]).map((f) => (
+                                      <span key={f} className="rounded-full border border-border px-2.5 py-1 text-[14px] text-foreground/50">{f}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Accessibility */}
+                              {Array.isArray(profile.accessibility_needs) && profile.accessibility_needs.length > 0 && (
+                                <div>
+                                  <span className="text-[14px] text-foreground/25">Accessibility</span>
+                                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                    {(profile.accessibility_needs as string[]).map((a) => (
+                                      <span key={a} className="rounded-full border border-border px-2.5 py-1 text-[14px] text-foreground/50">{a}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleAcceptAndRun}
-                  disabled={submitting}
-                  className="flex-1"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="mr-2 h-4 w-4" />
-                      Accept & Run
-                    </>
-                  )}
-                </Button>
-                <Button variant="outline" onClick={handleModify} disabled={submitting}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Modify
-                </Button>
-                <Button variant="ghost" size="icon" onClick={handleReset} disabled={submitting}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </motion.div>
-          )}
+              <Button
+                onClick={handleSubmitPlan}
+                disabled={submitting || selectedPersonaIds.size === 0}
+                className="w-full h-12"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Submit Plan'
+                )}
+              </Button>
 
-          {/* Phase: Modify */}
-          {(phase === 'modify' && plan) && (
-            <motion.div
-              key="modify"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              className="space-y-5"
-            >
-              {/* Edit Tasks */}
-              <div>
-                <h3 className="mb-2 text-sm font-medium text-foreground/70">
-                  Tasks
-                </h3>
-                <div className="space-y-2">
-                  {editableTasks.map((task, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-medium text-primary-foreground">
-                        {i + 1}
-                      </span>
-                      <Input
-                        value={task.description}
-                        onChange={(e) => updateTask(i, e.target.value)}
-                        placeholder={`Task ${i + 1}`}
-                        className="flex-1"
-                      />
-                      {editableTasks.length > 1 && (
+              {/* Estimate + selected faces */}
+              {selectedPersonaIds.size > 0 && (
+                <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
+                  <div className="flex items-center -space-x-2">
+                    {(personas ?? [])
+                      .filter((p) => selectedPersonaIds.has(p.id))
+                      .map((p) => (
                         <button
-                          onClick={() => removeTask(i)}
-                          className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          key={p.id}
+                          onClick={() => togglePersona(p.id)}
+                          className="group/avatar relative h-6 w-6 rounded-full border border-border overflow-hidden shrink-0 hover:z-10"
                         >
-                          <X className="h-3.5 w-3.5" />
+                          {p.avatar_url ? (
+                            <img src={p.avatar_url} alt={p.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="flex h-full w-full items-center justify-center bg-foreground/5 text-[10px]">
+                              {p.emoji}
+                            </span>
+                          )}
+                          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                            <X className="h-2.5 w-2.5 text-white" />
+                          </span>
                         </button>
-                      )}
-                    </div>
-                  ))}
-                  {editableTasks.length < 5 && (
-                    <button
-                      onClick={addTask}
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      <Plus className="h-3 w-3" />
-                      Add another task
-                    </button>
-                  )}
+                      ))}
+                  </div>
+                  <span>
+                    <span className="text-foreground/40">~</span>{' '}
+                    {selectedPersonaIds.size * 2} min &middot; ${(selectedPersonaIds.size * 0.5).toFixed(2)}
+                  </span>
                 </div>
-              </div>
-
-              {/* Edit Personas */}
-              <div>
-                <h3 className="mb-2 text-sm font-medium text-foreground/70">
-                  Personas
-                </h3>
-                <div className="space-y-2">
-                  {editablePersonas.map((persona, i) => (
-                    <div
-                      key={persona.template_id ?? `persona-${i}`}
-                      className="flex items-center justify-between rounded-lg border p-2.5"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{persona.emoji}</span>
-                        <div>
-                          <p className="text-sm font-medium">{persona.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {persona.reason}
-                          </p>
-                        </div>
-                      </div>
-                      {editablePersonas.length > 1 && (
-                        <button
-                          onClick={() => removePersona(i)}
-                          className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Save / Cancel */}
-              <div className="flex gap-2">
-                <Button onClick={handleSaveModifications} className="flex-1">
-                  <Check className="mr-2 h-4 w-4" />
-                  Save Changes
-                </Button>
-                <Button variant="outline" onClick={() => setPhase('review')}>
-                  Cancel
-                </Button>
-              </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -9,21 +9,22 @@ import {
   Moon,
   Sun,
   BookOpen,
-  Plus,
+  TabletSmartphone,
   ClipboardList,
-  ArrowLeft,
-  ArrowRight,
+  Home,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TERMS } from '@/lib/constants';
+import { MirorLogo } from '@/components/common/miror-logo';
 
 const navItems = [
-  { href: '/', label: `New ${TERMS.singularCap}`, icon: Plus },
+  { href: '/', label: 'Home', icon: Home },
+  { href: '/study/new', label: `New ${TERMS.singular}`, icon: TabletSmartphone },
   { href: '/tests', label: `My ${TERMS.plural}`, icon: ClipboardList },
   { href: '/personas', label: 'Testers', icon: Users },
 ];
 
-function useNavHistory() {
+export function useNavHistory() {
   const pathname = usePathname();
   const router = useRouter();
   const historyRef = useRef<string[]>([]);
@@ -69,42 +70,14 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const { canGoBack, canGoForward, goBack, goForward } = useNavHistory();
-
   return (
-    <aside className="flex h-full w-52 shrink-0 flex-col border-r border-border bg-[#F9F9FC]">
-      {/* Logo + navigation arrows */}
-      <div className="px-5 pt-2 pb-3">
-        <div className="flex items-center justify-between">
-          <Link href="/" className="font-bold text-base">
-            Mirror
+    <aside className="flex h-full w-52 shrink-0 flex-col border-r border-border bg-[#F9F9FC] dark:bg-[#161616]">
+      {/* Logo — h-[42px] matches PageHeaderBar */}
+      <div className="px-5">
+        <div className="flex h-[42px] items-center">
+          <Link href="/" className="text-[22px] translate-y-[3px] opacity-95 transition-all duration-200 hover:opacity-100 hover:scale-[1.02]">
+            <MirorLogo iconSize={22} />
           </Link>
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={goBack}
-              disabled={!canGoBack}
-              className={cn(
-                'rounded p-1 transition-colors',
-                canGoBack
-                  ? 'text-muted-foreground/40 hover:text-muted-foreground'
-                  : 'text-muted-foreground/15 cursor-default',
-              )}
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={goForward}
-              disabled={!canGoForward}
-              className={cn(
-                'rounded p-1 transition-colors',
-                canGoForward
-                  ? 'text-muted-foreground/40 hover:text-muted-foreground'
-                  : 'text-muted-foreground/15 cursor-default',
-              )}
-            >
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
         </div>
         <p className="mt-6 text-sm leading-tight text-muted-foreground">
           Find UX issues before your users do
@@ -112,7 +85,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex flex-1 flex-col gap-0.5 px-3 pt-4">
+      <nav className="flex flex-1 flex-col gap-0.5 px-3 pt-6">
         {navItems.map((item) => {
           const isActive =
             item.href === '/'

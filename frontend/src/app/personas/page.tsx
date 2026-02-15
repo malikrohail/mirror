@@ -23,6 +23,7 @@ import { useStudies } from '@/hooks/use-study';
 import { PersonaTable } from '@/components/persona/persona-table';
 import { PersonaBuilderForm } from '@/components/persona/persona-builder-form';
 import { EmptyState } from '@/components/common/empty-state';
+import { TeamIllustration } from '@/components/common/empty-illustrations';
 import { PageSkeleton } from '@/components/common/page-skeleton';
 import { PageHeaderBar } from '@/components/layout/page-header-bar';
 import { cn } from '@/lib/utils';
@@ -88,14 +89,14 @@ export default function PersonaLibraryPage() {
   const [myTeamIds, setMyTeamIds] = useState<string[]>([]);
 
   const refreshMyTeam = useCallback(() => {
-    const stored: string[] = JSON.parse(localStorage.getItem('mirror-my-team') ?? '[]');
+    const stored: string[] = JSON.parse(localStorage.getItem('miror-my-team') ?? '[]');
     setMyTeamIds(stored);
   }, []);
 
   useEffect(() => {
     refreshMyTeam();
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'mirror-my-team') refreshMyTeam();
+      if (e.key === 'miror-my-team') refreshMyTeam();
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
@@ -149,10 +150,10 @@ export default function PersonaLibraryPage() {
 
   const headerChips = templates
     ? [
-        { label: 'Testers', value: templates.length },
-        { label: 'My team', value: myTeamCount },
-        { label: 'My tests', value: myTests },
-        { label: 'Total spent', value: `$${totalCost.toFixed(2)}` },
+        { label: 'Testers', value: templates.length, tooltip: 'Total AI personas available' },
+        { label: 'My team', value: myTeamCount, tooltip: 'Personas added to your team' },
+        { label: 'My tests', value: myTests, tooltip: 'Total tests you have run' },
+        { label: 'Total spent', value: `$${totalCost.toFixed(2)}`, tooltip: 'Total API cost across all tests' },
       ]
     : [];
 
@@ -162,6 +163,8 @@ export default function PersonaLibraryPage() {
     <div>
       {headerChips.length > 0 && (
         <PageHeaderBar
+          icon={Users}
+          title="Testers"
           chips={headerChips}
           right={
             <Button size="sm" className="h-[30px] text-sm" onClick={() => setBuilderOpen(true)}>
@@ -171,35 +174,25 @@ export default function PersonaLibraryPage() {
           }
         />
       )}
-      <div className="space-y-4 p-6">
-        {/* Tab bar + filter */}
+      <div className="space-y-2.5 px-[100px] pt-[40px] pb-[100px]">
+        {/* Filter bar */}
         <div className="flex items-center gap-2">
-          <div className="flex border-b border-border -mb-px">
-            <button
-              onClick={() => setTab('all')}
-              className={cn(
-                'px-3 pb-2 text-sm font-medium transition-colors border-b-2 -mb-px',
-                tab === 'all'
-                  ? 'border-foreground text-foreground'
-                  : 'border-transparent text-foreground/40 hover:text-foreground/70',
-              )}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setTab('mine')}
-              className={cn(
-                'px-3 pb-2 text-sm font-medium transition-colors border-b-2 -mb-px',
-                tab === 'mine'
-                  ? 'border-foreground text-foreground'
-                  : 'border-transparent text-foreground/40 hover:text-foreground/70',
-              )}
-            >
-              My team <span className="ml-1 text-foreground/30">{myTeamCount}</span>
-            </button>
-          </div>
-
+          <p className="text-[14px] uppercase text-foreground/30">Available testers</p>
           <div className="flex-1" />
+
+          {/* My Team toggle chip */}
+          <button
+            onClick={() => setTab(tab === 'mine' ? 'all' : 'mine')}
+            className={cn(
+              'flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 text-[14px] transition-colors',
+              tab === 'mine'
+                ? 'border-foreground/20 bg-foreground/5 text-foreground/70'
+                : 'border-border text-foreground/70 hover:text-foreground',
+            )}
+          >
+            My Team <span className="text-foreground/30">{myTeamCount}</span>
+            {tab === 'mine' && <X className="h-3 w-3" />}
+          </button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -325,9 +318,15 @@ export default function PersonaLibraryPage() {
           <PersonaTable templates={filtered} onTeamChange={refreshMyTeam} isMyTeam={tab === 'mine'} />
         ) : (
           <EmptyState
-            icon={<Users className="h-12 w-12" />}
+            illustration={<TeamIllustration />}
             title={tab === 'mine' ? 'No team members yet' : 'No testers found'}
             description={tab === 'mine' ? 'Testers you create or use in tests will appear here.' : 'No persona templates match your filter.'}
+            action={tab === 'mine' ? (
+              <Button variant="outline" size="sm" onClick={() => setTab('all')}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Browse testers
+              </Button>
+            ) : undefined}
           />
         )}
       </div>

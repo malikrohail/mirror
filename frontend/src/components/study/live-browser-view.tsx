@@ -57,7 +57,7 @@ export function LiveBrowserView({
         />
       ) : (
         <div className="flex aspect-video w-full items-center justify-center bg-muted/20">
-          <p className="text-xs text-muted-foreground">Waiting for first screenshot...</p>
+          <p className="text-xs text-muted-foreground">Waiting for first screenshot</p>
         </div>
       )}
 

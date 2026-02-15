@@ -7,7 +7,8 @@ import { HeatmapLegend } from './heatmap-legend';
 import { PageSelector } from './page-selector';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/common/empty-state';
-import { MousePointer, ImageOff } from 'lucide-react';
+import { HeatmapIllustration } from '@/components/common/empty-illustrations';
+import { ImageOff } from 'lucide-react';
 import { getScreenshotUrl } from '@/lib/api-client';
 
 interface ClickHeatmapProps {
@@ -57,7 +58,7 @@ export function ClickHeatmap({ studyId }: ClickHeatmapProps) {
   if (!data?.data_points.length) {
     return (
       <EmptyState
-        icon={<MousePointer className="h-12 w-12" />}
+        illustration={<HeatmapIllustration />}
         title="No click data"
         description="No click data is available for this test yet."
       />

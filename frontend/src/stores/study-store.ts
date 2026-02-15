@@ -408,7 +408,7 @@ export const useStudyStore = create<StudyStore>()(
   reset: () => set({ activeStudy: null, logs: [] }),
     }),
     {
-      name: 'mirror-study-progress',
+      name: 'miror-study-progress',
       storage: createJSONStorage(() => sessionStorage),
     }
   )
