@@ -30,6 +30,9 @@ import { LiveStepTimeline } from '@/components/study/live-step-timeline';
 import { ScreencastViewer } from '@/components/study/screencast-viewer';
 import { LiveBrowserView } from '@/components/study/live-browser-view';
 import { ReportPreview } from '@/components/report/report-preview';
+import { IssuesTab } from '@/components/results/issues-tab';
+import { SessionReplay } from '@/components/session/session-replay';
+import { ClickHeatmap } from '@/components/heatmap/click-heatmap';
 import { PageHeaderBar } from '@/components/layout/page-header-bar';
 import type { HeaderChip } from '@/components/layout/page-header-bar';
 
@@ -477,47 +480,23 @@ export default function StudyRunningPage({
               <div style={{ height: '460px' }}>
                 <TabsContent value="issues" className="h-full m-0">
                   <div className="h-full overflow-y-auto p-4">
-                    {!issues || issues.length === 0 ? (
-                      <div className="flex h-full items-center justify-center">
-                        <p className="text-sm text-muted-foreground/50">No issues found</p>
-                      </div>
+                    <IssuesTab studyId={id} />
+                  </div>
+                </TabsContent>
+                <TabsContent value="replay" className="h-full m-0">
+                  <div className="h-full overflow-y-auto p-4">
+                    {completeSessions && completeSessions.length > 0 ? (
+                      <SessionReplay sessionId={selectedSessionId ?? completeSessions[0].id} />
                     ) : (
-                      <div className="space-y-2">
-                        {issues.map((issue) => (
-                          <div key={issue.id} className="rounded-lg border border-border p-3">
-                            <div className="flex items-start gap-2">
-                              <span className={cn(
-                                'mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
-                                issue.severity === 'critical' ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400' :
-                                issue.severity === 'major' ? 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400' :
-                                issue.severity === 'minor' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400' :
-                                'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400'
-                              )}>
-                                {issue.severity}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[13px] text-foreground">{issue.description}</p>
-                                {issue.recommendation && (
-                                  <p className="mt-1 text-[12px] text-muted-foreground/60">{issue.recommendation}</p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="flex h-full items-center justify-center">
+                        <p className="text-sm text-muted-foreground/50">No sessions available</p>
                       </div>
                     )}
                   </div>
                 </TabsContent>
-                <TabsContent value="replay" className="h-full m-0">
-                  <div className="h-full overflow-hidden">
-                    {renderBrowserView()}
-                  </div>
-                </TabsContent>
                 <TabsContent value="heatmap" className="h-full m-0">
-                  <div className="flex h-full items-center justify-center bg-muted/30">
-                    <p className="text-sm text-muted-foreground/50">
-                      Heatmap will appear here after analysis
-                    </p>
+                  <div className="h-full overflow-y-auto p-4">
+                    <ClickHeatmap studyId={id} />
                   </div>
                 </TabsContent>
                 <TabsContent value="report" className="h-full m-0">
