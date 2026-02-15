@@ -6,14 +6,14 @@ StringDataRightTruncationError which poisoned the DB session and lost
 all step data for the affected persona.
 
 Revision ID: 006
-Revises: 005_add_issue_type
+Revises: 005
 """
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "006"
-down_revision = "005_add_issue_type"
+down_revision = "005"
 
 
 def upgrade() -> None:
