@@ -47,6 +47,7 @@ class PersonaOut(BaseModel):
 
 class StudyOut(BaseModel):
     id: uuid.UUID
+    name: str | None = None
     url: str
     starting_path: str
     status: str
@@ -74,6 +75,7 @@ class StudyOut(BaseModel):
 
 class StudySummary(BaseModel):
     id: uuid.UUID
+    name: str | None = None
     url: str
     status: str
     overall_score: float | None = None

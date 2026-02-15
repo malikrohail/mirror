@@ -8,6 +8,7 @@ import { PageSelector } from './page-selector';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/common/empty-state';
 import { HeatmapIllustration } from '@/components/common/empty-illustrations';
+import { ErrorState } from '@/components/common/error-state';
 import { ImageOff } from 'lucide-react';
 import { getScreenshotUrl } from '@/lib/api-client';
 
@@ -20,7 +21,7 @@ export function ClickHeatmap({ studyId }: ClickHeatmapProps) {
   const [containerWidth, setContainerWidth] = useState(800);
   const [imgLoaded, setImgLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { data, isLoading } = useHeatmap(studyId, selectedPage || undefined);
+  const { data, isLoading, isError, error } = useHeatmap(studyId, selectedPage || undefined);
 
   const pages = useMemo(() => {
     if (!data?.data_points) return [];
@@ -55,12 +56,21 @@ export function ClickHeatmap({ studyId }: ClickHeatmapProps) {
     return <Skeleton className="h-96" />;
   }
 
-  if (!data?.data_points.length) {
+  if (isError) {
+    return (
+      <ErrorState
+        title="Failed to load heatmap"
+        message={error?.message}
+      />
+    );
+  }
+
+  if (!data?.data_points?.length) {
     return (
       <EmptyState
         illustration={<HeatmapIllustration />}
-        title="No click data"
-        description="No click data is available for this test yet."
+        title="No click data yet"
+        description="Click data will appear here once personas interact with the site. Run a study to generate heatmap data."
       />
     );
   }
@@ -84,7 +94,12 @@ export function ClickHeatmap({ studyId }: ClickHeatmapProps) {
       </div>
 
       <div ref={containerRef} className="relative overflow-hidden rounded-lg border bg-muted">
-        {screenshotPath ? (
+        {filteredPoints.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+            <HeatmapIllustration />
+            <span>No clicks recorded on this page</span>
+          </div>
+        ) : screenshotPath ? (
           <>
             {!imgLoaded && (
               <div className="flex items-center justify-center bg-muted" style={{ height: 480 }}>
@@ -107,11 +122,13 @@ export function ClickHeatmap({ studyId }: ClickHeatmapProps) {
             <span>No page screenshot available</span>
           </div>
         )}
-        <HeatmapOverlay
-          dataPoints={filteredPoints}
-          width={containerWidth}
-          height={containerRef.current?.clientHeight ?? 480}
-        />
+        {filteredPoints.length > 0 && (
+          <HeatmapOverlay
+            dataPoints={filteredPoints}
+            width={containerWidth}
+            height={containerRef.current?.clientHeight ?? 480}
+          />
+        )}
       </div>
     </div>
   );

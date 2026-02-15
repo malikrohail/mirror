@@ -20,6 +20,7 @@ class StudyStatus(str, enum.Enum):
 class Study(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "studies"
 
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
     starting_path: Mapped[str] = mapped_column(String(2048), default="/")
     schedule_id: Mapped[uuid.UUID | None] = mapped_column(

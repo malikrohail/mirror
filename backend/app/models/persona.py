@@ -20,6 +20,10 @@ class Persona(Base, UUIDMixin, TimestampMixin):
     )
     profile: Mapped[dict] = mapped_column(JSONB, default=dict)
     is_custom: Mapped[bool] = mapped_column(Boolean, default=False)
+    model: Mapped[str | None] = mapped_column(
+        String(50), nullable=True, default="opus-4.6",
+        doc="AI model used for this persona: opus-4.6, sonnet-4.5, haiku-4.5",
+    )
 
     # Relationships
     study: Mapped["Study"] = relationship("Study", back_populates="personas")  # noqa: F821
@@ -37,3 +41,7 @@ class PersonaTemplate(Base, UUIDMixin, TimestampMixin):
     category: Mapped[str] = mapped_column(String(100), nullable=False)
     short_description: Mapped[str] = mapped_column(Text, nullable=False)
     default_profile: Mapped[dict] = mapped_column(JSONB, default=dict)
+    model: Mapped[str | None] = mapped_column(
+        String(50), nullable=True, default="opus-4.6",
+        doc="Default AI model for this persona template",
+    )

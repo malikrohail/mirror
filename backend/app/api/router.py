@@ -3,6 +3,8 @@ from fastapi import APIRouter
 from app.api.v1 import (
     accessibility,
     compare,
+    estimate,
+    favorites,
     fixes,
     github_export,
     health,
@@ -10,13 +12,16 @@ from app.api.v1 import (
     journeys,
     narration,
     personas,
+    preferences,
     proxy,
     reports,
     schedules,
     screenshots,
     scroll_depth,
     sessions,
+    showcase,
     studies,
+    teams,
     test_planner,
     videos,
 )
@@ -42,3 +47,8 @@ api_router.include_router(fixes.router, tags=["fixes"])
 api_router.include_router(accessibility.router, tags=["accessibility"])
 api_router.include_router(test_planner.router, tags=["test-planner"])
 api_router.include_router(github_export.router, tags=["github-export"])
+api_router.include_router(estimate.router, prefix="/estimate", tags=["estimate"])
+api_router.include_router(teams.router, prefix="/teams", tags=["teams"])
+api_router.include_router(preferences.router, prefix="/preferences", tags=["preferences"])
+api_router.include_router(favorites.router, prefix="/favorites", tags=["favorites"])
+api_router.include_router(showcase.router, tags=["showcase"])

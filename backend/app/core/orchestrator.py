@@ -38,7 +38,7 @@ from app.core.step_recorder import DatabaseStepRecorder
 from app.core.synthesizer import Synthesizer
 from app.db.repositories.session_repo import SessionRepository
 from app.db.repositories.study_repo import StudyRepository
-from app.llm.client import LLMClient
+from app.llm.client import HAIKU_MODEL, LLMClient, OPUS_MODEL, SONNET_MODEL
 from app.llm.schemas import AccessibilityNeeds, PersonaProfile
 from app.models.insight import Insight, InsightType
 from app.models.issue import Issue
@@ -88,7 +88,6 @@ class StudyOrchestrator:
         self._firecrawl = FirecrawlClient()
 
         # Fast LLM client for small studies (uses Sonnet for synthesis + reports)
-        from app.llm.client import SONNET_MODEL
         self._fast_llm = LLMClient(stage_model_overrides={
             "synthesis": SONNET_MODEL,
             "report_generation": SONNET_MODEL,
@@ -101,6 +100,16 @@ class StudyOrchestrator:
 
         # Cost tracking (Iteration 4)
         self._cost_tracker = CostTracker()
+
+        # Per-persona LLM clients (populated during navigation)
+        self._persona_llm_clients: list[LLMClient] = []
+
+    # Mapping from user-facing model slugs to Anthropic API model IDs
+    PERSONA_MODEL_TO_API: dict[str, str] = {
+        "opus-4.6": OPUS_MODEL,
+        "sonnet-4.5": SONNET_MODEL,
+        "haiku-4.5": HAIKU_MODEL,
+    }
 
     async def _ensure_browser_pool(self) -> BrowserPool:
         """Initialize browser pool if not already done."""
@@ -353,7 +362,7 @@ class StudyOrchestrator:
             study.duration_seconds = round(run_duration, 1)
 
             # Transfer LLM token usage from all clients to cost tracker
-            for llm_client in (self._llm, self._fast_llm):
+            for llm_client in (self._llm, self._fast_llm, *self._persona_llm_clients):
                 usage = llm_client.usage
                 if usage.calls > 0:
                     self._cost_tracker.record_llm_usage(
@@ -481,6 +490,8 @@ class StudyOrchestrator:
                 profile_dict = profile.model_dump()
                 profile_dict["id"] = str(persona.id)
                 profile_dict["behavioral_notes"] = PersonaEngine.get_behavioral_modifiers(profile)
+                # Propagate per-persona model selection from DB
+                profile_dict["model"] = getattr(persona, "model", None) or "opus-4.6"
                 profiles.append(profile_dict)
             except Exception as e:
                 logger.error("Failed to generate persona %s: %s", persona.id, e)
@@ -500,25 +511,29 @@ class StudyOrchestrator:
                     "goals": [],
                     "background": "A general user testing the website.",
                     "behavioral_notes": "",
+                    "model": getattr(persona, "model", None) or "opus-4.6",
                 }
                 profiles.append(fallback)
         return profiles
 
     @staticmethod
     def _build_profile_from_template(t: dict[str, Any]) -> PersonaProfile:
-        """Convert a template dict (string values) into a PersonaProfile (int values).
+        """Convert a template dict (string/int values) into a PersonaProfile (int values).
 
-        Templates use strings like 'high'/'low' for behavioral attributes,
-        while PersonaProfile expects 1-10 integers. This avoids an Opus API call.
+        Templates now use integers 1-10 (canonical format). Legacy templates with
+        string labels ('high'/'low') are also handled via LEVEL_MAP for backward
+        compatibility.
         """
-        LEVEL_MAP = {"low": 2, "moderate": 5, "medium": 5, "high": 8}
-        READING_MAP = {"skims": 2, "scans": 3, "moderate": 5, "thorough": 8, "careful": 8}
+        from app.services.persona_service import LEVEL_MAP
 
-        def to_int(val: Any, mapping: dict[str, int], default: int = 5) -> int:
+        READING_MAP = {"skims": 3, "scans": 3, "moderate": 5, "thorough": 8, "careful": 8}
+
+        def to_int(val: Any, mapping: dict[str, int] | None = None, default: int = 5) -> int:
             if isinstance(val, int):
                 return max(1, min(10, val))
             if isinstance(val, str):
-                return mapping.get(val.lower(), default)
+                combined = {**LEVEL_MAP, **(mapping or {})}
+                return combined.get(val.lower(), default)
             return default
 
         # Convert accessibility_needs from list/dict/etc to AccessibilityNeeds
@@ -638,6 +653,27 @@ class StudyOrchestrator:
                 viewport = persona_dict.get("device_preference", "desktop")
                 session_id = str(session.id)
                 persona_name = persona_dict.get("name", "Unknown")
+
+                # Create per-persona navigator with model override if specified
+                persona_model_slug = persona_dict.get("model") or "opus-4.6"
+                api_model = self.PERSONA_MODEL_TO_API.get(persona_model_slug)
+                if api_model and api_model != HAIKU_MODEL:
+                    # Override the navigation model for this persona
+                    persona_llm = LLMClient(stage_model_overrides={"navigation": api_model})
+                    persona_llm.set_langfuse_context(
+                        session_id=str(study_id),
+                        persona_name=persona_name,
+                        tags=["study-run", f"model-{persona_model_slug}"],
+                    )
+                    persona_navigator = Navigator(
+                        persona_llm,
+                        max_steps=int(os.getenv("MAX_STEPS_PER_SESSION", "30")),
+                    )
+                    self._persona_llm_clients.append(persona_llm)
+                else:
+                    persona_llm = self._llm
+                    persona_navigator = self._navigator
+
                 browser_session = await pool.acquire(viewport=viewport)
                 result: NavigationResult | None = None
                 screencast: CDPScreencastManager | None = None
@@ -714,7 +750,7 @@ class StudyOrchestrator:
                         db_session.status = SessionStatus.RUNNING
                         await persona_db.commit()
 
-                        result = await self._navigator.navigate_session(
+                        result = await persona_navigator.navigate_session(
                             session_id=session_id,
                             persona=persona_dict,
                             task_description=task_desc,

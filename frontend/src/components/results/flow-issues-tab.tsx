@@ -10,37 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { SEVERITY_COLORS } from '@/lib/constants';
-import type { Severity } from '@/types';
-
-// ---------- Types ----------
-
-interface TransitionIssue {
-  from_page: string;
-  to_page: string;
-  description: string;
-  severity: Severity;
-  heuristic: string;
-  recommendation: string;
-}
-
-interface FlowAnalysisResult {
-  flow_name: string;
-  pages: string[];
-  consistency_score: number;
-  transition_issues: TransitionIssue[];
-  information_loss: string[];
-  strengths: string[];
-  summary: string;
-}
-
-// ---------- API ----------
-
-async function fetchFlowAnalysis(studyId: string): Promise<FlowAnalysisResult[]> {
-  const res = await fetch(`/api/v1/studies/${studyId}/flow-analysis`);
-  if (res.status === 404) return [];
-  if (!res.ok) throw new Error('Failed to fetch flow analysis');
-  return res.json();
-}
+import { getFlowAnalysis } from '@/lib/api-client';
+import type { FlowAnalysisResult, TransitionIssue } from '@/types';
 
 // ---------- Component ----------
 
@@ -51,7 +22,7 @@ interface FlowIssuesTabProps {
 export function FlowIssuesTab({ studyId }: FlowIssuesTabProps) {
   const { data: flows, isLoading } = useQuery({
     queryKey: ['flow-analysis', studyId],
-    queryFn: () => fetchFlowAnalysis(studyId),
+    queryFn: () => getFlowAnalysis(studyId),
     enabled: !!studyId,
   });
 

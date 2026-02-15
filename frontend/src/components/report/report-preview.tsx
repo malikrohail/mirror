@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { getReportMdUrl } from '@/lib/api-client';
+import { getReportMarkdown } from '@/lib/api-client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportActions } from './report-actions';
 
@@ -18,11 +18,7 @@ export function ReportPreview({ studyId, hideActions }: ReportPreviewProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(getReportMdUrl(studyId))
-      .then(async (res) => {
-        if (!res.ok) throw new Error('Failed to load report');
-        return res.text();
-      })
+    getReportMarkdown(studyId)
       .then((text) => {
         setMarkdown(text);
         setLoading(false);

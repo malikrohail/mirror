@@ -43,7 +43,8 @@ class Session(Base, UUIDMixin, TimestampMixin):
     persona: Mapped["Persona"] = relationship("Persona", back_populates="sessions")  # noqa: F821
     task: Mapped["Task"] = relationship("Task", back_populates="sessions")  # noqa: F821
     steps: Mapped[list["Step"]] = relationship(  # noqa: F821
-        "Step", back_populates="session", cascade="all, delete-orphan"
+        "Step", back_populates="session", cascade="all, delete-orphan",
+        order_by="Step.step_number",
     )
     issues: Mapped[list["Issue"]] = relationship(  # noqa: F821
         "Issue", back_populates="session", cascade="all, delete-orphan"

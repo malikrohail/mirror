@@ -35,6 +35,10 @@ import type {
   NarrationGenerateResponse,
   GitHubPRRequest,
   GitHubPRResponse,
+  FlowAnalysisResult,
+  AccessibilityAuditResult,
+  FixPreviewResponse,
+  ShowcaseStudy,
 } from '@/types';
 
 class ApiError extends Error {
@@ -57,6 +61,31 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new ApiError(res.status, body);
   }
   if (res.status === 204) return undefined as T;
+  return res.json();
+}
+
+async function requestText(path: string, options?: RequestInit): Promise<string> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { ...options?.headers },
+    ...options,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => 'Unknown error');
+    throw new ApiError(res.status, body);
+  }
+  return res.text();
+}
+
+async function requestNullable<T>(path: string, options?: RequestInit): Promise<T | null> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    ...options,
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const body = await res.text().catch(() => 'Unknown error');
+    throw new ApiError(res.status, body);
+  }
   return res.json();
 }
 
@@ -335,6 +364,40 @@ export function createGitHubPR(studyId: string, data: GitHubPRRequest): Promise<
     method: 'POST',
     body: JSON.stringify(data),
   });
+}
+
+// ── Report Markdown (text) ──────────────────────────
+
+export function getReportMarkdown(studyId: string): Promise<string> {
+  return requestText(`/studies/${studyId}/report/md`);
+}
+
+// ── Flow Analysis ───────────────────────────────────
+
+export function getFlowAnalysis(studyId: string): Promise<FlowAnalysisResult[]> {
+  return requestNullable<FlowAnalysisResult[]>(`/studies/${studyId}/flow-analysis`).then((r) => r ?? []);
+}
+
+// ── Accessibility ───────────────────────────────────
+
+export function getAccessibilityAudit(studyId: string): Promise<AccessibilityAuditResult | null> {
+  return requestNullable<AccessibilityAuditResult>(`/studies/${studyId}/accessibility`);
+}
+
+export function runAccessibilityAudit(studyId: string): Promise<AccessibilityAuditResult> {
+  return request(`/studies/${studyId}/accessibility/audit`, { method: 'POST' });
+}
+
+// ── Fix Preview ─────────────────────────────────────
+
+export function previewFix(studyId: string, issueId: string): Promise<FixPreviewResponse> {
+  return request(`/studies/${studyId}/issues/${issueId}/preview-fix`, { method: 'POST' });
+}
+
+// ── Showcase ────────────────────────────────────────
+
+export function getShowcaseStudy(): Promise<ShowcaseStudy> {
+  return request('/showcase');
 }
 
 export { ApiError };

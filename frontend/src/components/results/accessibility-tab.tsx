@@ -10,52 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { SEVERITY_COLORS } from '@/lib/constants';
-import type { Severity } from '@/types';
-
-// ---------- Types for accessibility audit data ----------
-
-interface VisualAccessibilityIssue {
-  description: string;
-  wcag_criterion: string;
-  measured_value: string | null;
-  required_value: string | null;
-  element_description: string;
-  severity: Severity;
-  screenshot_region: Record<string, number>;
-}
-
-interface WCAGCriterionResult {
-  criterion: string;
-  level: string;
-  status: 'pass' | 'fail' | 'not_applicable';
-  evidence: string;
-}
-
-interface AccessibilityAuditResult {
-  page_url: string;
-  wcag_level: string;
-  pass_count: number;
-  fail_count: number;
-  compliance_percentage: number;
-  criteria: WCAGCriterionResult[];
-  visual_issues: VisualAccessibilityIssue[];
-  summary: string;
-}
-
-// ---------- API functions ----------
-
-async function fetchAccessibilityAudit(studyId: string): Promise<AccessibilityAuditResult | null> {
-  const res = await fetch(`/api/v1/studies/${studyId}/accessibility`);
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error('Failed to fetch accessibility audit');
-  return res.json();
-}
-
-async function runAccessibilityAudit(studyId: string): Promise<AccessibilityAuditResult> {
-  const res = await fetch(`/api/v1/studies/${studyId}/accessibility/audit`, { method: 'POST' });
-  if (!res.ok) throw new Error('Failed to run accessibility audit');
-  return res.json();
-}
+import { getAccessibilityAudit, runAccessibilityAudit } from '@/lib/api-client';
+import type { AccessibilityAuditResult, VisualAccessibilityIssue, WCAGCriterionResult } from '@/types';
 
 // ---------- Component ----------
 
@@ -69,7 +25,7 @@ export function AccessibilityTab({ studyId }: AccessibilityTabProps) {
 
   const { data: audit, isLoading } = useQuery({
     queryKey: ['accessibility-audit', studyId],
-    queryFn: () => fetchAccessibilityAudit(studyId),
+    queryFn: () => getAccessibilityAudit(studyId),
     enabled: !!studyId,
   });
 
