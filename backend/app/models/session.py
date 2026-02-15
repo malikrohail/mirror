@@ -46,7 +46,7 @@ class Session(Base, UUIDMixin, TimestampMixin):
         "Step", back_populates="session", cascade="all, delete-orphan"
     )
     issues: Mapped[list["Issue"]] = relationship(  # noqa: F821
-        "Issue", back_populates="session"
+        "Issue", back_populates="session", cascade="all, delete-orphan"
     )
     video: Mapped["SessionVideo | None"] = relationship(  # noqa: F821
         "SessionVideo", back_populates="session", uselist=False, cascade="all, delete-orphan"

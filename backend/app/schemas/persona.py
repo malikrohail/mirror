@@ -15,13 +15,21 @@ class PersonaTemplateOut(BaseModel):
     default_profile: dict = {}
     created_at: datetime
     avatar_url: str = ""
+    model_display_name: str = "Opus 4.6"
+    estimated_cost_per_run_usd: float = 0.0
 
     model_config = {"from_attributes": True}
 
     @model_validator(mode="after")
-    def _set_avatar_url(self) -> "PersonaTemplateOut":
+    def _set_computed_fields(self) -> "PersonaTemplateOut":
         if not self.avatar_url:
             self.avatar_url = f"https://i.pravatar.cc/200?u={quote(self.name)}"
+        if self.estimated_cost_per_run_usd == 0.0:
+            # Approximate per-persona, per-task cost based on current pricing:
+            # persona_generation (1 call) + navigation (~15 steps) +
+            # screenshot_analysis (~5 pages) + fraction of synthesis/report.
+            # TODO: make dynamic when per-persona model routing is implemented.
+            self.estimated_cost_per_run_usd = 0.40
         return self
 
 

@@ -31,6 +31,8 @@ import type {
   StudyPlanResponse,
   NarrationStatusOut,
   NarrationGenerateResponse,
+  GitHubPRRequest,
+  GitHubPRResponse,
 } from '@/types';
 
 class ApiError extends Error {
@@ -303,6 +305,15 @@ export function generateFixes(studyId: string, issueIds?: string[]): Promise<Fix
 
 export function listFixes(studyId: string): Promise<FixSuggestionOut[]> {
   return request(`/studies/${studyId}/fixes`);
+}
+
+// ── GitHub PR Export ─────────────────────────────────
+
+export function createGitHubPR(studyId: string, data: GitHubPRRequest): Promise<GitHubPRResponse> {
+  return request(`/studies/${studyId}/export/github-pr`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
 export { ApiError };

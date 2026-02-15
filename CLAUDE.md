@@ -612,3 +612,66 @@ All prompts are defined in `backend/app/llm/prompts.py`. All response schemas in
 - **Screenshot naming**: `{study_id}/{session_id}/steps/step_{NNN}.png` — zero-padded 3-digit step number
 - **Heatmap generation**: Aggregate click_x/click_y from all steps on the same page_url. Normalize to viewport. Generate overlay PNG with Pillow using gaussian blur.
 - **Report generation**: First generate Markdown (structured). Then convert to PDF via WeasyPrint with custom CSS template.
+
+---
+
+## Deploying to VPS (Push Local Changes Live)
+
+The production site is hosted at **miror.tech** on a DigitalOcean droplet. Here's how to push local changes so they go live on the domain.
+
+### Quick Deploy (One Command)
+
+```bash
+# From the mirror project root on your local machine:
+make deploy
+```
+
+If `make deploy` is not set up, use the manual steps below.
+
+### Manual Deploy Steps
+
+```bash
+# Step 1: Push your code to the server (from local machine)
+rsync -avz \
+  --exclude='node_modules' --exclude='.next' --exclude='__pycache__' \
+  --exclude='.venv' --exclude='data/' --exclude='.git' --exclude='.env' \
+  /Users/test/Downloads/mirror/ root@157.230.215.4:/opt/mirror/
+
+# Step 2: Rebuild and restart all containers on the server
+ssh root@157.230.215.4 "cd /opt/mirror && docker compose -f docker-compose.prod.yml up -d --build"
+
+# Step 3: Run database migrations (if any new migrations were added)
+ssh root@157.230.215.4 "cd /opt/mirror && docker compose -f docker-compose.prod.yml exec backend bash -c 'cd /app && PYTHONPATH=/app alembic upgrade head'"
+
+# Step 4: Verify everything is running
+ssh root@157.230.215.4 "cd /opt/mirror && docker compose -f docker-compose.prod.yml ps"
+```
+
+### What Each Step Does
+
+| Step | Command | What it does |
+|------|---------|-------------|
+| 1 | `rsync ...` | Copies your local code to the server at `/opt/mirror/`, excluding heavy folders like `node_modules`, `.venv`, `data/` |
+| 2 | `docker compose ... up -d --build` | Rebuilds Docker images (backend, frontend, worker) and restarts all 6 containers (postgres, redis, backend, worker, frontend, caddy) |
+| 3 | `alembic upgrade head` | Applies any new database schema changes. Safe to run even if there are no new migrations |
+| 4 | `docker compose ... ps` | Shows all container statuses — all should show `Up` |
+
+### Checking Logs
+
+```bash
+# All services
+ssh root@157.230.215.4 "cd /opt/mirror && docker compose -f docker-compose.prod.yml logs --tail 50"
+
+# Specific service (backend, frontend, worker, caddy, postgres, redis)
+ssh root@157.230.215.4 "cd /opt/mirror && docker compose -f docker-compose.prod.yml logs backend --tail 50"
+```
+
+### Server Details
+
+| Item | Value |
+|------|-------|
+| Domain | `miror.tech` |
+| Server IP | `157.230.215.4` |
+| SSH | `ssh root@157.230.215.4` |
+| Code on server | `/opt/mirror/` |
+| Compose file | `docker-compose.prod.yml` |

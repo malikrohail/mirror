@@ -84,7 +84,8 @@ class StudyRepository:
         return study
 
     async def delete(self, study_id: uuid.UUID) -> bool:
-        study = await self.get_by_id(study_id)
+        # Must load ALL relationships for SQLAlchemy cascade to work
+        study = await self.get_with_all(study_id)
         if study:
             await self.session.delete(study)
             await self.session.flush()

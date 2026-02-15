@@ -1,8 +1,10 @@
-"""GitHub integration — export Mirror UX issues as GitHub issues."""
+"""GitHub integration — export Mirror UX issues as GitHub issues and PRs."""
 
 from __future__ import annotations
 
+import base64
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -232,3 +234,575 @@ class GitHubIntegration:
             repo,
         )
         return created_urls
+
+    # ------------------------------------------------------------------
+    # GitHub PR creation — ships overlay fix files directly to a repo
+    # ------------------------------------------------------------------
+
+    def _gh_headers(self, token: str) -> dict[str, str]:
+        """Standard GitHub API headers."""
+        return {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+
+    async def validate_repo_access(
+        self, repo: str, token: str
+    ) -> dict[str, Any]:
+        """Check the token has write access to the repo.
+
+        Returns:
+            Repo metadata dict from GitHub API.
+
+        Raises:
+            httpx.HTTPStatusError: 404 if repo not found, 403 if no access.
+        """
+        client = await self._get_client()
+        resp = await client.get(
+            f"/repos/{repo}",
+            headers=self._gh_headers(token),
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        perms = data.get("permissions", {})
+        if not perms.get("push"):
+            raise PermissionError(
+                f"Token does not have write access to {repo}"
+            )
+        return data
+
+    async def get_default_branch(
+        self, repo: str, token: str
+    ) -> tuple[str, str]:
+        """Get the default branch name and its HEAD SHA.
+
+        Returns:
+            (branch_name, head_sha) tuple.
+        """
+        client = await self._get_client()
+        # Get repo metadata for default branch name
+        resp = await client.get(
+            f"/repos/{repo}",
+            headers=self._gh_headers(token),
+        )
+        resp.raise_for_status()
+        default_branch = resp.json()["default_branch"]
+
+        # Get the SHA of the branch HEAD
+        resp = await client.get(
+            f"/repos/{repo}/git/ref/heads/{default_branch}",
+            headers=self._gh_headers(token),
+        )
+        resp.raise_for_status()
+        sha = resp.json()["object"]["sha"]
+        return default_branch, sha
+
+    async def create_branch(
+        self,
+        repo: str,
+        token: str,
+        branch_name: str,
+        base_sha: str,
+    ) -> str:
+        """Create a new branch from the given SHA.
+
+        If the branch already exists, appends a numeric suffix.
+
+        Returns:
+            The actual branch name created.
+        """
+        client = await self._get_client()
+        headers = self._gh_headers(token)
+
+        name = branch_name
+        for attempt in range(5):
+            resp = await client.post(
+                f"/repos/{repo}/git/refs",
+                json={"ref": f"refs/heads/{name}", "sha": base_sha},
+                headers=headers,
+            )
+            if resp.status_code == 422 and "already exists" in resp.text.lower():
+                name = f"{branch_name}-{attempt + 2}"
+                continue
+            resp.raise_for_status()
+            logger.info("Created branch %s in %s", name, repo)
+            return name
+
+        # All attempts exhausted — raise
+        resp.raise_for_status()
+        return name  # unreachable, keeps type checker happy
+
+    async def create_files_commit(
+        self,
+        repo: str,
+        token: str,
+        branch: str,
+        files: dict[str, str],
+        message: str,
+    ) -> str:
+        """Create a commit with multiple files using the Git Trees API.
+
+        Args:
+            repo: "owner/repo" format.
+            token: GitHub PAT.
+            branch: Branch to commit to.
+            files: Mapping of file_path → file_content.
+            message: Commit message.
+
+        Returns:
+            The new commit SHA.
+        """
+        client = await self._get_client()
+        headers = self._gh_headers(token)
+
+        # Get the current branch SHA
+        resp = await client.get(
+            f"/repos/{repo}/git/ref/heads/{branch}",
+            headers=headers,
+        )
+        resp.raise_for_status()
+        base_sha = resp.json()["object"]["sha"]
+
+        # Get the base tree SHA
+        resp = await client.get(
+            f"/repos/{repo}/git/commits/{base_sha}",
+            headers=headers,
+        )
+        resp.raise_for_status()
+        base_tree_sha = resp.json()["tree"]["sha"]
+
+        # Create blobs for each file
+        tree_items: list[dict[str, str]] = []
+        for file_path, content in files.items():
+            resp = await client.post(
+                f"/repos/{repo}/git/blobs",
+                json={
+                    "content": base64.b64encode(content.encode()).decode(),
+                    "encoding": "base64",
+                },
+                headers=headers,
+            )
+            resp.raise_for_status()
+            blob_sha = resp.json()["sha"]
+            tree_items.append({
+                "path": file_path,
+                "mode": "100644",
+                "type": "blob",
+                "sha": blob_sha,
+            })
+
+        # Create tree
+        resp = await client.post(
+            f"/repos/{repo}/git/trees",
+            json={"base_tree": base_tree_sha, "tree": tree_items},
+            headers=headers,
+        )
+        resp.raise_for_status()
+        tree_sha = resp.json()["sha"]
+
+        # Create commit
+        resp = await client.post(
+            f"/repos/{repo}/git/commits",
+            json={
+                "message": message,
+                "tree": tree_sha,
+                "parents": [base_sha],
+            },
+            headers=headers,
+        )
+        resp.raise_for_status()
+        commit_sha = resp.json()["sha"]
+
+        # Update branch ref to point to new commit
+        resp = await client.patch(
+            f"/repos/{repo}/git/refs/heads/{branch}",
+            json={"sha": commit_sha},
+            headers=headers,
+        )
+        resp.raise_for_status()
+
+        logger.info("Created commit %s on %s/%s", commit_sha[:8], repo, branch)
+        return commit_sha
+
+    async def create_pull_request(
+        self,
+        repo: str,
+        token: str,
+        title: str,
+        body: str,
+        head: str,
+        base: str,
+    ) -> tuple[str, int]:
+        """Open a pull request.
+
+        Returns:
+            (html_url, pr_number) tuple.
+        """
+        client = await self._get_client()
+        resp = await client.post(
+            f"/repos/{repo}/pulls",
+            json={
+                "title": title,
+                "body": body,
+                "head": head,
+                "base": base,
+            },
+            headers=self._gh_headers(token),
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        pr_url = data["html_url"]
+        pr_number = data["number"]
+        logger.info("Created PR #%d in %s: %s", pr_number, repo, pr_url)
+        return pr_url, pr_number
+
+    # ------------------------------------------------------------------
+    # File content generators
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _severity_emoji(severity: str) -> str:
+        return {
+            "critical": "\U0001f534",
+            "major": "\U0001f7e0",
+            "minor": "\U0001f7e1",
+            "enhancement": "\U0001f535",
+        }.get(severity.lower(), "\u26aa")
+
+    @staticmethod
+    def aggregate_css_fixes(
+        issues: list[dict[str, Any]], study_id: str
+    ) -> str | None:
+        """Build mirror-fixes.css from issues that have CSS fix code."""
+        css_issues = [
+            i for i in issues
+            if i.get("fix_code") and (i.get("fix_language") or "").lower() == "css"
+        ]
+        if not css_issues:
+            return None
+
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        lines = [
+            f"/* Mirror UX Fixes — Auto-generated",
+            f" * Study: {study_id} | Date: {now}",
+            f" * Fixes {len(css_issues)} CSS issues found by AI usability testing",
+            f" * https://miror.tech",
+            f" */",
+            "",
+        ]
+        for idx, issue in enumerate(css_issues, 1):
+            sev = (issue.get("severity") or "unknown").upper()
+            desc = issue.get("description", "UX issue")
+            element = issue.get("element", "")
+            lines.append(f"/* Fix {idx}: {desc[:80]} [{sev}] */")
+            if element:
+                lines.append(f"/* Element: {element} */")
+            lines.append(issue["fix_code"].strip())
+            lines.append("")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def aggregate_js_fixes(
+        issues: list[dict[str, Any]], study_id: str
+    ) -> str | None:
+        """Build mirror-patches.js from issues that have JS fix code."""
+        js_issues = [
+            i for i in issues
+            if i.get("fix_code")
+            and (i.get("fix_language") or "").lower() in ("javascript", "js")
+        ]
+        if not js_issues:
+            return None
+
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        lines = [
+            f"/** Mirror UX Patches — Auto-generated",
+            f" * Study: {study_id} | Date: {now}",
+            f" * Patches {len(js_issues)} issues found by AI usability testing",
+            f" * https://miror.tech",
+            f" */",
+            "(function() {",
+            '  "use strict";',
+            "",
+        ]
+        for idx, issue in enumerate(js_issues, 1):
+            sev = (issue.get("severity") or "unknown").upper()
+            desc = issue.get("description", "UX issue")
+            lines.append(f"  // Fix {idx}: {desc[:80]} [{sev}]")
+            # Indent each line of the fix code
+            for code_line in issue["fix_code"].strip().splitlines():
+                lines.append(f"  {code_line}")
+            lines.append("")
+
+        lines.append("})();")
+        return "\n".join(lines)
+
+    @staticmethod
+    def generate_mirror_fixes_md(
+        issues: list[dict[str, Any]],
+        study_id: str,
+        study_url: str,
+        score: int | None,
+    ) -> str:
+        """Build MIRROR-FIXES.md documenting every fix."""
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        sev_emoji = GitHubIntegration._severity_emoji
+
+        lines = [
+            "# Mirror UX Fixes",
+            "",
+            f"> Auto-generated on {now} by [Mirror](https://miror.tech) — AI-powered usability testing",
+            "",
+            f"**Tested URL:** {study_url}",
+        ]
+        if score is not None:
+            lines.append(f"**UX Score:** {score}/100")
+        lines.append(f"**Issues Fixed:** {len(issues)}")
+        lines.append("")
+
+        # Summary table
+        severity_counts: dict[str, int] = {}
+        for i in issues:
+            s = (i.get("severity") or "unknown").lower()
+            severity_counts[s] = severity_counts.get(s, 0) + 1
+
+        lines.append("## Summary")
+        lines.append("")
+        lines.append("| Severity | Count |")
+        lines.append("|----------|-------|")
+        for sev in ("critical", "major", "minor", "enhancement"):
+            count = severity_counts.get(sev, 0)
+            if count:
+                lines.append(f"| {sev_emoji(sev)} {sev.capitalize()} | {count} |")
+        lines.append("")
+
+        # Individual fixes
+        lines.append("## Fixes")
+        lines.append("")
+        for idx, issue in enumerate(issues, 1):
+            sev = (issue.get("severity") or "unknown")
+            lines.append(
+                f"### {idx}. {sev_emoji(sev)} [{sev.upper()}] "
+                f"{issue.get('description', 'UX issue')}"
+            )
+            lines.append("")
+            if issue.get("element"):
+                lines.append(f"**Element:** `{issue['element']}`")
+            if issue.get("page_url"):
+                lines.append(f"**Page:** {issue['page_url']}")
+            if issue.get("heuristic"):
+                lines.append(f"**Heuristic:** {issue['heuristic']}")
+            if issue.get("wcag_criterion"):
+                lines.append(f"**WCAG:** {issue['wcag_criterion']}")
+            if issue.get("recommendation"):
+                lines.append(f"\n{issue['recommendation']}")
+            if issue.get("fix_code"):
+                lang = issue.get("fix_language", "")
+                lines.append(f"\n```{lang}")
+                lines.append(issue["fix_code"].strip())
+                lines.append("```")
+            lines.append("")
+
+        # How to apply
+        lines.append("## How to Apply")
+        lines.append("")
+        lines.append(
+            "These fixes use the **overlay pattern** — CSS overrides and "
+            "optional JS patches that work with any framework."
+        )
+        lines.append("")
+        lines.append("1. **Merge this PR** for an instant improvement")
+        lines.append(
+            "2. **Link the CSS/JS** in your HTML "
+            '(`<link rel="stylesheet" href="mirror-fixes.css">`)'
+        )
+        lines.append(
+            "3. **For permanent fixes**, use the recommendations above "
+            "to update your source files directly"
+        )
+        lines.append("")
+        lines.append("---")
+        lines.append(
+            f"*Generated by [Mirror](https://miror.tech) — "
+            f"5 AI personas tested your site so real users don't have to.*"
+        )
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def build_pr_body(
+        issues: list[dict[str, Any]],
+        study_id: str,
+        study_url: str,
+        score: int | None,
+        files_created: list[str],
+    ) -> str:
+        """Build a rich PR description with severity table and fix details."""
+        sev_emoji = GitHubIntegration._severity_emoji
+
+        severity_counts: dict[str, int] = {}
+        for i in issues:
+            s = (i.get("severity") or "unknown").lower()
+            severity_counts[s] = severity_counts.get(s, 0) + 1
+
+        lines = [
+            "## Mirror UX Fixes",
+            "",
+        ]
+        if score is not None:
+            lines.append(f"**UX Score:** {score}/100")
+        lines.append(f"**Tested URL:** {study_url}")
+        lines.append(f"**Fixes included:** {len(issues)}")
+        lines.append("")
+
+        # Severity breakdown
+        lines.append("| Severity | Count |")
+        lines.append("|----------|-------|")
+        for sev in ("critical", "major", "minor", "enhancement"):
+            count = severity_counts.get(sev, 0)
+            if count:
+                lines.append(f"| {sev_emoji(sev)} {sev.capitalize()} | {count} |")
+        lines.append("")
+
+        # Files in this PR
+        lines.append("### Files")
+        lines.append("")
+        for f in files_created:
+            lines.append(f"- `{f}`")
+        lines.append("")
+
+        # How to apply
+        lines.append("### How to Apply")
+        lines.append("")
+        lines.append(
+            "**Merge this PR** for an instant improvement. "
+            "The overlay files use CSS `!important` overrides and optional "
+            "JS runtime patches — the same pattern used by A/B testing tools "
+            "and browser extensions."
+        )
+        lines.append("")
+        lines.append(
+            "For permanent source-level changes, see the recommendations "
+            "in `MIRROR-FIXES.md`."
+        )
+        lines.append("")
+
+        # Individual fixes
+        lines.append("<details>")
+        lines.append("<summary>Fixes included (click to expand)</summary>")
+        lines.append("")
+        for idx, issue in enumerate(issues, 1):
+            sev = (issue.get("severity") or "unknown")
+            desc = issue.get("description", "UX issue")
+            lines.append(
+                f"**{idx}. {sev_emoji(sev)} [{sev.upper()}]** {desc}"
+            )
+            if issue.get("element"):
+                lines.append(f"  - Element: `{issue['element']}`")
+            if issue.get("recommendation"):
+                lines.append(f"  - {issue['recommendation']}")
+            if issue.get("fix_code"):
+                lang = issue.get("fix_language", "")
+                lines.append(f"  ```{lang}")
+                lines.append(f"  {issue['fix_code'].strip()}")
+                lines.append("  ```")
+            lines.append("")
+
+        lines.append("</details>")
+        lines.append("")
+        lines.append("---")
+        lines.append(
+            "*Generated by [Mirror](https://miror.tech) — "
+            "AI personas tested your site so real users don't have to.*"
+        )
+
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Orchestrator: create_pr_with_fixes
+    # ------------------------------------------------------------------
+
+    async def create_pr_with_fixes(
+        self,
+        repo: str,
+        token: str,
+        study_id: str,
+        study_url: str,
+        score: int | None,
+        issues: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Orchestrate the full PR creation flow.
+
+        Args:
+            repo: "owner/repo" format.
+            token: GitHub PAT with repo scope.
+            study_id: Mirror study UUID.
+            study_url: The URL that was tested.
+            score: Overall UX score (0-100) or None.
+            issues: List of issue dicts with fix_code, fix_language, etc.
+
+        Returns:
+            Dict with pr_url, pr_number, branch_name, files_created,
+            and fixes_included count.
+        """
+        # 1. Validate access
+        await self.validate_repo_access(repo, token)
+
+        # 2. Get default branch + SHA
+        default_branch, base_sha = await self.get_default_branch(repo, token)
+
+        # 3. Create branch
+        short_id = study_id[:8] if len(study_id) > 8 else study_id
+        branch_name = await self.create_branch(
+            repo, token, f"mirror/ux-fixes-{short_id}", base_sha
+        )
+
+        # 4. Build file contents
+        files: dict[str, str] = {}
+
+        css_content = self.aggregate_css_fixes(issues, study_id)
+        if css_content:
+            files["mirror-fixes.css"] = css_content
+
+        js_content = self.aggregate_js_fixes(issues, study_id)
+        if js_content:
+            files["mirror-patches.js"] = js_content
+
+        md_content = self.generate_mirror_fixes_md(
+            issues, study_id, study_url, score
+        )
+        files["MIRROR-FIXES.md"] = md_content
+
+        # 5. Commit files
+        fix_count = len(issues)
+        commit_msg = (
+            f"fix: apply {fix_count} UX fix{'es' if fix_count != 1 else ''} "
+            f"from Mirror AI testing\n\n"
+            f"Tested URL: {study_url}\n"
+            f"Study ID: {study_id}"
+        )
+        await self.create_files_commit(
+            repo, token, branch_name, files, commit_msg
+        )
+
+        # 6. Build PR body and open PR
+        pr_body = self.build_pr_body(
+            issues, study_id, study_url, score, list(files.keys())
+        )
+        pr_title = (
+            f"fix: Mirror UX fixes — {fix_count} issue{'s' if fix_count != 1 else ''} "
+            f"from AI testing"
+        )
+        pr_url, pr_number = await self.create_pull_request(
+            repo, token, pr_title, pr_body, branch_name, default_branch
+        )
+
+        return {
+            "pr_url": pr_url,
+            "pr_number": pr_number,
+            "branch_name": branch_name,
+            "files_created": list(files.keys()),
+            "fixes_included": fix_count,
+        }
