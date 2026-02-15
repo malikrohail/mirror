@@ -104,7 +104,8 @@ class StudyOrchestrator:
         if self._pool is None:
             max_ctx = int(os.getenv("MAX_CONCURRENT_SESSIONS", "5"))
             force_local = self._browser_mode == "local"
-            self._pool = BrowserPool(max_contexts=max_ctx, force_local=force_local)
+            self._pool = BrowserPool(max_contexts=max_ctx, force_local=force_local, redis=self.redis)
+            logger.info("Initializing browser pool (mode=%s)...", self._browser_mode or "auto")
             await self._pool.initialize()
 
             # Log browser pool mode for observability
@@ -146,19 +147,42 @@ class StudyOrchestrator:
             await LiveSessionStateStore(self.redis).clear_study(str(study_id))
             await self._publish_progress(study_id, 5, "starting")
 
-            pool = await self._ensure_browser_pool()
             study_url = study.url
             starting_path = study.starting_path or ""
 
-            # --- Phase 2: Generate persona profiles ---
-            persona_profiles = await self._generate_persona_profiles(study)
-            await self._publish_progress(study_id, 10, "personas_ready")
+            # --- Phase 1b: Parallel setup (browser + personas + sitemap) ---
+            # Run browser init, persona generation, and Firecrawl concurrently
+            # to eliminate sequential delays (saves 10-25 seconds)
+            await self._publish_progress(study_id, 6, "provisioning_browser")
 
-            # --- Phase 2.5: Pre-crawl site with Firecrawl ---
-            sitemap = await self._precrawl_site(study_url)
-            await self._publish_progress(study_id, 15, "sitemap_ready")
+            pool_task = asyncio.create_task(self._ensure_browser_pool())
+            persona_task = asyncio.create_task(
+                self._generate_persona_profiles(study)
+            )
+            sitemap_task = asyncio.create_task(
+                self._precrawl_site_cached(study_url)
+            )
+
+            # Wait for browser + personas (required for navigation)
+            pool, persona_profiles = await asyncio.gather(
+                pool_task, persona_task
+            )
+            await self._publish_progress(study_id, 12, "personas_ready")
+
+            # Sitemap is optional — don't block navigation on it.
+            # If it's already done, great; otherwise navigation starts without it
+            # and we inject the sitemap context later.
+            sitemap: SiteMap | None = None
+            if sitemap_task.done():
+                sitemap = sitemap_task.result()
+                await self._publish_progress(study_id, 15, "sitemap_ready")
+            else:
+                logger.info(
+                    "Firecrawl still running — starting navigation without sitemap"
+                )
 
             # --- Phase 3: Parallel navigation ---
+            await self._publish_progress(study_id, 15, "navigating")
             nav_results = await self._run_navigation_sessions(
                 study_id=study_id,
                 study=study,
@@ -167,6 +191,11 @@ class StudyOrchestrator:
                 persona_profiles=persona_profiles,
                 pool=pool,
             )
+
+            # Cancel sitemap task if still running (navigation is done)
+            if not sitemap_task.done():
+                sitemap_task.cancel()
+                logger.info("Cancelled pending Firecrawl task (navigation complete)")
             if not nav_results:
                 raise RuntimeError(
                     "No navigation sessions completed. Browserbase may be rate-limited."
@@ -487,6 +516,42 @@ class StudyOrchestrator:
         except Exception as e:
             logger.warning("Pre-crawl failed (non-fatal): %s", e)
             return SiteMap(base_url=url, total_pages=0)
+
+    async def _precrawl_site_cached(self, url: str) -> SiteMap:
+        """Pre-crawl with Redis cache (24h TTL per domain).
+
+        Avoids re-crawling the same domain on repeat tests, saving 5-15s.
+        """
+        from urllib.parse import urlparse
+
+        domain = urlparse(url).netloc
+        cache_key = f"firecrawl:sitemap:{domain}"
+
+        # Check cache first
+        try:
+            cached = await self.redis.get(cache_key)
+            if cached:
+                logger.info("Firecrawl cache hit for %s", domain)
+                return SiteMap.model_validate_json(cached)
+        except Exception as e:
+            logger.debug("Cache read failed (non-fatal): %s", e)
+
+        # Cache miss — crawl
+        sitemap = await self._precrawl_site(url)
+
+        # Store in cache with 24h TTL
+        if sitemap.total_pages > 0:
+            try:
+                await self.redis.setex(
+                    cache_key,
+                    86400,  # 24 hours
+                    sitemap.model_dump_json(),
+                )
+                logger.info("Cached Firecrawl sitemap for %s (%d pages)", domain, sitemap.total_pages)
+            except Exception as e:
+                logger.debug("Cache write failed (non-fatal): %s", e)
+
+        return sitemap
 
     # ------------------------------------------------------------------
     # AI Engine: Navigation

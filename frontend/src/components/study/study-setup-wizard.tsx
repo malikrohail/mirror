@@ -49,6 +49,12 @@ export function StudySetupWizard() {
     }
   }, []);
 
+  // Pre-warm Browserbase session in the background while user configures study.
+  // This saves 7-15 seconds when they click "Run Test".
+  useEffect(() => {
+    fetch('/api/v1/studies/browser/warm', { method: 'POST' }).catch(() => {});
+  }, []);
+
   const toggleBrowserMode = (m: BrowserMode) => {
     setBrowserMode(m);
     localStorage.setItem('mirror-browser-mode', m);

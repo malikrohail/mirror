@@ -123,3 +123,54 @@ async def estimate_study_cost(
     from app.services.cost_estimator import CostEstimator
     estimator = CostEstimator(db)
     return await estimator.estimate(study_id)
+
+
+@router.post("/browser/warm")
+async def warm_browser(
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """Pre-warm a Browserbase session while the user configures their study.
+
+    Call this from the frontend when the user lands on the study setup page.
+    The session ID is stored in Redis and reused when the study starts,
+    saving 7-15 seconds of cold-start latency.
+    """
+    import os
+    import httpx
+
+    bb_api_key = os.getenv("BROWSERBASE_API_KEY", "")
+    bb_project_id = os.getenv("BROWSERBASE_PROJECT_ID", "")
+
+    if not bb_api_key or not bb_project_id:
+        return {"status": "skipped", "reason": "Browserbase not configured"}
+
+    # Check if we already have a warm session
+    existing = await redis.get("browserbase:warm_session")
+    if existing:
+        return {"status": "ready", "session_id": existing}
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                "https://api.browserbase.com/v1/sessions",
+                headers={
+                    "x-bb-api-key": bb_api_key,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "projectId": bb_project_id,
+                    "browserSettings": {
+                        "viewport": {"width": 1920, "height": 1080},
+                    },
+                },
+            )
+            resp.raise_for_status()
+            session_data = resp.json()
+            session_id = session_data.get("id", "")
+
+            # Cache for 5 minutes (session expires after inactivity)
+            await redis.setex("browserbase:warm_session", 300, session_id)
+
+            return {"status": "warming", "session_id": session_id}
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}

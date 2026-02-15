@@ -144,6 +144,7 @@ class BrowserPool:
 
     max_contexts: int = 5
     force_local: bool = False
+    redis: Any | None = None  # aioredis.Redis for pre-warm session lookup
     _playwright: Playwright | None = field(default=None, init=False, repr=False)
     _local_browsers: list[Browser] = field(
         default_factory=list, init=False, repr=False
@@ -458,10 +459,26 @@ class BrowserPool:
     async def _acquire_browserbase(
         self, preset: ViewportPreset, context_args: dict[str, Any]
     ) -> BrowserSession:
-        """Create a new Browserbase session and connect Playwright to it."""
+        """Create a new Browserbase session and connect Playwright to it.
+
+        Checks Redis for a pre-warmed session first (saves 7-15s cold start).
+        Falls back to creating a new session if none cached.
+        """
         assert self._playwright is not None
 
-        # 1. Create session via REST API. Browserbase returns 201 Created on success.
+        # 0. Check for pre-warmed session in Redis
+        warm_session_id: str | None = None
+        if self.redis is not None:
+            try:
+                warm_session_id = await self.redis.getdel("browserbase:warm_session")
+                if warm_session_id:
+                    logger.info(
+                        "Reusing pre-warmed Browserbase session: %s", warm_session_id
+                    )
+            except Exception as e:
+                logger.debug("Pre-warm cache check failed: %s", e)
+
+        # 1. Create session via REST API (or reuse warm one)
         max_attempts = 3
         session_data: dict[str, Any] | None = None
 
@@ -475,57 +492,77 @@ class BrowserPool:
             # 5s, 10s, 20s across attempts 1..3.
             return (2 ** (attempt - 1)) * 5
 
-        async with httpx.AsyncClient() as client:
-            for attempt in range(1, max_attempts + 1):
-                resp = await client.post(
-                    f"{BB_API_URL}/sessions",
-                    headers={
-                        "X-BB-API-Key": self._bb_api_key,
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "projectId": self._bb_project_id,
-                        "browserSettings": {
-                            "viewport": {
-                                "width": preset.width,
-                                "height": preset.height,
-                            },
-                            "solveCaptchas": True,
-                            "recordSession": True,
-                        },
-                    },
-                    timeout=30.0,
-                )
-
-                if resp.status_code == 429:
-                    wait_seconds = _retry_wait_seconds(resp, attempt)
-                    if attempt < max_attempts:
-                        logger.warning(
-                            (
-                                "Browserbase session create rate-limited "
-                                "(attempt %d/%d); retrying in %ds"
-                            ),
-                            attempt,
-                            max_attempts,
-                            wait_seconds,
-                        )
-                        await asyncio.sleep(wait_seconds)
-                        continue
-                    logger.error(
-                        "Browserbase session create still rate-limited after %d attempts",
-                        max_attempts,
+        if warm_session_id:
+            # Fetch connect URL for the pre-warmed session
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(
+                        f"{BB_API_URL}/sessions/{warm_session_id}",
+                        headers={"X-BB-API-Key": self._bb_api_key},
+                        timeout=10.0,
                     )
-                    break
+                    resp.raise_for_status()
+                    session_data = resp.json()
+                    session_data["id"] = warm_session_id
+            except Exception as e:
+                logger.warning(
+                    "Pre-warmed session %s unusable, creating new: %s",
+                    warm_session_id, e,
+                )
+                warm_session_id = None
 
-                resp.raise_for_status()
-                session_data = resp.json()
-                break
+        if session_data is None:
+            async with httpx.AsyncClient() as client:
+                for attempt in range(1, max_attempts + 1):
+                    resp = await client.post(
+                        f"{BB_API_URL}/sessions",
+                        headers={
+                            "X-BB-API-Key": self._bb_api_key,
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "projectId": self._bb_project_id,
+                            "browserSettings": {
+                                "viewport": {
+                                    "width": preset.width,
+                                    "height": preset.height,
+                                },
+                                "solveCaptchas": True,
+                                "recordSession": True,
+                            },
+                        },
+                        timeout=30.0,
+                    )
+
+                    if resp.status_code == 429:
+                        wait_seconds = _retry_wait_seconds(resp, attempt)
+                        if attempt < max_attempts:
+                            logger.warning(
+                                (
+                                    "Browserbase session create rate-limited "
+                                    "(attempt %d/%d); retrying in %ds"
+                                ),
+                                attempt,
+                                max_attempts,
+                                wait_seconds,
+                            )
+                            await asyncio.sleep(wait_seconds)
+                            continue
+                        logger.error(
+                            "Browserbase session create still rate-limited after %d attempts",
+                            max_attempts,
+                        )
+                        break
+
+                    resp.raise_for_status()
+                    session_data = resp.json()
+                    break
 
         if session_data is None:
             raise RuntimeError("Browserbase rate limit exceeded after retries")
 
         bb_session_id = session_data["id"]
-        connect_url = session_data["connectUrl"]
+        connect_url = session_data.get("connectUrl", "")
 
         # 2. Connect Playwright via CDP
         browser = await self._playwright.chromium.connect_over_cdp(connect_url)

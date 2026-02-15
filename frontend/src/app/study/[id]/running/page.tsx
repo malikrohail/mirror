@@ -303,7 +303,15 @@ export default function StudyRunningPage({
           <span className="inline-flex h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />
         )}
         <span className="font-normal text-foreground capitalize">
-          {isRunning ? 'Running' : isAnalyzing ? 'Analyzing' : isComplete ? 'Done' : isFailed ? 'Failed' : 'Starting'}
+          {isComplete ? 'Done' : isFailed ? 'Failed' : isAnalyzing ? 'Analyzing' : isRunning ? 'Running' : (() => {
+            // Show granular phase during startup
+            const phase = activeStudy?.phase;
+            if (phase === 'provisioning_browser') return 'Launching browser...';
+            if (phase === 'personas_ready') return 'Personas ready';
+            if (phase === 'sitemap_ready') return 'Site mapped';
+            if (phase === 'starting') return 'Starting...';
+            return 'Starting...';
+          })()}
         </span>
       </span>
     ),
