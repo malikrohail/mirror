@@ -37,14 +37,22 @@ class PersonaService:
             raise HTTPException(status_code=404, detail="Persona not found")
         return persona
 
-    async def create_custom_template(self, profile: "PersonaProfile"):
+    async def create_custom_template(
+        self,
+        profile: "PersonaProfile",
+        avatar_url: str | None = None,
+    ):
         """Save an LLM-generated persona profile as a custom template."""
+        default_profile = profile.model_dump()
+        if avatar_url:
+            default_profile["avatar_url"] = avatar_url
+
         return await self.repo.create_template(
             name=profile.name,
             emoji=profile.emoji,
             category="Custom",
             short_description=profile.short_description,
-            default_profile=profile.model_dump(),
+            default_profile=default_profile,
         )
 
     async def seed_templates(self) -> int:

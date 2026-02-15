@@ -13,6 +13,8 @@ import type {
   HeatmapResponse,
   ReportMetadata,
   PersonaTemplateOut,
+  PersonaGenerateDraftResponse,
+  PersonaGenerateRequest,
   PersonaOut,
   HealthResponse,
   ComparisonResult,
@@ -200,10 +202,29 @@ export function getPersonaTemplate(id: string): Promise<PersonaTemplateOut> {
   return request(`/personas/templates/${id}`);
 }
 
-export function generatePersona(description: string): Promise<PersonaTemplateOut> {
+export function generatePersona(
+  data: string | PersonaGenerateRequest,
+): Promise<PersonaTemplateOut> {
+  const payload: PersonaGenerateRequest = typeof data === 'string'
+    ? { description: data }
+    : data;
+
   return request('/personas/generate', {
     method: 'POST',
-    body: JSON.stringify({ description }),
+    body: JSON.stringify(payload),
+  });
+}
+
+export function generatePersonaDraft(
+  data: string | PersonaGenerateRequest,
+): Promise<PersonaGenerateDraftResponse> {
+  const payload: PersonaGenerateRequest = typeof data === 'string'
+    ? { description: data }
+    : data;
+
+  return request('/personas/generate/draft', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
 

@@ -7,6 +7,7 @@ study-specific context at call time without f-string globals.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 
@@ -26,7 +27,7 @@ the web.
 
 OUTPUT FORMAT: Return a JSON object matching this exact schema:
 {
-  "name": "string — full realistic name",
+  "name": "string — short descriptive archetype label, NOT a human name (e.g. 'Visually Impaired Professor', 'Anxious First-Time Buyer', 'Mobile-Only Teen')",
   "age": int (13-95),
   "occupation": "string",
   "emoji": "single emoji that represents the persona",
@@ -77,7 +78,23 @@ identity but add realistic details, backstory, and behavioral notes.
 {persona_generation_system_prompt().split('OUTPUT FORMAT:')[1]}"""
 
 
-def persona_from_description_prompt(description: str) -> str:
+def persona_from_description_prompt(
+    description: str,
+    config: dict[str, Any] | None = None,
+) -> str:
+    config_block = ""
+    if config:
+        config_block = f"""
+GENERATION CONFIGURATION (strong preferences):
+{json.dumps(config, indent=2)}
+
+Apply this configuration as constraints:
+- Use provided numeric trait values exactly (1-10 scale)
+- Use device_preference exactly when provided
+- Respect each provided accessibility_needs boolean value
+- If the description conflicts with explicit configuration, prioritize configuration
+"""
+
     return f"""\
 You are a UX research expert. A user has described a persona in natural language. \
 Generate a complete persona profile from this description.
@@ -88,6 +105,7 @@ USER DESCRIPTION:
 Interpret the description and create a fully detailed persona that matches the \
 intent. Fill in any attributes not explicitly mentioned with realistic, \
 consistent values.
+{config_block}
 
 {persona_generation_system_prompt().split('OUTPUT FORMAT:')[1]}"""
 

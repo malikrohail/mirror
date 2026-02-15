@@ -192,8 +192,35 @@ export interface PersonaTemplateOut {
   created_at: string;
 }
 
+export interface PersonaAccessibilityConfig {
+  screen_reader?: boolean;
+  low_vision?: boolean;
+  color_blind?: boolean;
+  motor_impairment?: boolean;
+  cognitive?: boolean;
+  description?: string | null;
+}
+
+export interface PersonaGenerationOptions {
+  tech_literacy?: number;
+  patience_level?: number;
+  reading_speed?: number;
+  trust_level?: number;
+  exploration_tendency?: number;
+  device_preference?: 'desktop' | 'mobile' | 'tablet';
+  accessibility_needs?: PersonaAccessibilityConfig;
+}
+
 export interface PersonaGenerateRequest {
   description: string;
+  options?: PersonaGenerationOptions;
+  avatar_url?: string;
+}
+
+export interface PersonaGenerateDraftResponse extends PersonaGenerationOptions {
+  name: string;
+  short_description?: string | null;
+  emoji?: string | null;
 }
 
 // ── Heatmap ───────────────────────────────────────────
