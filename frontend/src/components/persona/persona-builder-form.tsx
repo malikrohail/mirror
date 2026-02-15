@@ -1,25 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import NextImage from 'next/image';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Slider } from '@/components/ui/slider';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
-import { useGeneratePersona } from '@/hooks/use-personas';
-import { Sparkles, Loader2, User, Monitor, Smartphone, Tablet, Check, RotateCcw } from 'lucide-react';
-import type { PersonaTemplateOut } from '@/types';
-
-const EXAMPLE_PROMPTS = [
-  'A 65-year-old retiree who has difficulty reading small text and prefers simple navigation',
-  'A blind user who relies entirely on a screen reader to browse the web',
-  'A busy parent who only browses on their phone during their commute',
-  'A non-native English speaker who struggles with technical jargon and complex forms',
-];
+import { useGeneratePersona, useGeneratePersonaDraft } from '@/hooks/use-personas';
+import { TypewriterStatus } from '@/components/common/typewriter-status';
+import { cn } from '@/lib/utils';
+import { Sparkles, Loader2, Monitor, Smartphone, Tablet, Check, RotateCcw, CornerDownLeft } from 'lucide-react';
+import type { PersonaGenerateDraftResponse, PersonaGenerateRequest, PersonaTemplateOut } from '@/types';
 
 const DEVICE_ICONS: Record<string, React.ReactNode> = {
   desktop: <Monitor className="h-3 w-3" />,
@@ -34,6 +32,190 @@ const BEHAVIORAL_LABELS: Record<string, { label: string; low: string; high: stri
   trust_level: { label: 'Trust Level', low: 'Skeptical', high: 'Trusting' },
   exploration_tendency: { label: 'Exploration', low: 'Task-Focused', high: 'Explorer' },
 };
+
+type DevicePreference = 'desktop' | 'mobile' | 'tablet';
+type AccessibilityConfigKey =
+  | 'screen_reader'
+  | 'low_vision'
+  | 'color_blind'
+  | 'motor_impairment'
+  | 'cognitive';
+
+const ACCESSIBILITY_OPTIONS: { key: AccessibilityConfigKey; label: string }[] = [
+  { key: 'screen_reader', label: 'Screen reader' },
+  { key: 'low_vision', label: 'Low vision' },
+  { key: 'color_blind', label: 'Color blind' },
+  { key: 'motor_impairment', label: 'Motor impairment' },
+  { key: 'cognitive', label: 'Cognitive support' },
+];
+
+const DEFAULT_LEVEL = 5;
+const DRAFT_LOADING_MESSAGES = [
+  'Parsing tester description',
+  'Generating behavioral baseline',
+  'Calibrating tech and patience levels',
+  'Inferring accessibility needs',
+  'Preparing editable tester configuration',
+];
+const TESTER_DESCRIPTION_PLACEHOLDER = 'e.g., A visually impaired university professor who uses assistive technology and expects excellent keyboard navigation';
+const FORM_LABEL_CLASS = 'text-[14px] font-normal text-foreground/70';
+
+function hashSeed(input: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function createPixelAvatarDataUrl(seedText: string): string {
+  if (typeof document === 'undefined') {
+    return '';
+  }
+
+  let seed = hashSeed(seedText || 'mirror-avatar') || 1;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+
+  const palettes = [
+    ['#101820', '#f2aa4c', '#f8f4e3'],
+    ['#151515', '#4fc3f7', '#d8f3ff'],
+    ['#1a1423', '#ff7f50', '#ffe8d6'],
+    ['#0f172a', '#60a5fa', '#dbeafe'],
+    ['#1f2937', '#34d399', '#ecfeff'],
+    ['#3b0d11', '#ff6b6b', '#ffe5e5'],
+  ];
+  const palette = palettes[Math.floor(rand() * palettes.length)] ?? palettes[0];
+  const [bg, colorA, colorB] = palette;
+
+  const grid = 12;
+  const cell = 8;
+  const smallCanvas = document.createElement('canvas');
+  smallCanvas.width = grid * cell;
+  smallCanvas.height = grid * cell;
+  const smallCtx = smallCanvas.getContext('2d');
+  if (!smallCtx) {
+    return '';
+  }
+
+  smallCtx.fillStyle = bg;
+  smallCtx.fillRect(0, 0, smallCanvas.width, smallCanvas.height);
+
+  for (let y = 0; y < grid; y += 1) {
+    for (let x = 0; x < Math.ceil(grid / 2); x += 1) {
+      const draw = rand() > 0.34;
+      if (!draw) continue;
+      smallCtx.fillStyle = rand() > 0.5 ? colorA : colorB;
+      smallCtx.fillRect(x * cell, y * cell, cell, cell);
+      const mirrorX = grid - 1 - x;
+      smallCtx.fillRect(mirrorX * cell, y * cell, cell, cell);
+    }
+  }
+
+  smallCtx.strokeStyle = colorA;
+  smallCtx.lineWidth = 2;
+  smallCtx.strokeRect(1, 1, smallCanvas.width - 2, smallCanvas.height - 2);
+
+  const outputCanvas = document.createElement('canvas');
+  outputCanvas.width = smallCanvas.width * 2;
+  outputCanvas.height = smallCanvas.height * 2;
+  const outputCtx = outputCanvas.getContext('2d');
+  if (!outputCtx) {
+    return '';
+  }
+  outputCtx.imageSmoothingEnabled = false;
+  outputCtx.drawImage(smallCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
+  return outputCanvas.toDataURL('image/png');
+}
+
+async function fileToSquareDataUrl(file: File): Promise<string> {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Please choose an image file.');
+  }
+
+  const src = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Unable to read image.'));
+      img.src = src;
+    });
+
+    const cropSize = Math.min(image.naturalWidth, image.naturalHeight);
+    const sx = Math.floor((image.naturalWidth - cropSize) / 2);
+    const sy = Math.floor((image.naturalHeight - cropSize) / 2);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Unable to process image.');
+    }
+
+    ctx.drawImage(image, sx, sy, cropSize, cropSize, 0, 0, 128, 128);
+    return canvas.toDataURL('image/png');
+  } finally {
+    URL.revokeObjectURL(src);
+  }
+}
+
+function ConfigSlider({
+  id,
+  label,
+  value,
+  displayValue,
+  min = 1,
+  max = 10,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  displayValue?: string;
+  min?: number;
+  max?: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <Label htmlFor={id} className={FORM_LABEL_CLASS}>
+          {label}
+        </Label>
+        <span className="text-[14px] text-foreground/30">{displayValue ?? `${value}/${max}`}</span>
+      </div>
+      <Slider
+        id={id}
+        min={min}
+        max={max}
+        step={1}
+        value={[value]}
+        onValueChange={(vals) => onChange(vals[0] ?? value)}
+      />
+    </div>
+  );
+}
+
+const DEVICE_LABELS: Record<number, string> = { 1: 'Mobile', 2: 'Tablet', 3: 'Desktop' };
+
+function deviceLevelToPreference(level: number): DevicePreference {
+  if (level <= 1) return 'mobile';
+  if (level <= 2) return 'tablet';
+  return 'desktop';
+}
+
+function devicePreferenceToLevel(pref: string): number {
+  switch (pref) {
+    case 'mobile': return 1;
+    case 'tablet': return 2;
+    default: return 3;
+  }
+}
 
 function levelToNumber(value: unknown): number | null {
   if (typeof value === 'number') return value;
@@ -150,23 +332,165 @@ function PersonaPreview({ persona }: { persona: PersonaTemplateOut }) {
   );
 }
 
-export function PersonaBuilderForm() {
+type PersonaBuilderFormProps = {
+  embedded?: boolean;
+  onSuccess?: (personaId: string) => void;
+};
+
+type BuilderStep = 'describe' | 'configure';
+
+function toLevelValue(value: number | null | undefined): number {
+  if (typeof value !== 'number') return DEFAULT_LEVEL;
+  if (value < 1) return 1;
+  if (value > 10) return 10;
+  return Math.round(value);
+}
+
+export function PersonaBuilderForm({ embedded = false, onSuccess }: PersonaBuilderFormProps) {
+  const [step, setStep] = useState<BuilderStep>('describe');
   const [description, setDescription] = useState('');
+  const [generatedName, setGeneratedName] = useState('');
+  const [draftSourceDescription, setDraftSourceDescription] = useState<string | null>(null);
   const [generatedPersona, setGeneratedPersona] = useState<PersonaTemplateOut | null>(null);
+  const [placeholderAvatarUrl, setPlaceholderAvatarUrl] = useState('');
+  const [uploadedAvatarUrl, setUploadedAvatarUrl] = useState('');
+  const [deviceLevel, setDeviceLevel] = useState(3);
+  const [techLiteracy, setTechLiteracy] = useState(DEFAULT_LEVEL);
+  const [patienceLevel, setPatienceLevel] = useState(DEFAULT_LEVEL);
+  const [readingSpeed, setReadingSpeed] = useState(DEFAULT_LEVEL);
+  const [trustLevel, setTrustLevel] = useState(DEFAULT_LEVEL);
+  const [explorationTendency, setExplorationTendency] = useState(DEFAULT_LEVEL);
+  const [accessibilityNeeds, setAccessibilityNeeds] = useState<Record<AccessibilityConfigKey, boolean>>({
+    screen_reader: false,
+    low_vision: false,
+    color_blind: false,
+    motor_impairment: false,
+    cognitive: false,
+  });
+  const [accessibilityDescription, setAccessibilityDescription] = useState('');
+  const generatePersonaDraft = useGeneratePersonaDraft();
   const generatePersona = useGeneratePersona();
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    const seed = `${Date.now()}-${Math.random()}`;
+    setPlaceholderAvatarUrl(createPixelAvatarDataUrl(seed));
+  }, []);
+
+  const selectedAvatarUrl = uploadedAvatarUrl || placeholderAvatarUrl;
+
+  const applyDraftOptions = (draft: PersonaGenerateDraftResponse) => {
+    setGeneratedName(draft.name.trim());
+    setTechLiteracy(toLevelValue(draft.tech_literacy));
+    setPatienceLevel(toLevelValue(draft.patience_level));
+    setReadingSpeed(toLevelValue(draft.reading_speed));
+    setTrustLevel(toLevelValue(draft.trust_level));
+    setExplorationTendency(toLevelValue(draft.exploration_tendency));
+    setDeviceLevel(devicePreferenceToLevel(draft.device_preference ?? 'desktop'));
+
+    const a11y = draft.accessibility_needs;
+    setAccessibilityNeeds({
+      screen_reader: a11y?.screen_reader === true,
+      low_vision: a11y?.low_vision === true,
+      color_blind: a11y?.color_blind === true,
+      motor_impairment: a11y?.motor_impairment === true,
+      cognitive: a11y?.cognitive === true,
+    });
+    setAccessibilityDescription(a11y?.description ?? '');
+  };
+
+  const handleContinueToConfigure = async () => {
+    if (generatePersonaDraft.isPending) return;
+    const normalizedDescription = description.trim();
+    if (normalizedDescription.length < 10) {
+      toast.error('Description must be at least 10 characters');
+      return;
+    }
+    if (draftSourceDescription === normalizedDescription) {
+      setStep('configure');
+      return;
+    }
+
+    try {
+      const draft = await generatePersonaDraft.mutateAsync({ description: normalizedDescription });
+      applyDraftOptions(draft);
+      setDraftSourceDescription(normalizedDescription);
+      setStep('configure');
+    } catch (err) {
+      toast.error('Failed to generate tester configuration', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+    }
+  };
+
+  const handleDescribeKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      e.key === 'ArrowRight'
+      && !e.shiftKey
+      && !e.metaKey
+      && !e.ctrlKey
+      && !e.altKey
+      && description.trim().length === 0
+    ) {
+      e.preventDefault();
+      setDescription(TESTER_DESCRIPTION_PLACEHOLDER.replace(/^e\.g\.,?\s*/i, ''));
+      return;
+    }
+
+    if (e.key === 'Enter' && !e.shiftKey && !generatePersonaDraft.isPending) {
+      e.preventDefault();
+      void handleContinueToConfigure();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (generatePersona.isPending) {
+      return;
+    }
+    if (!selectedAvatarUrl) {
+      toast.error('Add a tester picture or select the generated placeholder.');
+      return;
+    }
     if (description.trim().length < 10) {
       toast.error('Description must be at least 10 characters');
       return;
     }
     try {
-      const result = await generatePersona.mutateAsync(description.trim());
+      const hasAccessibilityConfig = Object.values(accessibilityNeeds).some(Boolean)
+        || accessibilityDescription.trim().length > 0;
+
+      const payload: PersonaGenerateRequest = {
+        description: description.trim(),
+        avatar_url: selectedAvatarUrl,
+        options: {
+          tech_literacy: techLiteracy,
+          patience_level: patienceLevel,
+          reading_speed: readingSpeed,
+          trust_level: trustLevel,
+          exploration_tendency: explorationTendency,
+          device_preference: deviceLevelToPreference(deviceLevel),
+          ...(hasAccessibilityConfig ? {
+            accessibility_needs: {
+              ...accessibilityNeeds,
+              ...(accessibilityDescription.trim().length > 0
+                ? { description: accessibilityDescription.trim() }
+                : {}),
+            },
+          } : {}),
+        },
+      };
+
+      const result = await generatePersona.mutateAsync(payload);
       setGeneratedPersona(result);
       setDescription('');
+      const existing: string[] = JSON.parse(localStorage.getItem('miror-my-team') ?? '[]');
+      if (!existing.includes(result.id)) {
+        localStorage.setItem('miror-my-team', JSON.stringify([...existing, result.id]));
+      }
       queryClient.invalidateQueries({ queryKey: ['persona-templates'] });
+      toast.success(`${result.name} added to your team`);
+      onSuccess?.(result.id);
     } catch (err) {
       toast.error('Failed to generate persona', {
         description: err instanceof Error ? err.message : 'Unknown error',
@@ -175,92 +499,273 @@ export function PersonaBuilderForm() {
   };
 
   const handleReset = () => {
+    setStep('describe');
+    setDraftSourceDescription(null);
+    setGeneratedName('');
     setGeneratedPersona(null);
     setDescription('');
+    setUploadedAvatarUrl('');
   };
 
-  return (
-    <div className="mx-auto max-w-xl space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
-            Build a Custom Persona
-          </CardTitle>
-          <CardDescription>
-            Describe the type of user you want to simulate. Our AI will generate a
-            detailed persona with behavioral attributes, frustration triggers, and
-            accessibility needs.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="persona-description">Describe your persona</Label>
-              <Textarea
-                id="persona-description"
-                placeholder="e.g., A visually impaired university professor who uses assistive technology and expects excellent keyboard navigation..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="min-h-[120px] resize-none text-base"
-              />
-              <p className="text-xs text-muted-foreground">
-                Minimum 10 characters. Include demographics, abilities, device preferences, and motivations.
-              </p>
-            </div>
-            <Button
-              type="submit"
-              disabled={generatePersona.isPending || description.trim().length < 10}
-              className="w-full"
-            >
-              {generatePersona.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating persona...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Generate Persona
-                </>
-              )}
-            </Button>
-          </form>
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-          {!description && !generatedPersona && (
-            <>
-              <Separator />
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Try an example
+    try {
+      const dataUrl = await fileToSquareDataUrl(file);
+      setUploadedAvatarUrl(dataUrl);
+    } catch (err) {
+      toast.error('Failed to process image', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const setAccessibilityNeed = (key: AccessibilityConfigKey, checked: boolean) => {
+    setAccessibilityNeeds((prev) => ({ ...prev, [key]: checked }));
+  };
+
+  const isAddTesterDisabled = description.trim().length === 0 || selectedAvatarUrl.length === 0;
+  const addTesterDisabledReason = description.trim().length === 0
+    ? 'Add a persona description to continue'
+    : 'Preparing placeholder image';
+
+  const formContent = (
+    <div
+      className={cn(
+        'bg-card',
+        embedded ? 'rounded-none border-0' : 'overflow-hidden rounded-xl border border-border',
+      )}
+    >
+      <div className={cn("border-b border-border", embedded && "-mx-6 px-6")}>
+        <div className="flex">
+          {(['Describe tester', 'Configure tester'] as const).map((label, i) => {
+            const isCurrent = (i === 0 && step === 'describe') || (i === 1 && step === 'configure');
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  if (i === 0) {
+                    setStep('describe');
+                  } else if (step === 'configure') {
+                    setStep('configure');
+                  } else {
+                    void handleContinueToConfigure();
+                  }
+                }}
+                className={cn(
+                  'relative flex-1 py-2.5 text-[14px] text-center transition-colors',
+                  isCurrent ? 'text-foreground/70' : 'text-foreground/30',
+                )}
+              >
+                {label}
+                {isCurrent && <div className="absolute bottom-0 left-3 right-3 h-[2px] rounded-t-full bg-foreground" />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="p-4">
+        {step === 'describe' ? (
+          generatePersonaDraft.isPending ? (
+            <div className="flex flex-col items-center gap-4 py-10">
+              <Loader2 className="h-10 w-10 animate-spin text-foreground/60 [animation-duration:1.6s]" />
+              <div className="text-center">
+                <p className="text-sm font-medium">Generating tester configuration</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Claude is preparing editable metrics from your description.
                 </p>
-                <div className="grid gap-2">
-                  {EXAMPLE_PROMPTS.map((prompt) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      onClick={() => setDescription(prompt)}
-                      className="rounded-md border px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent hover:text-accent-foreground"
+              </div>
+              <TypewriterStatus messages={DRAFT_LOADING_MESSAGES} />
+            </div>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleContinueToConfigure();
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Textarea
+                  id="persona-description"
+                  placeholder={TESTER_DESCRIPTION_PLACEHOLDER}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  onKeyDown={handleDescribeKeyDown}
+                  className="min-h-[120px] resize-none border-border/60 text-base shadow-none placeholder:text-[14px] placeholder:font-normal placeholder:text-foreground/30 focus-visible:border-border/70 focus-visible:ring-0 focus-visible:shadow-none"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={description.trim().length < 10}
+                className="h-12 w-full disabled:opacity-100"
+              >
+                Continue to Configure
+                <CornerDownLeft className="ml-2 h-4 w-4 opacity-40" />
+              </Button>
+            </form>
+          )
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-20 shrink-0">
+                <label htmlFor="tester-avatar-upload" className="block cursor-pointer">
+                  {selectedAvatarUrl ? (
+                    <NextImage
+                      src={selectedAvatarUrl}
+                      alt="Tester picture"
+                      width={80}
+                      height={80}
+                      className="h-20 w-20 rounded-md border bg-muted object-cover transition-opacity hover:opacity-90"
+                      style={uploadedAvatarUrl ? undefined : { imageRendering: 'pixelated' }}
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="h-20 w-20 rounded-md border bg-muted/40" />
+                  )}
+                </label>
+                <input
+                  id="tester-avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
+              </div>
+
+              <div className="min-w-0 flex-1 space-y-1">
+                {generatedName !== '' && (
+                  <p className="text-sm font-medium text-foreground/70">{generatedName}</p>
+                )}
+                <p className="text-sm text-foreground/40">{description}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-foreground/30">
+                Preferences
+              </p>
+
+              <div className="rounded-lg border border-border p-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ConfigSlider
+                    id="preferred-device"
+                    label="Preferred device"
+                    value={deviceLevel}
+                    min={1}
+                    max={3}
+                    displayValue={DEVICE_LABELS[deviceLevel] ?? 'Desktop'}
+                    onChange={setDeviceLevel}
+                  />
+                  <ConfigSlider
+                    id="tech-literacy"
+                    label="Tech literacy"
+                    value={techLiteracy}
+                    onChange={setTechLiteracy}
+                  />
+                  <ConfigSlider
+                    id="patience-level"
+                    label="Patience"
+                    value={patienceLevel}
+                    onChange={setPatienceLevel}
+                  />
+                  <ConfigSlider
+                    id="reading-speed"
+                    label="Reading speed"
+                    value={readingSpeed}
+                    onChange={setReadingSpeed}
+                  />
+                  <ConfigSlider
+                    id="trust-level"
+                    label="Trust level"
+                    value={trustLevel}
+                    onChange={setTrustLevel}
+                  />
+                  <ConfigSlider
+                    id="exploration-tendency"
+                    label="Exploration tendency"
+                    value={explorationTendency}
+                    onChange={setExplorationTendency}
+                  />
+                </div>
+              </div>
+
+              <p className="mt-6 text-xs font-medium uppercase tracking-wide text-foreground/30">
+                Accessibility
+              </p>
+
+              <div className="rounded-lg border border-border p-3">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {ACCESSIBILITY_OPTIONS.map((option) => (
+                    <label
+                      key={option.key}
+                      className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
                     >
-                      {prompt}
-                    </button>
+                      <Checkbox
+                        checked={accessibilityNeeds[option.key]}
+                        onCheckedChange={(checked) => setAccessibilityNeed(option.key, checked === true)}
+                      />
+                      {option.label}
+                    </label>
                   ))}
                 </div>
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </div>
 
-      {generatedPersona && (
-        <div className="space-y-3">
-          <PersonaPreview persona={generatedPersona} />
-          <Button variant="outline" onClick={handleReset} className="w-full">
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Create Another Persona
-          </Button>
-        </div>
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="block w-full">
+                    <Button
+                      type="submit"
+                      disabled={isAddTesterDisabled}
+                      className="h-12 w-full disabled:opacity-100"
+                    >
+                      {generatePersona.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {generatePersona.isPending ? 'Adding tester...' : 'Add Tester'}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {isAddTesterDisabled && (
+                  <TooltipContent side="top">
+                    {addTesterDisabledReason}
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={embedded ? 'space-y-6' : 'mx-auto max-w-xl space-y-6'}>
+      {embedded ? (
+        formContent
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              Build a Custom Persona
+            </CardTitle>
+            <CardDescription>
+              Describe the type of user you want to simulate. Our AI will generate a
+              detailed persona with behavioral attributes, frustration triggers, and
+              accessibility needs.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>{formContent}</CardContent>
+        </Card>
       )}
+
     </div>
   );
 }

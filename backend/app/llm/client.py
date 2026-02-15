@@ -353,10 +353,12 @@ class LLMClient:
         )
 
     async def generate_persona_from_description(
-        self, description: str
+        self,
+        description: str,
+        config: dict[str, Any] | None = None,
     ) -> PersonaProfile:
         """Generate a full persona profile from a natural language description."""
-        system = persona_from_description_prompt(description)
+        system = persona_from_description_prompt(description, config=config)
         messages = [{"role": "user", "content": "Generate the complete persona profile."}]
         return await self._call_structured(
             "persona_generation", system, messages, PersonaProfile

@@ -9,7 +9,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db
-from app.schemas.persona import PersonaGenerateRequest, PersonaTemplateOut
+from app.schemas.persona import (
+    PersonaAccessibilityOptions,
+    PersonaGenerateDraftResponse,
+    PersonaGenerateRequest,
+    PersonaGenerationOptions,
+    PersonaTemplateOut,
+)
 from app.services.persona_service import PersonaService
 
 logger = logging.getLogger(__name__)
@@ -81,7 +87,10 @@ async def generate_persona(
 
     try:
         llm = LLMClient()
-        profile = await llm.generate_persona_from_description(data.description)
+        profile = await llm.generate_persona_from_description(
+            data.description,
+            config=data.options.model_dump(exclude_none=True) if data.options else None,
+        )
     except Exception as e:
         logger.error("Persona generation failed: %s", e)
         raise HTTPException(
@@ -91,10 +100,46 @@ async def generate_persona(
 
     # Save as a custom template so it appears in the template list
     svc = PersonaService(db)
-    template = await svc.create_custom_template(profile)
+    template = await svc.create_custom_template(profile, avatar_url=data.avatar_url)
     await db.commit()
     await db.refresh(template)
     return template
+
+
+@router.post("/generate/draft", response_model=PersonaGenerateDraftResponse)
+async def generate_persona_draft(
+    data: PersonaGenerateRequest,
+):
+    """Generate a draft persona configuration from description without saving."""
+    from app.llm.client import LLMClient
+
+    try:
+        llm = LLMClient()
+        profile = await llm.generate_persona_from_description(
+            data.description,
+            config=data.options.model_dump(exclude_none=True) if data.options else None,
+        )
+    except Exception as e:
+        logger.error("Persona draft generation failed: %s", e)
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI persona draft generation failed: {e}",
+        )
+
+    return PersonaGenerateDraftResponse(
+        name=profile.name,
+        short_description=profile.short_description,
+        emoji=profile.emoji,
+        tech_literacy=profile.tech_literacy,
+        patience_level=profile.patience_level,
+        reading_speed=profile.reading_speed,
+        trust_level=profile.trust_level,
+        exploration_tendency=profile.exploration_tendency,
+        device_preference=profile.device_preference,
+        accessibility_needs=PersonaAccessibilityOptions(
+            **profile.accessibility_needs.model_dump(),
+        ),
+    )
 
 
 @router.post("/recommend", response_model=PersonaRecommendResponse)

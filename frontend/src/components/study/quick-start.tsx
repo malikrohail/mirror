@@ -8,6 +8,7 @@ import {
   Loader2,
   Check,
   X,
+  Plus,
   Globe,
   Monitor,
   Smartphone,
@@ -25,6 +26,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +37,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PersonaBuilderForm } from '@/components/persona/persona-builder-form';
 import { useCreateStudy, useRunStudy } from '@/hooks/use-study';
 import { usePersonaTemplates } from '@/hooks/use-personas';
 import { TERMS } from '@/lib/constants';
@@ -112,6 +115,7 @@ export function QuickStart({
     () => new Set(preSelected ?? []),
   );
   const [submitting, setSubmitting] = useState(false);
+  const [builderOpen, setBuilderOpen] = useState(false);
   const [expandedPersonaId, setExpandedPersonaId] = useState<string | null>(null);
   const [personaFilter, setPersonaFilter] = useState('');
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
@@ -197,7 +201,33 @@ export function QuickStart({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (
+      e.key === 'ArrowRight' &&
+      !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey &&
+      url.trim().length === 0
+    ) {
+      e.preventDefault();
+      setUrl(URL_PLACEHOLDER);
+      onUrlChangeProp?.(URL_PLACEHOLDER);
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey && isValidInput && phase === 'input') {
+      e.preventDefault();
+      handleContinue();
+    }
+  };
+
+  const handleTaskKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      e.key === 'ArrowRight' &&
+      !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey &&
+      description.trim().length === 0
+    ) {
+      e.preventDefault();
+      setDescription(TASK_PLACEHOLDER);
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey && isValidInput && phase === 'input') {
       e.preventDefault();
       handleContinue();
@@ -329,7 +359,7 @@ export function QuickStart({
                     setUrl(e.target.value);
                     onUrlChangeProp?.(e.target.value);
                   }}
-                  onKeyDown={handleKeyDown}
+                  onKeyDown={handleUrlKeyDown}
                   placeholder="example.com"
                   className="w-full rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-foreground/70 outline-none placeholder:text-foreground/20 focus:ring-1 focus:ring-ring"
                 />
@@ -342,7 +372,7 @@ export function QuickStart({
                   ref={descRef}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  onKeyDown={handleKeyDown}
+                  onKeyDown={handleTaskKeyDown}
                   placeholder="e.g. Sign up for a free trial"
                   className="w-full min-h-20 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm outline-none resize-none placeholder:text-foreground/20 focus:ring-1 focus:ring-ring"
                 />
@@ -513,6 +543,21 @@ export function QuickStart({
               </div>
 
               <div className="space-y-1.5 max-h-[340px] overflow-y-auto no-scrollbar">
+                {/* Add your own */}
+                <button
+                  type="button"
+                  onClick={() => setBuilderOpen(true)}
+                  className="flex w-full items-center gap-2.5 rounded-lg border border-dashed border-border p-2.5 transition-colors hover:border-foreground/20 hover:bg-muted/20"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/5 text-base shrink-0">
+                    <Plus className="h-4 w-4 text-foreground/40" />
+                  </span>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-[14px] font-medium">Add your own</p>
+                    <p className="text-xs text-muted-foreground truncate">Create a custom AI tester</p>
+                  </div>
+                </button>
+
                 {(personas ?? [])
                   .filter((p) => {
                     const profile = p.default_profile as Record<string, unknown> | undefined;
@@ -711,6 +756,25 @@ export function QuickStart({
           )}
         </AnimatePresence>
       </div>
+
+      <Dialog open={builderOpen} onOpenChange={setBuilderOpen}>
+        <DialogContent
+          showCloseButton={false}
+          overlayClassName="backdrop-blur-sm"
+          className="sm:max-w-xl max-h-[85vh] overflow-y-auto"
+        >
+          <DialogTitle className="sr-only">Add your own tester</DialogTitle>
+          <PersonaBuilderForm embedded onSuccess={(personaId) => {
+            setBuilderOpen(false);
+            setSelectedPersonaIds((prev) => {
+              if (prev.size >= MAX_PERSONAS) return prev;
+              const next = new Set(prev);
+              next.add(personaId);
+              return next;
+            });
+          }} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

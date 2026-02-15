@@ -95,6 +95,17 @@ async def test_generate_persona_stub(client: AsyncClient, db_session: AsyncSessi
     mock_llm_instance.generate_persona_from_description = AsyncMock(
         return_value=fake_profile
     )
+    description = "A 55-year-old small business owner who is new to technology"
+    avatar_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"
+    options = {
+        "tech_literacy": 3,
+        "patience_level": 6,
+        "device_preference": "desktop",
+        "accessibility_needs": {
+            "low_vision": True,
+            "description": "Needs larger text and high contrast.",
+        },
+    }
 
     # Replace commit → flush and refresh → no-op to work within test transaction
     original_commit = db_session.commit
@@ -114,9 +125,7 @@ async def test_generate_persona_stub(client: AsyncClient, db_session: AsyncSessi
         with patch("app.llm.client.LLMClient", return_value=mock_llm_instance):
             response = await client.post(
                 "/api/v1/personas/generate",
-                json={
-                    "description": "A 55-year-old small business owner who is new to technology"
-                },
+                json={"description": description, "options": options, "avatar_url": avatar_url},
             )
     finally:
         db_session.commit = original_commit  # type: ignore[assignment]
@@ -126,3 +135,51 @@ async def test_generate_persona_stub(client: AsyncClient, db_session: AsyncSessi
     data = response.json()
     assert data["name"] == "Gerry"
     assert "default_profile" in data
+    assert data["avatar_url"] == avatar_url
+    assert data["default_profile"]["avatar_url"] == avatar_url
+    mock_llm_instance.generate_persona_from_description.assert_awaited_once_with(
+        description,
+        config=options,
+    )
+
+
+@pytest.mark.asyncio
+async def test_generate_persona_draft_stub(client: AsyncClient):
+    """Draft generation returns editable metrics without saving a template."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from app.llm.schemas import PersonaProfile
+
+    fake_profile = PersonaProfile(
+        name="Jules",
+        age=31,
+        occupation="Marketing manager",
+        emoji="🧑",
+        short_description="A pragmatic user with moderate tech fluency",
+        background="Works quickly and values clarity over exploration.",
+        tech_literacy=6,
+        patience_level=4,
+        reading_speed=5,
+        trust_level=4,
+        exploration_tendency=3,
+        device_preference="mobile",
+        frustration_triggers=["unclear CTAs"],
+        goals=["finish checkout quickly"],
+    )
+    fake_profile.accessibility_needs.low_vision = True
+
+    mock_llm_instance = MagicMock()
+    mock_llm_instance.generate_persona_from_description = AsyncMock(return_value=fake_profile)
+
+    with patch("app.llm.client.LLMClient", return_value=mock_llm_instance):
+        response = await client.post(
+            "/api/v1/personas/generate/draft",
+            json={"description": "A busy mobile-first user who values speed and clarity"},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["tech_literacy"] == 6
+    assert data["patience_level"] == 4
+    assert data["device_preference"] == "mobile"
+    assert data["accessibility_needs"]["low_vision"] is True

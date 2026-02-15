@@ -3,11 +3,11 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Plus, Users, ListFilter, X, Tag, Monitor, Smartphone, Tablet,
-  Cpu, Gauge, Accessibility, DollarSign,
+  Cpu, Gauge,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -332,9 +332,13 @@ export default function PersonaLibraryPage() {
       </div>
 
       <Dialog open={builderOpen} onOpenChange={setBuilderOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
-          <DialogTitle className="sr-only">Add Tester</DialogTitle>
-          <PersonaBuilderForm />
+        <DialogContent
+          showCloseButton={false}
+          overlayClassName="backdrop-blur-sm"
+          className="sm:max-w-xl max-h-[85vh] overflow-y-auto"
+        >
+          <DialogTitle className="sr-only">Add your own tester</DialogTitle>
+          <PersonaBuilderForm embedded onSuccess={() => { setBuilderOpen(false); setTab('mine'); refreshMyTeam(); }} />
         </DialogContent>
       </Dialog>
     </div>
