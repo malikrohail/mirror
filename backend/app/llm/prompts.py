@@ -203,7 +203,7 @@ Current page: {page_title}
 URL: {page_url}
 {sitemap_section}
 ACCESSIBILITY TREE (text representation of page elements):
-{a11y_tree[:8000]}
+{a11y_tree[:4000]}
 
 PREVIOUS ACTIONS:
 {history_summary if history_summary else "This is the first step."}

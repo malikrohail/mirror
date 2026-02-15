@@ -228,8 +228,6 @@ class Navigator:
 
             # Navigate to starting URL with retry
             await self._goto_with_retry(page, start_url)
-            # Brief wait for JS frameworks to hydrate
-            await page.wait_for_timeout(500)
 
             # Auto-dismiss cookie consent banners
             try:
@@ -363,7 +361,7 @@ class Navigator:
         """Navigate to a URL with retry on TimeoutError / TargetClosedError."""
         for attempt in range(1 + self._action_retries):
             try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+                await page.goto(url, wait_until="domcontentloaded", timeout=15_000)
                 return
             except Exception as e:
                 error_name = type(e).__name__
@@ -592,7 +590,7 @@ class Navigator:
         if not history:
             return ""
         lines = []
-        for step in history[-8:]:  # Last 8 steps to stay within token budget
+        for step in history[-5:]:  # Last 5 steps to stay within token budget
             line = (
                 f"Step {step.step_number}: [{step.emotional_state}] "
                 f"{step.think_aloud[:80]} → {step.action_type} "

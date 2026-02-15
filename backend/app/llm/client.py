@@ -56,6 +56,50 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
+
+def _compress_screenshot_for_llm(
+    screenshot: bytes, quality: int = 60, max_width: int = 1280
+) -> tuple[bytes, str]:
+    """Compress a screenshot to JPEG for faster LLM vision calls.
+
+    Reduces a 1920x1080 PNG (~160KB) to a 1280x720 JPEG (~20-30KB).
+    Returns (compressed_bytes, media_type).
+    Falls back to original PNG if Pillow is unavailable.
+    """
+    try:
+        import io
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(screenshot))
+
+        # Downscale if wider than max_width
+        if img.width > max_width:
+            ratio = max_width / img.width
+            new_size = (max_width, int(img.height * ratio))
+            img = img.resize(new_size, Image.LANCZOS)
+
+        # Convert to RGB (JPEG doesn't support alpha)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        compressed = buf.getvalue()
+
+        logger.debug(
+            "Screenshot compressed for LLM: %dKB → %dKB (%.0f%% reduction)",
+            len(screenshot) // 1024,
+            len(compressed) // 1024,
+            (1 - len(compressed) / len(screenshot)) * 100,
+        )
+        return compressed, "image/jpeg"
+    except ImportError:
+        logger.debug("Pillow not available, sending raw PNG to LLM")
+        return screenshot, "image/png"
+    except Exception as e:
+        logger.debug("Screenshot compression failed, using raw: %s", e)
+        return screenshot, "image/png"
+
 # Model constants — overridable via env
 OPUS_MODEL = os.getenv("OPUS_MODEL", "claude-opus-4-6")
 SONNET_MODEL = os.getenv("SONNET_MODEL", "claude-sonnet-4-5-20250929")
@@ -358,8 +402,10 @@ class LLMClient:
             history_summary=history_summary,
         )
 
-        # Build multimodal message with screenshot image
-        screenshot_b64 = base64.b64encode(screenshot).decode("utf-8")
+        # Compress screenshot to JPEG for faster LLM upload (~160KB PNG → ~25KB JPEG)
+        compressed, media_type = _compress_screenshot_for_llm(screenshot)
+        screenshot_b64 = base64.b64encode(compressed).decode("utf-8")
+
         messages = [
             {
                 "role": "user",
@@ -368,7 +414,7 @@ class LLMClient:
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": "image/png",
+                            "media_type": media_type,
                             "data": screenshot_b64,
                         },
                     },
@@ -378,7 +424,7 @@ class LLMClient:
         ]
 
         return await self._call_structured(
-            "navigation", system, messages, NavigationDecision
+            "navigation", system, messages, NavigationDecision, max_tokens=1024,
         )
 
     # ------------------------------------------------------------------
