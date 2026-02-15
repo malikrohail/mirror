@@ -646,14 +646,34 @@ export default function StudyRunningPage({
     }
   }
   {
-    // Cost: prefer persisted value from API for completed studies, otherwise use real-time WS cost
-    const costUsd = (isComplete && study?.total_cost_usd != null)
-      ? study.total_cost_usd
-      : (activeStudy?.cost?.total_cost_usd ?? 0);
+    // Cost: persisted actual cost for completed studies.
+    // During running: estimate from step count (~$0.02/step for LLM calls)
+    // plus base overhead (~$0.10 for persona gen + synthesis + report).
+    // WS cost from progress events used when available (more accurate).
+    let costUsd: number;
+    let costLabel: string;
+    if (isComplete && study?.total_cost_usd != null) {
+      costUsd = study.total_cost_usd;
+      costLabel = 'Total API cost for this test';
+    } else if ((activeStudy?.cost?.total_cost_usd ?? 0) > 0) {
+      costUsd = activeStudy!.cost!.total_cost_usd;
+      costLabel = 'Estimated cost (updates as LLM calls complete)';
+    } else {
+      // Estimate from step count when no WS cost data yet
+      const totalSteps = Object.values(activeStudy?.personas ?? {}).reduce(
+        (sum, p) => sum + (p.step_number ?? 0), 0,
+      );
+      const baseCost = 0.10; // persona gen + synthesis + report overhead
+      const perStepCost = 0.02; // ~avg LLM cost per navigation step
+      costUsd = totalSteps > 0 ? baseCost + totalSteps * perStepCost : 0;
+      costLabel = totalSteps > 0
+        ? `Estimated from ${totalSteps} steps (final cost calculated on completion)`
+        : 'Cost will update as the test runs';
+    }
     headerChips.push({
       label: 'Cost',
       value: <span className="tabular-nums">${costUsd.toFixed(2)}</span>,
-      tooltip: 'Total API cost for this test (LLM + browser)',
+      tooltip: costLabel,
     });
   }
 
