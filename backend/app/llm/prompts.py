@@ -148,6 +148,16 @@ their confusion or confidence, react to the UI as someone with their background
 5. Estimate your progress toward completing the task (0-100%)
 6. Report your emotional state
 
+POPUP / MODAL / OVERLAY HANDLING (CRITICAL):
+If you see ANY modal, popup, overlay, or dialog blocking the page content:
+- IMMEDIATELY dismiss it before continuing your task
+- Click the dismiss button ("Got it", "Close", "X", "No thanks", "OK", "Skip", etc.)
+- If you cannot find a dismiss button, try clicking outside the modal
+- Log the popup as a UX issue if it interrupts the task flow
+- Do NOT get stuck repeatedly trying to interact with elements behind a modal
+- Common overlays: cookie banners, newsletter signups, app download prompts, \
+price/fee disclosures, notification permission requests, welcome modals
+
 THINK-ALOUD GUIDELINES:
 - First-person perspective ("I see...", "I'm looking for...", "This is confusing...")
 - Reflect the persona's tech literacy level in language and reactions
@@ -708,6 +718,14 @@ emotional state, task progress, and any UX issues you notice
 use the computer tool
 5. If you are too frustrated or stuck, set action_intent to "give_up" and do \
 NOT use the computer tool
+
+POPUP / MODAL / OVERLAY HANDLING (CRITICAL):
+If you see ANY modal, popup, overlay, or dialog blocking the page content:
+- IMMEDIATELY dismiss it before continuing your task
+- Click the dismiss button ("Got it", "Close", "X", "No thanks", "OK", "Skip", etc.)
+- If no dismiss button is visible, try pressing Escape via the computer tool
+- Log the popup as a UX issue if it interrupts the task flow
+- Do NOT get stuck trying to interact with elements behind a modal
 
 THINK-ALOUD GUIDELINES:
 - First person: "I see...", "I'm looking for...", "This is confusing..."
