@@ -914,7 +914,11 @@ export default function StudyRunningPage({
                       {findingsView === 'report' ? (
                         <ReportPreview studyId={id} hideActions />
                       ) : (
-                        <GroupedIssueList issues={issues ?? []} />
+                        <GroupedIssueList issues={
+                          selectedSessionId
+                            ? (issues ?? []).filter((i) => i.session_id === selectedSessionId)
+                            : (issues ?? [])
+                        } />
                       )}
                     </div>
                   </div>
