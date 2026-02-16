@@ -119,6 +119,10 @@ npm run dev
 
 Open http://localhost:3000 to start testing.
 
+### Deployment
+
+Production runs on a DigitalOcean droplet at [miror.tech](https://miror.tech) — deploy with `make deploy` (rsync + `docker compose -f docker-compose.prod.yml up -d --build`).
+
 ### Environment Variables
 
 Copy `.env.example` to `.env` and fill in:
