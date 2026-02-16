@@ -27,6 +27,13 @@
     "tailwind-merge": "^3.4.0",
     "zustand": "^5.0.11"
   },
+  "prettier": {
+    "semi": true,
+    "singleQuote": true,
+    "trailingComma": "all",
+    "tabWidth": 2,
+    "printWidth": 100
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.7",
     "@testing-library/jest-dom": "^6.9.1",

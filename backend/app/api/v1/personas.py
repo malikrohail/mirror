@@ -52,7 +52,6 @@ async def list_templates(
     svc = PersonaService(db)
     templates = await svc.list_templates(category=category)
     if not templates:
-        # Auto-seed on first access if DB is empty
         try:
             count = await svc.seed_templates()
             if count > 0:

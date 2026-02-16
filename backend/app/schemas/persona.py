@@ -43,9 +43,6 @@ class PersonaTemplateOut(BaseModel):
             if isinstance(profile_avatar, str) and profile_avatar:
                 self.avatar_url = profile_avatar
 
-        if not self.avatar_url:
-            self.avatar_url = f"https://i.pravatar.cc/200?u={quote(self.name)}"
-
         # Derive display name and cost from the model field
         self.model_display_name = MODEL_DISPLAY_NAMES.get(self.model, "Opus 4.6")
         self.estimated_cost_per_run_usd = MODEL_COSTS.get(self.model, 0.40)

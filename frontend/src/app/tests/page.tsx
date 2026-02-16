@@ -43,7 +43,7 @@ import { TestsIllustration, ScheduleIllustration } from '@/components/common/emp
 import { ErrorState } from '@/components/common/error-state';
 import { PageSkeleton } from '@/components/common/page-skeleton';
 import { PageHeaderBar } from '@/components/layout/page-header-bar';
-import { formatDistanceToNow } from '@/lib/format';
+import { formatDistanceToNow } from '@/lib/utils';
 import { SEVERITY_COLORS, TERMS } from '@/lib/constants';
 import { cn, scoreColor, scoreLabel, studyName } from '@/lib/utils';
 import type { StudySummary, StudyStatus, ScheduleOut, IssueDiff } from '@/types';

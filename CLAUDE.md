@@ -2,11 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# MIRROR — AI User Testing Platform
+# MIROR — AI User Testing Platform
 
-## What Is Mirror
+## What Is Miror
 
-Mirror is an AI-powered usability testing platform. Users paste a URL, define tasks, select AI personas, and Mirror launches real browsers (via Playwright) where each persona navigates the live site. Claude Opus 4.6 analyzes every screenshot, generates think-aloud narration, detects UX issues, and produces a comparative insight report. Traditional user testing costs $12K+ and takes weeks — Mirror delivers 80% of those insights in 5 minutes.
+Miror is an AI-powered usability testing platform. Users paste a URL, define tasks, select AI personas, and Miror launches real browsers (via Playwright) where each persona navigates the live site. Claude Opus 4.6 analyzes every screenshot, generates think-aloud narration, detects UX issues, and produces a comparative insight report. Traditional user testing costs $12K+ and takes weeks — Miror delivers 80% of those insights in 5 minutes.
 
 **Tagline:** "Watch AI personas break your website — so real users don't have to."
 
@@ -54,7 +54,7 @@ Mirror is an AI-powered usability testing platform. Users paste a URL, define ta
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     FRONTEND (Next.js 15)                        │
+│                     FRONTEND (Next.js 16)                        │
 │  Pages: Dashboard, Study Setup, Running, Results, Replay,       │
 │         Heatmap, Report, Persona Library, Custom Builder         │
 │  Connects via: REST (TanStack Query) + WebSocket (real-time)     │
@@ -118,11 +118,20 @@ Mirror is an AI-powered usability testing platform. Users paste a URL, define ta
 ## Directory Structure
 
 ```
-mirror/
+miror/
 ├── CLAUDE.md                          # This file
-├── docker-compose.yml                 # PostgreSQL, Redis, backend, frontend
-├── .env.example                       # Environment variable template
+├── README.md
+├── LICENSE
 ├── Makefile                           # Common commands (dev, test, lint, build)
+├── Caddyfile                          # Caddy reverse proxy config (production)
+├── Dockerfile.local                   # Local Playwright Docker image
+├── docker-compose.yml                 # PostgreSQL, Redis, backend, frontend (dev)
+├── docker-compose.prod.yml            # Production compose (+ caddy, worker)
+├── .env.example                       # Environment variable template
+├── .dockerignore
+├── .gitignore
+│
+├── docs/                              # Project documentation
 │
 ├── backend/
 │   ├── pyproject.toml                 # Python project config (ruff, pytest, deps)
@@ -137,10 +146,8 @@ mirror/
 │   │   ├── dependencies.py            # FastAPI dependency injection
 │   │   │
 │   │   ├── api/
-│   │   │   ├── __init__.py
 │   │   │   ├── router.py              # Main API router (mounts all sub-routers)
 │   │   │   ├── v1/
-│   │   │   │   ├── __init__.py
 │   │   │   │   ├── studies.py          # Study CRUD + run endpoints
 │   │   │   │   ├── sessions.py         # Session + step endpoints
 │   │   │   │   ├── personas.py         # Persona templates + generation
@@ -148,37 +155,13 @@ mirror/
 │   │   │   │   ├── screenshots.py      # Screenshot serving
 │   │   │   │   └── health.py           # Health check endpoint
 │   │   │   └── ws/
-│   │   │       ├── __init__.py
 │   │   │       └── progress.py         # WebSocket for study progress
 │   │   │
-│   │   ├── models/
-│   │   │   ├── __init__.py
-│   │   │   ├── base.py                 # SQLAlchemy base + mixins
-│   │   │   ├── study.py                # Study model
-│   │   │   ├── task.py                 # Task model
-│   │   │   ├── persona.py              # Persona model
-│   │   │   ├── session.py              # Session model
-│   │   │   ├── step.py                 # Step model
-│   │   │   ├── issue.py                # Issue model
-│   │   │   └── insight.py              # Insight model
-│   │   │
-│   │   ├── schemas/
-│   │   │   ├── __init__.py
-│   │   │   ├── study.py                # Pydantic schemas for study endpoints
-│   │   │   ├── session.py
-│   │   │   ├── persona.py
-│   │   │   ├── report.py
-│   │   │   └── ws.py                   # WebSocket message schemas
-│   │   │
-│   │   ├── services/
-│   │   │   ├── __init__.py
-│   │   │   ├── study_service.py        # Study business logic
-│   │   │   ├── persona_service.py      # Persona CRUD + generation
-│   │   │   ├── session_service.py      # Session data access
-│   │   │   └── report_service.py       # Report generation
+│   │   ├── models/                     # SQLAlchemy models
+│   │   ├── schemas/                    # Pydantic request/response schemas
+│   │   ├── services/                   # Business logic layer
 │   │   │
 │   │   ├── core/
-│   │   │   ├── __init__.py
 │   │   │   ├── orchestrator.py         # Study orchestrator (manages parallel sessions)
 │   │   │   ├── navigator.py            # Navigation agent loop (per persona)
 │   │   │   ├── analyzer.py             # Screenshot UX analyzer (Opus vision)
@@ -188,32 +171,23 @@ mirror/
 │   │   │   └── report_builder.py       # PDF + Markdown report builder
 │   │   │
 │   │   ├── browser/
-│   │   │   ├── __init__.py
 │   │   │   ├── pool.py                 # Playwright browser pool lifecycle
 │   │   │   ├── actions.py              # Browser actions (click, type, scroll, etc.)
 │   │   │   └── screenshots.py          # Screenshot capture + annotation
 │   │   │
 │   │   ├── llm/
-│   │   │   ├── __init__.py
 │   │   │   ├── client.py               # Anthropic API client (with model routing)
 │   │   │   ├── prompts.py              # All system prompts for 5 pipeline stages
 │   │   │   └── schemas.py              # Pydantic models for LLM JSON responses
 │   │   │
 │   │   ├── storage/
-│   │   │   ├── __init__.py
 │   │   │   └── file_storage.py         # File storage (local FS, S3-compatible interface)
 │   │   │
 │   │   ├── db/
-│   │   │   ├── __init__.py
 │   │   │   ├── engine.py               # Async SQLAlchemy engine + session factory
 │   │   │   └── repositories/           # Data access layer
-│   │   │       ├── __init__.py
-│   │   │       ├── study_repo.py
-│   │   │       ├── session_repo.py
-│   │   │       └── persona_repo.py
 │   │   │
 │   │   ├── workers/
-│   │   │   ├── __init__.py
 │   │   │   ├── settings.py             # arq worker settings
 │   │   │   └── tasks.py                # Background task definitions
 │   │   │
@@ -227,104 +201,151 @@ mirror/
 │       ├── test_core/
 │       └── test_browser/
 │
-├── frontend/
-│   ├── package.json
-│   ├── next.config.ts
-│   ├── tailwind.config.ts
-│   ├── tsconfig.json
-│   ├── components.json                  # shadcn/ui config
-│   │
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── layout.tsx               # Root layout (header, providers)
-│   │   │   ├── page.tsx                 # Landing / Dashboard
-│   │   │   ├── study/
-│   │   │   │   ├── new/
-│   │   │   │   │   └── page.tsx         # Study setup wizard
-│   │   │   │   └── [id]/
-│   │   │   │       ├── page.tsx         # Results dashboard
-│   │   │   │       ├── running/
-│   │   │   │       │   └── page.tsx     # Live progress view
-│   │   │   │       ├── session/
-│   │   │   │       │   └── [sessionId]/
-│   │   │   │       │       └── page.tsx # Session replay
-│   │   │   │       ├── heatmap/
-│   │   │   │       │   └── page.tsx     # Heatmap view
-│   │   │   │       └── report/
-│   │   │   │           └── page.tsx     # Report preview + export
-│   │   │   └── personas/
-│   │   │       ├── page.tsx             # Persona library
-│   │   │       └── builder/
-│   │   │           └── page.tsx         # Custom persona builder
-│   │   │
-│   │   ├── components/
-│   │   │   ├── ui/                      # shadcn/ui primitives
-│   │   │   ├── layout/
-│   │   │   │   ├── Header.tsx
-│   │   │   │   ├── Sidebar.tsx
-│   │   │   │   └── Footer.tsx
-│   │   │   ├── study/
-│   │   │   │   ├── StudyCard.tsx
-│   │   │   │   ├── StudySetupWizard.tsx
-│   │   │   │   ├── TaskInput.tsx
-│   │   │   │   └── StudyProgress.tsx
-│   │   │   ├── persona/
-│   │   │   │   ├── PersonaCard.tsx
-│   │   │   │   ├── PersonaSelector.tsx
-│   │   │   │   └── PersonaBuilder.tsx
-│   │   │   ├── results/
-│   │   │   │   ├── ScoreCard.tsx
-│   │   │   │   ├── StruggleMap.tsx
-│   │   │   │   ├── IssueList.tsx
-│   │   │   │   ├── PersonaComparison.tsx
-│   │   │   │   └── RecommendationList.tsx
-│   │   │   ├── session/
-│   │   │   │   ├── SessionReplay.tsx
-│   │   │   │   ├── ScreenshotViewer.tsx
-│   │   │   │   ├── ThinkAloudBubble.tsx
-│   │   │   │   └── StepTimeline.tsx
-│   │   │   ├── heatmap/
-│   │   │   │   ├── ClickHeatmap.tsx
-│   │   │   │   └── HeatmapOverlay.tsx
-│   │   │   └── common/
-│   │   │       ├── ProgressBar.tsx
-│   │   │       ├── ExportButton.tsx
-│   │   │       └── EmptyState.tsx
-│   │   │
-│   │   ├── hooks/
-│   │   │   ├── use-study.ts
-│   │   │   ├── use-websocket.ts
-│   │   │   ├── use-session-replay.ts
-│   │   │   └── use-personas.ts
-│   │   │
-│   │   ├── lib/
-│   │   │   ├── api-client.ts            # Typed API client (fetch wrapper)
-│   │   │   ├── ws-client.ts             # WebSocket client
-│   │   │   ├── utils.ts                 # Utility functions
-│   │   │   └── constants.ts             # App constants
-│   │   │
-│   │   ├── stores/
-│   │   │   ├── study-store.ts           # Zustand store for study state
-│   │   │   └── ui-store.ts              # UI state (sidebar, theme, etc.)
-│   │   │
-│   │   └── types/
-│   │       └── index.ts                 # Shared TypeScript types
-│   │
-│   └── public/
-│       ├── mirror-logo.svg
-│       └── og-image.png
-│
-└── data/                                # Runtime data (gitignored)
-    └── studies/
-        └── {study_id}/
-            ├── sessions/
-            │   └── {session_id}/
-            │       └── steps/
-            │           ├── step_001.png
-            │           └── step_001.json
-            ├── heatmaps/
-            ├── analysis.json
-            └── report.pdf
+└── frontend/
+    ├── package.json                    # Dependencies + Prettier config
+    ├── next.config.ts                  # Next.js config (API proxy rewrites)
+    ├── tsconfig.json
+    ├── postcss.config.mjs              # PostCSS + Tailwind v4
+    ├── eslint.config.mjs
+    ├── vitest.config.ts
+    ├── components.json                 # shadcn/ui config
+    ├── Dockerfile                      # Production frontend Docker image
+    │
+    └── src/
+        ├── app/
+        │   ├── layout.tsx               # Root layout (sidebar, providers)
+        │   ├── page.tsx                 # Landing / Home
+        │   ├── globals.css              # Global styles (Tailwind imports)
+        │   ├── icon.svg                 # Favicon
+        │   ├── error.tsx                # Global error boundary
+        │   ├── loading.tsx              # Global loading state
+        │   ├── not-found.tsx            # 404 page
+        │   ├── tests/
+        │   │   └── page.tsx             # My Tests (study list)
+        │   ├── study/
+        │   │   ├── new/
+        │   │   │   └── page.tsx         # Study setup wizard
+        │   │   └── [id]/
+        │   │       ├── page.tsx         # Redirects to running/
+        │   │       ├── running/
+        │   │       │   └── page.tsx     # Live progress + results view
+        │   │       ├── session/
+        │   │       │   └── [sessionId]/
+        │   │       │       └── page.tsx # Session replay
+        │   │       ├── heatmap/
+        │   │       │   └── page.tsx     # Heatmap view
+        │   │       └── report/
+        │   │           └── page.tsx     # Report preview + export
+        │   ├── personas/
+        │   │   ├── page.tsx             # Persona library
+        │   │   ├── builder/
+        │   │   │   └── page.tsx         # Custom persona builder
+        │   │   └── options/
+        │   │       └── page.tsx         # Persona options
+        │   ├── schedules/
+        │   │   └── page.tsx             # Scheduled tests
+        │   ├── docs/
+        │   │   └── page.tsx             # Documentation viewer
+        │   ├── how-it-works/
+        │   │   └── page.tsx             # How it works page
+        │   └── demo/                    # Design sandbox (29 wireframe experiments)
+        │       ├── page.tsx
+        │       └── README.md
+        │
+        ├── components/
+        │   ├── docs-viewer.tsx          # Markdown docs renderer
+        │   ├── ui/                      # shadcn/ui primitives (20 files)
+        │   ├── layout/
+        │   │   ├── sidebar.tsx          # App sidebar navigation
+        │   │   ├── providers.tsx        # Theme + Query + Tooltip providers
+        │   │   ├── page-header-bar.tsx  # Reusable page header
+        │   │   └── navigation-progress.tsx
+        │   ├── study/
+        │   │   ├── study-setup-wizard.tsx
+        │   │   ├── quick-start.tsx
+        │   │   ├── study-card.tsx
+        │   │   ├── study-progress.tsx
+        │   │   ├── persona-progress-card.tsx
+        │   │   ├── screencast-viewer.tsx
+        │   │   ├── live-browser-view.tsx
+        │   │   ├── live-step-timeline.tsx
+        │   │   └── website-preview.tsx
+        │   ├── persona/
+        │   │   ├── persona-builder-form.tsx
+        │   │   ├── persona-detail-card.tsx
+        │   │   └── persona-table.tsx
+        │   ├── results/
+        │   │   ├── score-cards-row.tsx
+        │   │   ├── issues-tab.tsx
+        │   │   ├── issue-card.tsx
+        │   │   ├── issue-list.tsx
+        │   │   ├── fix-panel.tsx
+        │   │   ├── fix-preview.tsx
+        │   │   └── github-pr-dialog.tsx
+        │   ├── session/
+        │   │   ├── session-replay.tsx
+        │   │   ├── screenshot-viewer.tsx
+        │   │   ├── step-timeline.tsx
+        │   │   ├── step-controls.tsx
+        │   │   ├── step-metadata.tsx
+        │   │   ├── persona-info-panel.tsx
+        │   │   └── video-player.tsx
+        │   ├── heatmap/
+        │   │   ├── click-heatmap.tsx
+        │   │   └── heatmap-overlay.tsx
+        │   ├── report/
+        │   │   ├── report-preview.tsx
+        │   │   ├── report-actions.tsx
+        │   │   └── interactive-dashboard.tsx
+        │   └── common/
+        │       ├── empty-state.tsx
+        │       ├── empty-illustrations.tsx
+        │       ├── error-state.tsx
+        │       ├── page-skeleton.tsx
+        │       ├── data-table.tsx
+        │       ├── miror-logo.tsx
+        │       ├── severity-badge.tsx
+        │       ├── status-badge.tsx
+        │       ├── progress-bar.tsx
+        │       ├── think-aloud-bubble.tsx
+        │       ├── tagline-h2.tsx
+        │       └── typewriter-status.tsx
+        │
+        ├── hooks/
+        │   ├── use-study.ts             # Study CRUD + mutations
+        │   ├── use-websocket.ts         # WebSocket connection hook
+        │   ├── use-session-replay.ts    # Session step navigation
+        │   ├── use-personas.ts          # Persona templates + generation
+        │   ├── use-screencast.ts        # Live screencast streaming
+        │   ├── use-schedules.ts         # Schedule CRUD
+        │   ├── use-heatmap.ts           # Heatmap data fetching
+        │   ├── use-video.ts             # Video generation
+        │   ├── use-narration.ts         # Audio narration
+        │   ├── use-score-history.ts     # Score trend data
+        │   └── use-reduced-motion.ts    # Accessibility media query
+        │
+        ├── lib/
+        │   ├── api-client.ts            # Typed API client (fetch wrapper)
+        │   ├── ws-client.ts             # WebSocket client
+        │   ├── query-client.ts          # TanStack Query client factory
+        │   ├── screencast-client.ts     # Screencast streaming client
+        │   ├── utils.ts                 # Utility functions (cn, score helpers, formatDistanceToNow)
+        │   ├── constants.ts             # App constants
+        │   └── __tests__/
+        │       └── api-client.test.ts
+        │
+        ├── stores/
+        │   ├── study-store.ts           # Zustand store for study state
+        │   └── ui-store.ts              # Navigation loading state
+        │
+        ├── styles/
+        │   ├── shadcn.css               # shadcn/ui CSS variables
+        │   └── tw-animate.css           # Tailwind animation utilities
+        │
+        └── types/
+            ├── index.ts                 # Shared TypeScript types
+            ├── ws.ts                    # WebSocket message types
+            └── react-markdown.d.ts      # Module declaration shim
 ```
 
 ---
@@ -345,7 +366,7 @@ mirror/
 
 ### TypeScript (Frontend)
 
-- **Style**: ESLint + Prettier (2-space indent, single quotes, trailing commas)
+- **Style**: ESLint + Prettier (2-space indent, single quotes, trailing commas). Prettier config lives in `package.json`
 - **Components**: Functional components with arrow syntax. Props typed with interface
 - **Naming**: `camelCase` for functions/variables, `PascalCase` for components/types, `kebab-case` for files
 - **State**: Zustand for global state. TanStack Query for server state. Local useState only for UI-only state
@@ -479,7 +500,7 @@ LOG_LEVEL=INFO
 
 ```bash
 # ── Quick Start (everything at once) ──
-make dev-all                          # Starts Docker infra + backend + worker + frontend via scripts/dev.sh
+make dev-all                          # Starts Docker infra + backend + worker + frontend
 
 # ── Infrastructure ──
 make docker-up                        # Start PostgreSQL + Redis containers
@@ -491,7 +512,7 @@ make worker                           # arq worker (production mode)
 make dev-worker                       # arq worker with auto-reload (uses scripts/dev_worker.py)
 
 # ── Frontend ──
-cd frontend && npx next dev --webpack # IMPORTANT: must use --webpack flag (see Turbopack note below)
+cd frontend && npx next dev           # Starts on port 3000 (Turbopack)
 
 # ── Database ──
 make migrate                          # Run pending migrations (alembic upgrade head)
@@ -520,16 +541,13 @@ make docker-local                     # Full stack with local Chromium in Docker
 make health-browser                   # Check browser pool health
 ```
 
-## Critical: Tailwind CSS v4 + Turbopack
+## Tailwind CSS v4 + Turbopack
 
-`postcss.config.mjs` with `@tailwindcss/postcss` + Tailwind v4 causes Turbopack to hang indefinitely. **Always run Next.js with the `--webpack` flag:**
-
-```bash
-npx next dev --webpack                # Correct — uses webpack
-npx next dev                          # WRONG — Turbopack hangs forever
-```
+Tailwind CSS v4 is pinned to **v4.0.7** (along with `@tailwindcss/postcss`). Versions above v4.0.7 cause Turbopack to hang indefinitely. Do NOT upgrade past v4.0.7.
 
 Do NOT remove `postcss.config.mjs` — without it, Tailwind CSS won't process at all. The `globals.css` imports from `../styles/tw-animate.css` and `../styles/shadcn.css` (local copies in `src/styles/`).
+
+Font: Fontshare Satoshi is loaded via `<link>` tag in `layout.tsx` `<head>` (not CSS `@import url()`).
 
 ## Running the Project (Manual Setup)
 
@@ -548,10 +566,10 @@ uvicorn app.main:app --reload --port 8000
 # Worker (separate terminal)
 arq app.workers.settings.WorkerSettings
 
-# Frontend (MUST use --webpack flag)
+# Frontend
 cd frontend
 npm install
-npx next dev --webpack                # Starts on port 3000
+npx next dev                          # Starts on port 3000
 
 # Full stack (Docker)
 docker compose up --build
@@ -591,7 +609,7 @@ The frontend proxies `/api/v1/*` requests to the backend via `next.config.ts` re
 
 ## LLM Pipeline Stages
 
-Mirror uses Claude in 5 distinct stages:
+Miror uses Claude in 5 distinct stages:
 
 | Stage | Model | Input | Output | Vision? |
 |-------|-------|-------|--------|---------|
@@ -622,7 +640,7 @@ The production site is hosted at **miror.tech** on a DigitalOcean droplet. Here'
 ### Quick Deploy (One Command)
 
 ```bash
-# From the mirror project root on your local machine:
+# From the project root on your local machine:
 make deploy
 ```
 
@@ -635,7 +653,7 @@ If `make deploy` is not set up, use the manual steps below.
 rsync -avz \
   --exclude='node_modules' --exclude='.next' --exclude='__pycache__' \
   --exclude='.venv' --exclude='data/' --exclude='.git' --exclude='.env' \
-  /Users/test/Downloads/mirror/ root@157.230.215.4:/opt/mirror/
+  ./ root@157.230.215.4:/opt/mirror/
 
 # Step 2: Rebuild and restart all containers on the server
 ssh root@157.230.215.4 "cd /opt/mirror && docker compose -f docker-compose.prod.yml up -d --build"

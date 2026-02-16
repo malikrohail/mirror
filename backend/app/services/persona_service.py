@@ -137,14 +137,24 @@ class PersonaService:
 
         count = 0
         for t in templates:
-            exists = await self.repo.template_exists(t["name"])
-            if not exists:
+            default_profile = dict(t.get("default_profile", {}))
+            if t.get("avatar_url"):
+                default_profile["avatar_url"] = t["avatar_url"]
+
+            existing = await self.repo.get_template_by_name(t["name"])
+            if existing:
+                old_profile = existing.default_profile or {}
+                new_avatar = default_profile.get("avatar_url", "")
+                if old_profile.get("avatar_url") != new_avatar:
+                    existing.default_profile = {**old_profile, "avatar_url": new_avatar}
+                    count += 1
+            else:
                 await self.repo.create_template(
                     name=t["name"],
                     emoji=t.get("emoji", "\ud83d\udc64"),
                     category=t["category"],
                     short_description=t["short_description"],
-                    default_profile=t.get("default_profile", {}),
+                    default_profile=default_profile,
                 )
                 count += 1
 

@@ -3,14 +3,59 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useHeatmap } from '@/hooks/use-heatmap';
 import { HeatmapOverlay } from './heatmap-overlay';
-import { HeatmapLegend } from './heatmap-legend';
-import { PageSelector } from './page-selector';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/common/empty-state';
 import { HeatmapIllustration } from '@/components/common/empty-illustrations';
 import { ErrorState } from '@/components/common/error-state';
 import { ImageOff } from 'lucide-react';
 import { getScreenshotUrl } from '@/lib/api-client';
+
+// ── HeatmapLegend (internal) ────────────────────────
+
+function HeatmapLegend() {
+  return (
+    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+      <span>Low</span>
+      <div
+        className="h-3 w-24 rounded-full"
+        style={{
+          background: 'linear-gradient(to right, rgba(255,255,0,0.3), rgba(255,165,0,0.6), rgba(255,0,0,0.9))',
+        }}
+      />
+      <span>High</span>
+    </div>
+  );
+}
+
+// ── PageSelector (internal) ─────────────────────────
+
+interface PageSelectorProps {
+  pages: string[];
+  selected: string;
+  onSelect: (page: string) => void;
+}
+
+function PageSelector({ pages, selected, onSelect }: PageSelectorProps) {
+  if (pages.length === 0) return null;
+
+  return (
+    <Select value={selected} onValueChange={onSelect}>
+      <SelectTrigger className="w-64">
+        <SelectValue placeholder="Select a page" />
+      </SelectTrigger>
+      <SelectContent>
+        {pages.map((page) => (
+          <SelectItem key={page} value={page}>
+            <span className="truncate">{page}</span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+// ── ClickHeatmap ────────────────────────────────────
 
 interface ClickHeatmapProps {
   studyId: string;
