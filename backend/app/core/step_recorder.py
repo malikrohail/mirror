@@ -102,12 +102,21 @@ class DatabaseStepRecorder:
         db_session_id = self._get_db_session_id(session_id)
 
         # 1. Save screenshot (filesystem, no DB lock needed)
-        screenshot_path = self.storage.save_screenshot(
-            study_id=self.study_id,
-            session_id=db_session_id,
-            step_number=step_number,
-            image_bytes=screenshot,
-        )
+        if hasattr(self.storage, 'save_screenshot_async'):
+            screenshot_path = await self.storage.save_screenshot_async(
+                study_id=self.study_id,
+                session_id=db_session_id,
+                step_number=step_number,
+                image_bytes=screenshot,
+            )
+        else:
+            screenshot_path = await asyncio.to_thread(
+                self.storage.save_screenshot,
+                self.study_id,
+                db_session_id,
+                step_number,
+                screenshot,
+            )
 
         # 2-4. DB writes under lock to prevent concurrent session corruption
         async with self._db_lock:

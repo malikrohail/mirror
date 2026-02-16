@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 import os
@@ -34,13 +35,13 @@ class FileStorage:
         full = self.base_path / path
         if not full.exists():
             raise FileNotFoundError(f"File not found: {path}")
-        return full.read_bytes()
+        return await asyncio.to_thread(full.read_bytes)
 
     async def write(self, path: str, data: bytes) -> None:
         """Write raw bytes to a storage path."""
         full = self.base_path / path
         full.parent.mkdir(parents=True, exist_ok=True)
-        full.write_bytes(data)
+        await asyncio.to_thread(full.write_bytes, data)
 
     # Screenshots
 
@@ -51,7 +52,7 @@ class FileStorage:
         step_number: int,
         image_bytes: bytes,
     ) -> str:
-        """Save a screenshot PNG and return its relative path."""
+        """Save a screenshot PNG and return its relative path (sync)."""
         session_dir = self._session_dir(study_id, session_id) / "steps"
         session_dir.mkdir(parents=True, exist_ok=True)
 
@@ -61,6 +62,18 @@ class FileStorage:
 
         # Return relative path for storage in DB
         return f"studies/{study_id}/sessions/{session_id}/steps/{filename}"
+
+    async def save_screenshot_async(
+        self,
+        study_id: uuid.UUID,
+        session_id: uuid.UUID,
+        step_number: int,
+        image_bytes: bytes,
+    ) -> str:
+        """Save a screenshot PNG without blocking the event loop."""
+        return await asyncio.to_thread(
+            self.save_screenshot, study_id, session_id, step_number, image_bytes
+        )
 
     def get_screenshot_url(self, path: str) -> str:
         """Convert a storage path to an API URL."""

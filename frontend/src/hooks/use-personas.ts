@@ -8,6 +8,7 @@ export function usePersonaTemplates(category?: string) {
   return useQuery({
     queryKey: ['persona-templates', category],
     queryFn: () => api.listPersonaTemplates(category),
+    staleTime: 60 * 60 * 1000, // 1 hour — templates rarely change
   });
 }
 

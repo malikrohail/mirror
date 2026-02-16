@@ -408,7 +408,9 @@ class LLMClient:
         )
 
         # Compress screenshot to JPEG for faster LLM upload (~160KB PNG → ~25KB JPEG)
-        compressed, media_type = _compress_screenshot_for_llm(screenshot)
+        compressed, media_type = await asyncio.to_thread(
+            _compress_screenshot_for_llm, screenshot
+        )
         screenshot_b64 = base64.b64encode(compressed).decode("utf-8")
 
         messages = [
@@ -466,7 +468,9 @@ class LLMClient:
         )
 
         # Compress screenshot for vision
-        compressed, media_type = _compress_screenshot_for_llm(screenshot)
+        compressed, media_type = await asyncio.to_thread(
+            _compress_screenshot_for_llm, screenshot
+        )
         screenshot_b64 = base64.b64encode(compressed).decode("utf-8")
 
         # Define tools: computer (built-in) + persona_step (custom)

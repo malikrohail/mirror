@@ -433,12 +433,8 @@ export default function StudyRunningPage({
     enabled: needsStepFallback,
   });
 
-  // Fetch sessions and issues once complete
-  const { data: completeSessions } = useQuery({
-    queryKey: ['sessions-complete', id],
-    queryFn: () => api.listSessions(id),
-    enabled: !!id && study?.status === 'complete',
-  });
+  // Reuse sessions data for complete state (same query key avoids duplicate fetch)
+  const completeSessions = study?.status === 'complete' ? sessions : undefined;
 
   const { data: issues } = useQuery({
     queryKey: ['issues', id],
@@ -456,6 +452,7 @@ export default function StudyRunningPage({
   const { data: personaTemplates } = useQuery({
     queryKey: ['persona-templates'],
     queryFn: () => api.listPersonaTemplates(),
+    staleTime: 60 * 60 * 1000, // 1 hour — templates rarely change
   });
 
   // Build a session-id → persona-name map from all available sources

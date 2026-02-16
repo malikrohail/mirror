@@ -291,14 +291,17 @@ class StudyOrchestrator:
                     if pname and sid:
                         name_to_session_id[pname] = sid
 
+                from app.models.session import Session
+                from sqlalchemy import update as sa_update
                 for ps in synthesis.persona_scores:
                     sid = name_to_session_id.get(ps.persona_name)
                     if sid:
                         try:
-                            from app.models.session import Session
-                            db_sess = await self.db.get(Session, uuid.UUID(sid))
-                            if db_sess:
-                                db_sess.ux_score = float(ps.score)
+                            await self.db.execute(
+                                sa_update(Session)
+                                .where(Session.id == uuid.UUID(sid))
+                                .values(ux_score=float(ps.score))
+                            )
                         except Exception as e:
                             logger.warning(
                                 "Failed to persist ux_score for persona %s: %s",
@@ -408,9 +411,12 @@ class StudyOrchestrator:
             for llm_client in (self._llm, self._fast_llm, *self._persona_llm_clients):
                 usage = llm_client.usage
                 if usage.calls > 0:
+                    # Use the client's primary model for cost attribution
+                    primary_model = llm_client._get_model("navigation")
                     self._cost_tracker.record_llm_usage(
                         usage.input_tokens, usage.output_tokens,
                         api_calls=usage.calls,
+                        model=primary_model,
                     )
 
             # Persist cost breakdown to study record
@@ -955,6 +961,8 @@ class StudyOrchestrator:
             for p in persona_profiles:
                 _persona_by_name[p.get("name", "")] = p
 
+        # Prepare step data and persona contexts for all sessions
+        analysis_tasks: list[tuple[str, list[dict[str, Any]], str]] = []
         for result in nav_results:
             if not result.steps:
                 continue
@@ -991,17 +999,26 @@ class StudyOrchestrator:
                         parts.append(f"Accessibility needs: {', '.join(active)}")
                 persona_context = " | ".join(parts)
 
+            analysis_tasks.append((result.session_id, step_data, persona_context))
+
+        # Run all session analyses in parallel (each is an independent LLM call)
+        async def _analyze_one(session_id: str, steps: list, context: str) -> list[dict]:
             try:
                 analysis = await self._analyzer.analyze_session(
-                    session_id=result.session_id,
-                    steps=step_data,
-                    persona_context=persona_context,
+                    session_id=session_id,
+                    steps=steps,
+                    persona_context=context,
                 )
-                all_issues.extend(
-                    Analyzer.issues_to_dicts(analysis.deduplicated_issues)
-                )
+                return Analyzer.issues_to_dicts(analysis.deduplicated_issues)
             except Exception as e:
-                logger.error("Analysis failed for session %s: %s", result.session_id, e)
+                logger.error("Analysis failed for session %s: %s", session_id, e)
+                return []
+
+        analysis_results = await asyncio.gather(
+            *[_analyze_one(sid, sd, pc) for sid, sd, pc in analysis_tasks]
+        )
+        for issues in analysis_results:
+            all_issues.extend(issues)
 
         # --- Flow analysis (Feature 1c) ---
         try:
@@ -1015,8 +1032,9 @@ class StudyOrchestrator:
                     if step.screenshot_path:
                         full_path = os.path.join(storage_path, step.screenshot_path)
                         if os.path.exists(full_path):
-                            with open(full_path, "rb") as f:
-                                screenshot_bytes = f.read()
+                            screenshot_bytes = await asyncio.to_thread(
+                                lambda p=full_path: open(p, "rb").read()
+                            )
                     step_data_with_screenshots.append({
                         "step_number": step.step_number,
                         "page_url": step.page_url,
@@ -1068,7 +1086,7 @@ class StudyOrchestrator:
         try:
             storage_path = os.getenv("STORAGE_PATH", "./data")
             seen_urls: set[str] = set()
-            audits = []
+            audit_inputs: list[tuple[bytes, str, str]] = []
 
             for result in nav_results:
                 if not result.steps:
@@ -1085,22 +1103,28 @@ class StudyOrchestrator:
                     full_path = os.path.join(storage_path, step.screenshot_path)
                     if not os.path.exists(full_path):
                         continue
-                    with open(full_path, "rb") as f:
-                        screenshot_bytes = f.read()
+                    screenshot_bytes = await asyncio.to_thread(
+                        lambda p=full_path: open(p, "rb").read()
+                    )
+                    audit_inputs.append((screenshot_bytes, page_url, step.page_title or ""))
 
-                    try:
-                        audit = await self._accessibility_auditor.audit_page(
-                            screenshot=screenshot_bytes,
-                            a11y_tree="",  # a11y tree not persisted during navigation
-                            page_url=page_url,
-                            page_title=step.page_title or "",
-                        )
-                        audits.append(audit)
-                    except Exception as e:
-                        logger.warning(
-                            "Accessibility audit failed for %s (non-fatal): %s",
-                            page_url, e,
-                        )
+            # Run all page audits in parallel
+            async def _audit_one(screenshot: bytes, url: str, title: str):
+                try:
+                    return await self._accessibility_auditor.audit_page(
+                        screenshot=screenshot,
+                        a11y_tree="",
+                        page_url=url,
+                        page_title=title,
+                    )
+                except Exception as e:
+                    logger.warning("Accessibility audit failed for %s (non-fatal): %s", url, e)
+                    return None
+
+            audit_results = await asyncio.gather(
+                *[_audit_one(s, u, t) for s, u, t in audit_inputs]
+            )
+            audits = [a for a in audit_results if a is not None]
 
             if not audits:
                 logger.info("No pages audited for accessibility in study %s", study_id)
@@ -1117,8 +1141,9 @@ class StudyOrchestrator:
             report_dir = f"{storage_path}/studies/{study_id}"
             os.makedirs(report_dir, exist_ok=True)
             a11y_path = f"{report_dir}/accessibility_report.json"
-            with open(a11y_path, "w") as f:
-                json.dump(report, f, indent=2)
+            await asyncio.to_thread(
+                lambda: open(a11y_path, "w").write(json.dumps(report, indent=2))
+            )
             logger.info("Saved accessibility report: %s", a11y_path)
 
             return report
@@ -1142,15 +1167,18 @@ class StudyOrchestrator:
 
         for page_url, heatmap_data in page_data.items():
             try:
-                heatmap_bytes = self._heatmap_gen.render_heatmap(heatmap_data)
-                # Save to filesystem (Agent 1's FileStorage can be used when available)
+                heatmap_bytes = await asyncio.to_thread(
+                    self._heatmap_gen.render_heatmap, heatmap_data
+                )
+                # Save to filesystem
                 import hashlib
                 url_hash = hashlib.md5(page_url.encode()).hexdigest()[:12]
                 heatmap_dir = f"{storage_path}/studies/{study_id}/heatmaps"
                 os.makedirs(heatmap_dir, exist_ok=True)
                 heatmap_path = f"{heatmap_dir}/{url_hash}.png"
-                with open(heatmap_path, "wb") as f:
-                    f.write(heatmap_bytes)
+                await asyncio.to_thread(
+                    lambda: open(heatmap_path, "wb").write(heatmap_bytes)
+                )
                 logger.info("Saved heatmap: %s", heatmap_path)
             except Exception as e:
                 logger.error("Heatmap generation failed for %s: %s", page_url, e)

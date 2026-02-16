@@ -64,37 +64,46 @@ class VideoService:
                 await self.db.commit()
                 return video
 
-            frames: list[Image.Image] = []
+            # Load all screenshot bytes first (async I/O)
+            step_images: list[tuple] = []
             for step in steps:
                 if not step.screenshot_path or not self.storage:
                     continue
                 try:
                     img_bytes = await self.storage.read(step.screenshot_path)
-                    img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+                    step_images.append((img_bytes, step))
                 except Exception as e:
                     logger.warning("Failed to load screenshot %s: %s", step.screenshot_path, e)
                     continue
 
-                if include_narration and step.think_aloud:
-                    img = self._add_narration_overlay(img, step, ImageDraw, ImageFont)
-                frames.append(img.convert("RGB"))
-
-            if not frames:
+            if not step_images:
                 video.status = VideoStatus.FAILED
                 video.error_message = "No valid screenshots found"
                 await self.db.commit()
                 return video
 
-            gif_buffer = io.BytesIO()
-            frames[0].save(gif_buffer, format="GIF", save_all=True, append_images=frames[1:], duration=frame_duration_ms, loop=0, optimize=False)
-            gif_bytes = gif_buffer.getvalue()
+            # Process PIL operations off the event loop
+            import asyncio
+
+            def _build_gif() -> bytes:
+                frames: list[Image.Image] = []
+                for img_bytes, step in step_images:
+                    img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+                    if include_narration and step.think_aloud:
+                        img = self._add_narration_overlay(img, step, ImageDraw, ImageFont)
+                    frames.append(img.convert("RGB"))
+                buf = io.BytesIO()
+                frames[0].save(buf, format="GIF", save_all=True, append_images=frames[1:], duration=frame_duration_ms, loop=0, optimize=False)
+                return buf.getvalue()
+
+            gif_bytes = await asyncio.to_thread(_build_gif)
 
             video_path = f"{session.study_id}/{session_id}/replay.gif"
             await self.storage.write(video_path, gif_bytes)
 
             video.video_path = video_path
             video.status = VideoStatus.COMPLETE
-            video.frame_count = len(frames)
+            video.frame_count = len(step_images)
             video.duration_seconds = (len(frames) * frame_duration_ms) / 1000.0
             video.has_narration = include_narration
             video.error_message = None

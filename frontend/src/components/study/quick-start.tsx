@@ -169,29 +169,31 @@ export function QuickStart({
     toast.success(`Browser mode: ${next === 'local' ? 'Local' : 'Cloud'}`);
   };
 
-  // Fetch cost estimate when persona count changes
+  // Fetch cost estimate when persona count changes (debounced 300ms)
   useEffect(() => {
     if (selectedPersonaIds.size === 0) {
       setCostEstimate(null);
       return;
     }
-    // Determine the dominant model for the estimate
-    const models = Array.from(selectedPersonaIds).map((id) => personaModels[id] ?? 'opus-4.6');
-    const modelCounts: Record<string, number> = {};
-    for (const m of models) modelCounts[m] = (modelCounts[m] ?? 0) + 1;
-    const dominantModel = Object.entries(modelCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'opus-4.6';
-
     let cancelled = false;
-    estimateCost({
-      persona_count: selectedPersonaIds.size,
-      task_count: 1,
-      model: dominantModel,
-    }).then((est) => {
-      if (!cancelled) setCostEstimate(est);
-    }).catch(() => {
-      // Silently fail — show fallback
-    });
-    return () => { cancelled = true; };
+    const timer = setTimeout(() => {
+      // Determine the dominant model for the estimate
+      const models = Array.from(selectedPersonaIds).map((id) => personaModels[id] ?? 'opus-4.6');
+      const modelCounts: Record<string, number> = {};
+      for (const m of models) modelCounts[m] = (modelCounts[m] ?? 0) + 1;
+      const dominantModel = Object.entries(modelCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'opus-4.6';
+
+      estimateCost({
+        persona_count: selectedPersonaIds.size,
+        task_count: 1,
+        model: dominantModel,
+      }).then((est) => {
+        if (!cancelled) setCostEstimate(est);
+      }).catch(() => {
+        // Silently fail — show fallback
+      });
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [selectedPersonaIds.size, personaModels]);
 
   const canGenerate = description.trim().length > 2 && url.trim().length > 0;
