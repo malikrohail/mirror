@@ -1,6 +1,9 @@
 import { WS_URL, WS_RECONNECT_INTERVAL, MAX_RECONNECT_ATTEMPTS } from './constants';
 import type { WsClientMessage, WsServerMessage } from '@/types/ws';
 
+const isDev = process.env.NODE_ENV === 'development';
+const log = (...args: unknown[]) => { if (isDev) console.log(...args); };
+
 export type WsConnectionState = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 
 type MessageHandler = (msg: WsServerMessage) => void;
@@ -20,16 +23,16 @@ export class WsClient {
       return;
     }
     const url = `${WS_URL}/api/v1/ws`;
-    console.log('[WS] Connecting to', url);
+    log('[WS] Connecting to', url);
     this.setState('connecting');
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
-      console.log('[WS] Connected');
+      log('[WS] Connected');
       this.reconnectAttempts = 0;
       this.setState('connected');
       if (this.subscribedStudyId) {
-        console.log('[WS] Subscribing to', this.subscribedStudyId);
+        log('[WS] Subscribing to', this.subscribedStudyId);
         this.send({ type: 'subscribe', study_id: this.subscribedStudyId });
       }
     };
@@ -38,23 +41,23 @@ export class WsClient {
       try {
         const msg = JSON.parse(event.data) as WsServerMessage;
         if (msg.type === 'study:session_snapshot') {
-          console.log(
+          log(
             '[WS] Message:',
             msg.type,
             'sessions=',
             Object.keys(msg.sessions ?? {}).length,
           );
         } else {
-          console.log('[WS] Message:', msg.type);
+          log('[WS] Message:', msg.type);
         }
         this.messageHandlers.forEach((h) => h(msg));
       } catch {
-        console.log('[WS] Failed to parse message:', event.data);
+        log('[WS] Failed to parse message:', event.data);
       }
     };
 
     this.ws.onclose = (event) => {
-      console.log('[WS] Closed, code:', event.code, 'reason:', event.reason, 'attempts:', this.reconnectAttempts);
+      log('[WS] Closed, code:', event.code, 'reason:', event.reason, 'attempts:', this.reconnectAttempts);
       this.ws = null;
       if (this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         this.setState('reconnecting');
@@ -65,7 +68,7 @@ export class WsClient {
     };
 
     this.ws.onerror = (event) => {
-      console.log('[WS] Error:', event);
+      log('[WS] Error:', event);
       this.ws?.close();
     };
   }

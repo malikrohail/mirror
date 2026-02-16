@@ -28,8 +28,6 @@ class PersonaTemplateOut(BaseModel):
             if isinstance(profile_avatar, str) and profile_avatar:
                 self.avatar_url = profile_avatar
 
-        if not self.avatar_url:
-            self.avatar_url = f"https://i.pravatar.cc/200?u={quote(self.name)}"
         if self.estimated_cost_per_run_usd == 0.0:
             # Approximate per-persona, per-task cost based on current pricing:
             # persona_generation (1 call) + navigation (~15 steps) +

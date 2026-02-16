@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { formatDistanceToNow } from '@/lib/format';
-import { scoreColor, scoreLabel } from '@/lib/utils';
+import { formatDistanceToNow, scoreColor, scoreLabel } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/common/status-badge';
 import type { StudySummary } from '@/types';

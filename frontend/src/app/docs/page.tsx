@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { DocsViewer } from './docs-viewer';
+import { DocsViewer } from '@/components/docs-viewer';
 
 interface DocConfig {
   file: string;

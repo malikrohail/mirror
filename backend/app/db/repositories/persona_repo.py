@@ -38,6 +38,12 @@ class PersonaRepository:
         )
         return result.scalar_one_or_none() is not None
 
+    async def get_template_by_name(self, name: str) -> PersonaTemplate | None:
+        result = await self.session.execute(
+            select(PersonaTemplate).where(PersonaTemplate.name == name).limit(1)
+        )
+        return result.scalar_one_or_none()
+
     # Personas
     async def create_persona(self, **kwargs) -> Persona:
         persona = Persona(**kwargs)

@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback } from 'react';
 import { useScreencast } from '@/hooks/use-screencast';
-import { Play, Pause, SkipBack, SkipForward, Maximize2, Minimize2 } from 'lucide-react';
+import { Play, Pause, Maximize2, Minimize2 } from 'lucide-react';
 
 interface ScreencastViewerProps {
   sessionId: string;

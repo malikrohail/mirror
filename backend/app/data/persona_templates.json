@@ -14,9 +14,20 @@
       "trust_level": "moderate",
       "device_preference": "mobile",
       "accessibility_needs": [],
-      "frustration_triggers": ["slow loading", "too many steps", "unclear navigation"],
-      "personality": {"openness": 0.8, "conscientiousness": 0.4, "extraversion": 0.7, "agreeableness": 0.5, "neuroticism": 0.3}
-    }
+      "frustration_triggers": [
+        "slow loading",
+        "too many steps",
+        "unclear navigation"
+      ],
+      "personality": {
+        "openness": 0.8,
+        "conscientiousness": 0.4,
+        "extraversion": 0.7,
+        "agreeableness": 0.5,
+        "neuroticism": 0.3
+      }
+    },
+    "avatar_url": "/images/personas/humans/tech-savvy-college-student.png"
   },
   {
     "name": "Busy Working Parent",
@@ -33,9 +44,20 @@
       "trust_level": "moderate",
       "device_preference": "desktop",
       "accessibility_needs": [],
-      "frustration_triggers": ["lengthy forms", "unclear pricing", "no search function"],
-      "personality": {"openness": 0.5, "conscientiousness": 0.8, "extraversion": 0.6, "agreeableness": 0.7, "neuroticism": 0.5}
-    }
+      "frustration_triggers": [
+        "lengthy forms",
+        "unclear pricing",
+        "no search function"
+      ],
+      "personality": {
+        "openness": 0.5,
+        "conscientiousness": 0.8,
+        "extraversion": 0.6,
+        "agreeableness": 0.7,
+        "neuroticism": 0.5
+      }
+    },
+    "avatar_url": "/images/personas/humans/busy-working-parent.png"
   },
   {
     "name": "Retired Grandparent",
@@ -51,10 +73,25 @@
       "reading_speed": "thorough",
       "trust_level": "skeptical",
       "device_preference": "desktop",
-      "accessibility_needs": ["large text", "high contrast"],
-      "frustration_triggers": ["small text", "icons without labels", "jargon", "popup dialogs"],
-      "personality": {"openness": 0.3, "conscientiousness": 0.9, "extraversion": 0.3, "agreeableness": 0.8, "neuroticism": 0.6}
-    }
+      "accessibility_needs": [
+        "large text",
+        "high contrast"
+      ],
+      "frustration_triggers": [
+        "small text",
+        "icons without labels",
+        "jargon",
+        "popup dialogs"
+      ],
+      "personality": {
+        "openness": 0.3,
+        "conscientiousness": 0.9,
+        "extraversion": 0.3,
+        "agreeableness": 0.8,
+        "neuroticism": 0.6
+      }
+    },
+    "avatar_url": "/images/personas/humans/retired-grandparent.png"
   },
   {
     "name": "Non-Native English Speaker",
@@ -71,9 +108,20 @@
       "trust_level": "moderate",
       "device_preference": "desktop",
       "accessibility_needs": [],
-      "frustration_triggers": ["idiomatic expressions", "culturally specific references", "ambiguous labels"],
-      "personality": {"openness": 0.7, "conscientiousness": 0.7, "extraversion": 0.4, "agreeableness": 0.6, "neuroticism": 0.4}
-    }
+      "frustration_triggers": [
+        "idiomatic expressions",
+        "culturally specific references",
+        "ambiguous labels"
+      ],
+      "personality": {
+        "openness": 0.7,
+        "conscientiousness": 0.7,
+        "extraversion": 0.4,
+        "agreeableness": 0.6,
+        "neuroticism": 0.4
+      }
+    },
+    "avatar_url": "/images/personas/humans/non-native-english-speaker.png"
   },
   {
     "name": "Impatient Executive",
@@ -90,9 +138,21 @@
       "trust_level": "skeptical",
       "device_preference": "desktop",
       "accessibility_needs": [],
-      "frustration_triggers": ["mandatory signup before value", "no clear pricing", "too much text", "no demo"],
-      "personality": {"openness": 0.4, "conscientiousness": 0.9, "extraversion": 0.8, "agreeableness": 0.3, "neuroticism": 0.5}
-    }
+      "frustration_triggers": [
+        "mandatory signup before value",
+        "no clear pricing",
+        "too much text",
+        "no demo"
+      ],
+      "personality": {
+        "openness": 0.4,
+        "conscientiousness": 0.9,
+        "extraversion": 0.8,
+        "agreeableness": 0.3,
+        "neuroticism": 0.5
+      }
+    },
+    "avatar_url": "/images/personas/humans/impatient-executive.png"
   },
   {
     "name": "First-Time Internet User",
@@ -108,10 +168,24 @@
       "reading_speed": "thorough",
       "trust_level": "very_skeptical",
       "device_preference": "mobile",
-      "accessibility_needs": ["large text"],
-      "frustration_triggers": ["anything unexpected", "too many options", "no clear instructions", "technical terms"],
-      "personality": {"openness": 0.2, "conscientiousness": 0.7, "extraversion": 0.4, "agreeableness": 0.8, "neuroticism": 0.7}
-    }
+      "accessibility_needs": [
+        "large text"
+      ],
+      "frustration_triggers": [
+        "anything unexpected",
+        "too many options",
+        "no clear instructions",
+        "technical terms"
+      ],
+      "personality": {
+        "openness": 0.2,
+        "conscientiousness": 0.7,
+        "extraversion": 0.4,
+        "agreeableness": 0.8,
+        "neuroticism": 0.7
+      }
+    },
+    "avatar_url": "/images/personas/humans/first-time-internet-user.png"
   },
   {
     "name": "Power User Developer",
@@ -128,9 +202,21 @@
       "trust_level": "skeptical",
       "device_preference": "desktop",
       "accessibility_needs": [],
-      "frustration_triggers": ["no keyboard navigation", "inconsistent design", "unnecessary confirmations", "no dark mode"],
-      "personality": {"openness": 0.9, "conscientiousness": 0.6, "extraversion": 0.3, "agreeableness": 0.4, "neuroticism": 0.3}
-    }
+      "frustration_triggers": [
+        "no keyboard navigation",
+        "inconsistent design",
+        "unnecessary confirmations",
+        "no dark mode"
+      ],
+      "personality": {
+        "openness": 0.9,
+        "conscientiousness": 0.6,
+        "extraversion": 0.3,
+        "agreeableness": 0.4,
+        "neuroticism": 0.3
+      }
+    },
+    "avatar_url": "/images/personas/humans/power-user-developer.png"
   },
   {
     "name": "Anxious First-Time Buyer",
@@ -147,9 +233,21 @@
       "trust_level": "very_skeptical",
       "device_preference": "mobile",
       "accessibility_needs": [],
-      "frustration_triggers": ["hidden fees", "no return policy visible", "too many required fields", "no security badges"],
-      "personality": {"openness": 0.5, "conscientiousness": 0.8, "extraversion": 0.3, "agreeableness": 0.7, "neuroticism": 0.8}
-    }
+      "frustration_triggers": [
+        "hidden fees",
+        "no return policy visible",
+        "too many required fields",
+        "no security badges"
+      ],
+      "personality": {
+        "openness": 0.5,
+        "conscientiousness": 0.8,
+        "extraversion": 0.3,
+        "agreeableness": 0.7,
+        "neuroticism": 0.8
+      }
+    },
+    "avatar_url": "/images/personas/humans/anxious-first-time-buyer.png"
   },
   {
     "name": "Screen Reader User",
@@ -165,10 +263,27 @@
       "reading_speed": "thorough",
       "trust_level": "moderate",
       "device_preference": "desktop",
-      "accessibility_needs": ["screen_reader", "keyboard_only", "no_images"],
-      "frustration_triggers": ["missing alt text", "no ARIA labels", "focus traps", "auto-playing media", "mouse-only interactions"],
-      "personality": {"openness": 0.6, "conscientiousness": 0.8, "extraversion": 0.5, "agreeableness": 0.6, "neuroticism": 0.4}
-    }
+      "accessibility_needs": [
+        "screen_reader",
+        "keyboard_only",
+        "no_images"
+      ],
+      "frustration_triggers": [
+        "missing alt text",
+        "no ARIA labels",
+        "focus traps",
+        "auto-playing media",
+        "mouse-only interactions"
+      ],
+      "personality": {
+        "openness": 0.6,
+        "conscientiousness": 0.8,
+        "extraversion": 0.5,
+        "agreeableness": 0.6,
+        "neuroticism": 0.4
+      }
+    },
+    "avatar_url": "/images/personas/humans/screen-reader-user.png"
   },
   {
     "name": "Low Vision User",
@@ -184,10 +299,26 @@
       "reading_speed": "thorough",
       "trust_level": "moderate",
       "device_preference": "desktop",
-      "accessibility_needs": ["high_contrast", "large_text", "zoom_200"],
-      "frustration_triggers": ["low contrast text", "small click targets", "text in images", "horizontal scrolling at zoom"],
-      "personality": {"openness": 0.5, "conscientiousness": 0.8, "extraversion": 0.4, "agreeableness": 0.8, "neuroticism": 0.5}
-    }
+      "accessibility_needs": [
+        "high_contrast",
+        "large_text",
+        "zoom_200"
+      ],
+      "frustration_triggers": [
+        "low contrast text",
+        "small click targets",
+        "text in images",
+        "horizontal scrolling at zoom"
+      ],
+      "personality": {
+        "openness": 0.5,
+        "conscientiousness": 0.8,
+        "extraversion": 0.4,
+        "agreeableness": 0.8,
+        "neuroticism": 0.5
+      }
+    },
+    "avatar_url": "/images/personas/humans/low-vision-user.png"
   },
   {
     "name": "Color Blind User",
@@ -203,10 +334,23 @@
       "reading_speed": "normal",
       "trust_level": "moderate",
       "device_preference": "desktop",
-      "accessibility_needs": ["color_blind_deuteranopia"],
-      "frustration_triggers": ["color-only indicators", "red/green status without labels", "poor contrast ratios"],
-      "personality": {"openness": 0.5, "conscientiousness": 0.7, "extraversion": 0.5, "agreeableness": 0.6, "neuroticism": 0.4}
-    }
+      "accessibility_needs": [
+        "color_blind_deuteranopia"
+      ],
+      "frustration_triggers": [
+        "color-only indicators",
+        "red/green status without labels",
+        "poor contrast ratios"
+      ],
+      "personality": {
+        "openness": 0.5,
+        "conscientiousness": 0.7,
+        "extraversion": 0.5,
+        "agreeableness": 0.6,
+        "neuroticism": 0.4
+      }
+    },
+    "avatar_url": "/images/personas/humans/color-blind-user.png"
   },
   {
     "name": "Motor Impairment User",
@@ -222,10 +366,26 @@
       "reading_speed": "normal",
       "trust_level": "moderate",
       "device_preference": "desktop",
-      "accessibility_needs": ["keyboard_only", "large_click_targets", "no_drag_drop"],
-      "frustration_triggers": ["small buttons", "hover-only menus", "drag and drop required", "timed interactions"],
-      "personality": {"openness": 0.6, "conscientiousness": 0.7, "extraversion": 0.4, "agreeableness": 0.7, "neuroticism": 0.5}
-    }
+      "accessibility_needs": [
+        "keyboard_only",
+        "large_click_targets",
+        "no_drag_drop"
+      ],
+      "frustration_triggers": [
+        "small buttons",
+        "hover-only menus",
+        "drag and drop required",
+        "timed interactions"
+      ],
+      "personality": {
+        "openness": 0.6,
+        "conscientiousness": 0.7,
+        "extraversion": 0.4,
+        "agreeableness": 0.7,
+        "neuroticism": 0.5
+      }
+    },
+    "avatar_url": "/images/personas/humans/motor-impairment-user.png"
   },
   {
     "name": "Cognitive Disability User",
@@ -241,10 +401,27 @@
       "reading_speed": "skims",
       "trust_level": "moderate",
       "device_preference": "desktop",
-      "accessibility_needs": ["reduced_motion", "minimal_distractions", "clear_structure"],
-      "frustration_triggers": ["animations", "autoplay", "wall of text", "multi-step processes", "no progress indicator"],
-      "personality": {"openness": 0.8, "conscientiousness": 0.3, "extraversion": 0.6, "agreeableness": 0.6, "neuroticism": 0.6}
-    }
+      "accessibility_needs": [
+        "reduced_motion",
+        "minimal_distractions",
+        "clear_structure"
+      ],
+      "frustration_triggers": [
+        "animations",
+        "autoplay",
+        "wall of text",
+        "multi-step processes",
+        "no progress indicator"
+      ],
+      "personality": {
+        "openness": 0.8,
+        "conscientiousness": 0.3,
+        "extraversion": 0.6,
+        "agreeableness": 0.6,
+        "neuroticism": 0.6
+      }
+    },
+    "avatar_url": "/images/personas/humans/cognitive-disability-user.png"
   },
   {
     "name": "E-commerce Power Shopper",
@@ -261,9 +438,21 @@
       "trust_level": "moderate",
       "device_preference": "mobile",
       "accessibility_needs": [],
-      "frustration_triggers": ["mandatory account creation", "no guest checkout", "hidden shipping costs", "complicated returns"],
-      "personality": {"openness": 0.6, "conscientiousness": 0.5, "extraversion": 0.7, "agreeableness": 0.5, "neuroticism": 0.4}
-    }
+      "frustration_triggers": [
+        "mandatory account creation",
+        "no guest checkout",
+        "hidden shipping costs",
+        "complicated returns"
+      ],
+      "personality": {
+        "openness": 0.6,
+        "conscientiousness": 0.5,
+        "extraversion": 0.7,
+        "agreeableness": 0.5,
+        "neuroticism": 0.4
+      }
+    },
+    "avatar_url": "/images/personas/humans/e-commerce-power-shopper.png"
   },
   {
     "name": "SaaS Evaluator",
@@ -280,9 +469,21 @@
       "trust_level": "skeptical",
       "device_preference": "desktop",
       "accessibility_needs": [],
-      "frustration_triggers": ["no pricing page", "contact sales only", "no free trial", "feature comparison unclear"],
-      "personality": {"openness": 0.5, "conscientiousness": 0.9, "extraversion": 0.5, "agreeableness": 0.4, "neuroticism": 0.3}
-    }
+      "frustration_triggers": [
+        "no pricing page",
+        "contact sales only",
+        "no free trial",
+        "feature comparison unclear"
+      ],
+      "personality": {
+        "openness": 0.5,
+        "conscientiousness": 0.9,
+        "extraversion": 0.5,
+        "agreeableness": 0.4,
+        "neuroticism": 0.3
+      }
+    },
+    "avatar_url": "/images/personas/humans/saas-evaluator.png"
   },
   {
     "name": "Healthcare Patient",
@@ -298,10 +499,24 @@
       "reading_speed": "thorough",
       "trust_level": "moderate",
       "device_preference": "desktop",
-      "accessibility_needs": ["large text"],
-      "frustration_triggers": ["medical jargon", "complex navigation", "no phone number visible", "confusing date pickers"],
-      "personality": {"openness": 0.3, "conscientiousness": 0.8, "extraversion": 0.4, "agreeableness": 0.8, "neuroticism": 0.6}
-    }
+      "accessibility_needs": [
+        "large text"
+      ],
+      "frustration_triggers": [
+        "medical jargon",
+        "complex navigation",
+        "no phone number visible",
+        "confusing date pickers"
+      ],
+      "personality": {
+        "openness": 0.3,
+        "conscientiousness": 0.8,
+        "extraversion": 0.4,
+        "agreeableness": 0.8,
+        "neuroticism": 0.6
+      }
+    },
+    "avatar_url": "/images/personas/humans/healthcare-patient.png"
   },
   {
     "name": "Fintech First-Timer",
@@ -318,9 +533,21 @@
       "trust_level": "very_skeptical",
       "device_preference": "mobile",
       "accessibility_needs": [],
-      "frustration_triggers": ["financial jargon", "no tooltips", "unclear risk warnings", "no human support option"],
-      "personality": {"openness": 0.6, "conscientiousness": 0.5, "extraversion": 0.6, "agreeableness": 0.7, "neuroticism": 0.7}
-    }
+      "frustration_triggers": [
+        "financial jargon",
+        "no tooltips",
+        "unclear risk warnings",
+        "no human support option"
+      ],
+      "personality": {
+        "openness": 0.6,
+        "conscientiousness": 0.5,
+        "extraversion": 0.6,
+        "agreeableness": 0.7,
+        "neuroticism": 0.7
+      }
+    },
+    "avatar_url": "/images/personas/humans/fintech-first-timer.png"
   },
   {
     "name": "Mobile-Only User",
@@ -337,9 +564,21 @@
       "trust_level": "moderate",
       "device_preference": "mobile",
       "accessibility_needs": [],
-      "frustration_triggers": ["not mobile responsive", "tiny tap targets", "no swipe gestures", "desktop-only features"],
-      "personality": {"openness": 0.8, "conscientiousness": 0.3, "extraversion": 0.8, "agreeableness": 0.5, "neuroticism": 0.3}
-    }
+      "frustration_triggers": [
+        "not mobile responsive",
+        "tiny tap targets",
+        "no swipe gestures",
+        "desktop-only features"
+      ],
+      "personality": {
+        "openness": 0.8,
+        "conscientiousness": 0.3,
+        "extraversion": 0.8,
+        "agreeableness": 0.5,
+        "neuroticism": 0.3
+      }
+    },
+    "avatar_url": "/images/personas/humans/mobile-only-user.png"
   },
   {
     "name": "Privacy-Conscious User",
@@ -356,9 +595,21 @@
       "trust_level": "very_skeptical",
       "device_preference": "desktop",
       "accessibility_needs": [],
-      "frustration_triggers": ["excessive data collection", "no privacy policy", "third-party trackers", "required phone number"],
-      "personality": {"openness": 0.4, "conscientiousness": 0.9, "extraversion": 0.2, "agreeableness": 0.3, "neuroticism": 0.5}
-    }
+      "frustration_triggers": [
+        "excessive data collection",
+        "no privacy policy",
+        "third-party trackers",
+        "required phone number"
+      ],
+      "personality": {
+        "openness": 0.4,
+        "conscientiousness": 0.9,
+        "extraversion": 0.2,
+        "agreeableness": 0.3,
+        "neuroticism": 0.5
+      }
+    },
+    "avatar_url": "/images/personas/humans/privacy-conscious-user.png"
   },
   {
     "name": "Distracted Commuter",
@@ -375,9 +626,21 @@
       "trust_level": "moderate",
       "device_preference": "mobile",
       "accessibility_needs": [],
-      "frustration_triggers": ["large page sizes", "no offline support", "lost form data on back", "auto-logout"],
-      "personality": {"openness": 0.6, "conscientiousness": 0.5, "extraversion": 0.5, "agreeableness": 0.6, "neuroticism": 0.4}
-    }
+      "frustration_triggers": [
+        "large page sizes",
+        "no offline support",
+        "lost form data on back",
+        "auto-logout"
+      ],
+      "personality": {
+        "openness": 0.6,
+        "conscientiousness": 0.5,
+        "extraversion": 0.5,
+        "agreeableness": 0.6,
+        "neuroticism": 0.4
+      }
+    },
+    "avatar_url": "/images/personas/humans/distracted-commuter.png"
   },
   {
     "name": "AI Shopping Assistant",
@@ -393,10 +656,26 @@
       "reading_speed": "thorough",
       "trust_level": "neutral",
       "device_preference": "desktop",
-      "accessibility_needs": ["semantic_html", "structured_data"],
-      "frustration_triggers": ["anti-bot CAPTCHAs", "price hidden behind interaction", "infinite scroll with no pagination", "dynamic content requiring hover", "login walls before product info"],
-      "personality": {"openness": 0.2, "conscientiousness": 1.0, "extraversion": 0.0, "agreeableness": 0.5, "neuroticism": 0.0}
-    }
+      "accessibility_needs": [
+        "semantic_html",
+        "structured_data"
+      ],
+      "frustration_triggers": [
+        "anti-bot CAPTCHAs",
+        "price hidden behind interaction",
+        "infinite scroll with no pagination",
+        "dynamic content requiring hover",
+        "login walls before product info"
+      ],
+      "personality": {
+        "openness": 0.2,
+        "conscientiousness": 1.0,
+        "extraversion": 0.0,
+        "agreeableness": 0.5,
+        "neuroticism": 0.0
+      }
+    },
+    "avatar_url": "/images/personas/ai/ai-shopping-assistant.png"
   },
   {
     "name": "AI Research Agent",
@@ -412,10 +691,27 @@
       "reading_speed": "thorough",
       "trust_level": "neutral",
       "device_preference": "desktop",
-      "accessibility_needs": ["semantic_html", "structured_data", "clear_headings"],
-      "frustration_triggers": ["content loaded via JavaScript only", "no sitemap", "pagination without direct links", "content behind modals", "inconsistent URL structure"],
-      "personality": {"openness": 0.3, "conscientiousness": 1.0, "extraversion": 0.0, "agreeableness": 0.5, "neuroticism": 0.0}
-    }
+      "accessibility_needs": [
+        "semantic_html",
+        "structured_data",
+        "clear_headings"
+      ],
+      "frustration_triggers": [
+        "content loaded via JavaScript only",
+        "no sitemap",
+        "pagination without direct links",
+        "content behind modals",
+        "inconsistent URL structure"
+      ],
+      "personality": {
+        "openness": 0.3,
+        "conscientiousness": 1.0,
+        "extraversion": 0.0,
+        "agreeableness": 0.5,
+        "neuroticism": 0.0
+      }
+    },
+    "avatar_url": "/images/personas/ai/ai-research-agent.png"
   },
   {
     "name": "AI Customer Support Bot",
@@ -431,10 +727,27 @@
       "reading_speed": "thorough",
       "trust_level": "neutral",
       "device_preference": "desktop",
-      "accessibility_needs": ["semantic_html", "clear_headings", "structured_data"],
-      "frustration_triggers": ["no search functionality", "FAQ not categorized", "support hidden behind chatbot", "no direct contact links", "circular navigation in help center"],
-      "personality": {"openness": 0.3, "conscientiousness": 0.9, "extraversion": 0.1, "agreeableness": 0.7, "neuroticism": 0.0}
-    }
+      "accessibility_needs": [
+        "semantic_html",
+        "clear_headings",
+        "structured_data"
+      ],
+      "frustration_triggers": [
+        "no search functionality",
+        "FAQ not categorized",
+        "support hidden behind chatbot",
+        "no direct contact links",
+        "circular navigation in help center"
+      ],
+      "personality": {
+        "openness": 0.3,
+        "conscientiousness": 0.9,
+        "extraversion": 0.1,
+        "agreeableness": 0.7,
+        "neuroticism": 0.0
+      }
+    },
+    "avatar_url": "/images/personas/ai/ai-customer-support-bot.png"
   },
   {
     "name": "AI Form-Filling Agent",
@@ -450,10 +763,28 @@
       "reading_speed": "thorough",
       "trust_level": "neutral",
       "device_preference": "desktop",
-      "accessibility_needs": ["semantic_html", "labeled_inputs", "standard_form_controls"],
-      "frustration_triggers": ["unlabeled form fields", "custom date pickers", "CAPTCHAs", "multi-step forms without progress state", "drag-and-drop file upload only", "hidden required fields"],
-      "personality": {"openness": 0.1, "conscientiousness": 1.0, "extraversion": 0.0, "agreeableness": 0.5, "neuroticism": 0.0}
-    }
+      "accessibility_needs": [
+        "semantic_html",
+        "labeled_inputs",
+        "standard_form_controls"
+      ],
+      "frustration_triggers": [
+        "unlabeled form fields",
+        "custom date pickers",
+        "CAPTCHAs",
+        "multi-step forms without progress state",
+        "drag-and-drop file upload only",
+        "hidden required fields"
+      ],
+      "personality": {
+        "openness": 0.1,
+        "conscientiousness": 1.0,
+        "extraversion": 0.0,
+        "agreeableness": 0.5,
+        "neuroticism": 0.0
+      }
+    },
+    "avatar_url": "/images/personas/ai/ai-form-filling-agent.png"
   },
   {
     "name": "AI Accessibility Auditor",
@@ -469,10 +800,28 @@
       "reading_speed": "thorough",
       "trust_level": "neutral",
       "device_preference": "desktop",
-      "accessibility_needs": ["screen_reader", "keyboard_only", "high_contrast"],
-      "frustration_triggers": ["missing ARIA landmarks", "no skip-to-content link", "images without alt text", "poor heading hierarchy", "focus not visible", "color-only indicators"],
-      "personality": {"openness": 0.4, "conscientiousness": 1.0, "extraversion": 0.0, "agreeableness": 0.5, "neuroticism": 0.0}
-    }
+      "accessibility_needs": [
+        "screen_reader",
+        "keyboard_only",
+        "high_contrast"
+      ],
+      "frustration_triggers": [
+        "missing ARIA landmarks",
+        "no skip-to-content link",
+        "images without alt text",
+        "poor heading hierarchy",
+        "focus not visible",
+        "color-only indicators"
+      ],
+      "personality": {
+        "openness": 0.4,
+        "conscientiousness": 1.0,
+        "extraversion": 0.0,
+        "agreeableness": 0.5,
+        "neuroticism": 0.0
+      }
+    },
+    "avatar_url": "/images/personas/ai/ai-accessibility-auditor.png"
   },
   {
     "name": "AI Web Scraper",
@@ -488,9 +837,26 @@
       "reading_speed": "thorough",
       "trust_level": "neutral",
       "device_preference": "desktop",
-      "accessibility_needs": ["semantic_html", "structured_data"],
-      "frustration_triggers": ["content rendered only via JavaScript", "rate limiting", "CAPTCHAs", "inconsistent DOM structure", "no API available", "anti-scraping measures"],
-      "personality": {"openness": 0.2, "conscientiousness": 0.9, "extraversion": 0.0, "agreeableness": 0.3, "neuroticism": 0.0}
-    }
+      "accessibility_needs": [
+        "semantic_html",
+        "structured_data"
+      ],
+      "frustration_triggers": [
+        "content rendered only via JavaScript",
+        "rate limiting",
+        "CAPTCHAs",
+        "inconsistent DOM structure",
+        "no API available",
+        "anti-scraping measures"
+      ],
+      "personality": {
+        "openness": 0.2,
+        "conscientiousness": 0.9,
+        "extraversion": 0.0,
+        "agreeableness": 0.3,
+        "neuroticism": 0.0
+      }
+    },
+    "avatar_url": "/images/personas/ai/ai-web-scraper.png"
   }
 ]

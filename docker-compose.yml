@@ -68,7 +68,7 @@ services:
     profiles: ["local"]
     build:
       context: .
-      dockerfile: Dockerfile.local
+      dockerfile: deploy/Dockerfile.local
     ports:
       - "8000:8000"
     shm_size: '2g'
@@ -98,7 +98,7 @@ services:
     profiles: ["local"]
     build:
       context: .
-      dockerfile: Dockerfile.local
+      dockerfile: deploy/Dockerfile.local
     command: arq app.workers.settings.WorkerSettings
     shm_size: '2g'
     environment:

@@ -8,7 +8,6 @@ import { ErrorState } from '@/components/common/error-state';
 import { PageSkeleton } from '@/components/common/page-skeleton';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { useStudyStore } from '@/stores/study-store';
-import { withResolvedPersonaAvatar } from '@/config/persona-avatars';
 import type { PersonaTemplateOut, SessionOut } from '@/types';
 
 interface StudyProgressProps {
@@ -67,10 +66,7 @@ export function StudyProgress({ studyId, hideLabel, selectedSessionId, onSelectS
   // Get persona templates for names
   const { data: templates } = useQuery({
     queryKey: ['persona-templates'],
-    queryFn: async () => {
-      const personaTemplates = await api.listPersonaTemplates();
-      return personaTemplates.map(withResolvedPersonaAvatar);
-    },
+    queryFn: () => api.listPersonaTemplates(),
   });
 
   const templateMap = new Map<string, PersonaTemplateOut>();

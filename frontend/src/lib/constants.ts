@@ -5,7 +5,6 @@ export const WS_URL =
     ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
     : 'ws://localhost:8000');
 
-export const STUDY_STATUSES = ['setup', 'running', 'analyzing', 'complete', 'failed'] as const;
 export const SEVERITIES = ['critical', 'major', 'minor', 'enhancement'] as const;
 export const ISSUE_TYPES = ['ux', 'accessibility', 'error', 'performance'] as const;
 
@@ -22,8 +21,6 @@ export const ISSUE_TYPE_COLORS: Record<string, string> = {
   error: 'text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-950 dark:border-red-900',
   performance: 'text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-950 dark:border-amber-900',
 };
-export const EMOTIONAL_STATES = ['curious', 'confused', 'frustrated', 'satisfied', 'stuck'] as const;
-
 export const SEVERITY_COLORS: Record<string, string> = {
   critical: 'text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-950 dark:border-red-900',
   major: 'text-orange-600 bg-orange-50 border-orange-200 dark:text-orange-400 dark:bg-orange-950 dark:border-orange-900',
@@ -52,27 +49,6 @@ export const TERMS = {
   plural: 'tests',
   singularCap: 'Test',
   pluralCap: 'Tests',
-} as const;
-
-/**
- * Standard table text color hierarchy (Option 2 — "Task hero").
- * Primary content column is the most readable; identifiers stay quiet.
- */
-export const TABLE_COLORS = {
-  /** Table header text: quiet uppercase labels */
-  header: 'text-foreground/30',
-  /** Identifier/name column: quiet, scannable */
-  identifier: 'text-foreground/30',
-  /** Primary content/description: hero — most readable column */
-  primary: 'text-foreground/70',
-  /** Count metadata (testers, age, cost, etc.) */
-  meta: 'text-foreground/40',
-  /** Date and secondary metadata */
-  secondary: 'text-foreground/30',
-  /** Empty/placeholder values (dashes, n/a) */
-  placeholder: 'text-foreground/20',
-  /** Hover reveal elements (chevrons, action buttons) */
-  hoverReveal: 'text-foreground/15',
 } as const;
 
 export const AUTOPLAY_INTERVAL = 2000;
