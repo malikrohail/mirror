@@ -34,12 +34,56 @@ class BrowserActions:
         self.timeout_ms = timeout_ms
 
     async def click(self, page: Page, selector: str) -> ActionResult:
-        """Click an element, with one retry if not found."""
+        """Click an element with multiple fallback strategies.
+
+        Strategy order:
+        1. Normal Playwright click (uses selector resolution + actionability)
+        2. If click succeeded but page didn't change, try coordinate-based
+           mouse.click at the element's center (bypasses event interception)
+        3. If element not found, retry once after a delay
+        """
         for attempt in range(2):
             try:
+                url_before = page.url
                 await page.click(selector, timeout=self.timeout_ms)
-                # Wait for any navigation triggered by the click
                 await self._wait_for_stable(page)
+
+                # Check if the click actually changed something.
+                # On SPAs (Airbnb, React apps), a CSS selector click
+                # sometimes finds the element but doesn't trigger the
+                # intended JS handler (e.g. expanding a compact search bar).
+                # Fallback: click at the element's pixel coordinates.
+                if page.url == url_before:
+                    try:
+                        dom_changed = await page.evaluate("""() => {
+                            // Quick check: did any new dialog/expanded
+                            // elements appear after the click?
+                            const expanded = document.querySelector(
+                                '[aria-expanded="true"], ' +
+                                '[role="dialog"]:not([style*="display: none"]), ' +
+                                '[role="search"] input:focus, ' +
+                                'input:focus, textarea:focus'
+                            );
+                            return !!expanded;
+                        }""")
+                        if not dom_changed:
+                            # Try coordinate-based click as fallback
+                            box = await page.locator(selector).first.bounding_box(
+                                timeout=2000
+                            )
+                            if box:
+                                cx = int(box["x"] + box["width"] / 2)
+                                cy = int(box["y"] + box["height"] / 2)
+                                await page.mouse.click(cx, cy)
+                                await self._wait_for_stable(page)
+                                logger.info(
+                                    "Click fallback: coordinate click at (%d, %d) "
+                                    "for '%s'",
+                                    cx, cy, selector,
+                                )
+                    except Exception:
+                        pass  # Fallback is best-effort
+
                 return ActionResult(
                     success=True,
                     action_type="click",

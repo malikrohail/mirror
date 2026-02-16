@@ -931,6 +931,25 @@ class Navigator:
             if step.action_error:
                 line += f" *** ACTION FAILED: {step.action_error} — DO NOT retry this selector ***"
             lines.append(line)
+
+        # Detect repeated same-action-no-progress pattern and warn the LLM
+        if len(history) >= 2:
+            last_two = history[-2:]
+            if (
+                all(s.action_type == "click" for s in last_two)
+                and all(s.page_url == last_two[0].page_url for s in last_two)
+                and all(s.task_progress == last_two[0].task_progress for s in last_two)
+                and not any(s.action_error for s in last_two)
+            ):
+                lines.append(
+                    "*** WARNING: Your last 2 clicks did NOT change the page. "
+                    "The element may not respond to CSS selector clicks. "
+                    "Try a COMPLETELY DIFFERENT approach: use a different selector "
+                    "from the accessibility tree, try the 'navigate' action to go "
+                    "to a search URL directly, or try clicking a parent/sibling "
+                    "element instead. DO NOT click the same element again. ***"
+                )
+
         return "\n".join(lines)
 
     @staticmethod

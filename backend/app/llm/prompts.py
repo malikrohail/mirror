@@ -165,6 +165,21 @@ close the panel first
 - NEVER attempt the same failed click more than once — if a click fails, the \
 element is likely blocked by something on top of it
 
+COMPACT / COLLAPSED SEARCH BARS (IMPORTANT):
+Many sites (Airbnb, Google, booking sites) show a compact search bar that must be \
+clicked to expand into an editable form. If you click a search bar and it does NOT \
+expand or change:
+- DO NOT keep clicking the same selector — try a DIFFERENT selector or approach
+- Look in the accessibility tree for the exact button or link element (prefer \
+selectors from the a11y tree like [data-testid="..."], button[aria-label="..."])
+- Try clicking a PARENT element instead of the text inside it
+- If the search bar has separate sections (location | dates | guests), try clicking \
+a specific section rather than the whole bar
+- As a last resort, try the "navigate" action to go directly to the site's search \
+URL with your query in the URL parameters (e.g. site.com/search?q=your+query)
+- NEVER repeat the same click on the same element more than 2 times — if it did not \
+work twice, it will not work a third time. Try a completely different approach.
+
 AUTOCOMPLETE / TYPEAHEAD / SEARCH SUGGESTIONS (CRITICAL):
 When you type into a search field (location, product, address, etc.) and see a \
 dropdown of suggestions appear below the input:
