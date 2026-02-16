@@ -34,12 +34,12 @@ This isn't a wrapper around one API call. It's a 5-stage pipeline with 200+ LLM 
 | Stage | Model | What Happens |
 |-------|-------|-------------|
 | **Persona Generation** | Opus 4.6 | Natural language description -> full behavioral profile with 10+ consistent attributes |
-| **Navigation** | Haiku 4.5 | Screenshot + accessibility tree -> think-aloud + next action (50-150 calls per study) |
+| **Navigation** | Sonnet 4.5 | Screenshot + Computer Use (coordinate-based clicks) -> think-aloud + next action (50-150 calls per study) |
 | **Screenshot Analysis** | Opus 4.6 | Deep visual UX audit: Nielsen's heuristics + WCAG 2.1 on every page |
 | **Cross-Persona Synthesis** | Opus 4.6 | Compares all personas' experiences, finds universal vs persona-specific issues |
 | **Report Generation** | Opus 4.6 | Professional PDF/Markdown report with prioritized recommendations |
 
-**Model routing** — Haiku for speed during navigation (low latency matters when you're making 150 decisions), Opus for depth during analysis (quality matters when you're synthesizing insights). Extended thinking for complex cross-persona synthesis.
+**Model routing** — Sonnet 4.5 with Computer Use for navigation (coordinate-based clicks, no CSS selectors needed), Opus for depth during analysis (quality matters when you're synthesizing insights). Extended thinking for complex cross-persona synthesis.
 
 **Vision is the unlock.** Every screenshot is sent with a full persona identity. Opus doesn't just see UI elements — it evaluates them as a specific person would.
 
@@ -48,6 +48,7 @@ See [docs/ai-and-llm-pipeline.md](docs/ai-and-llm-pipeline.md) for the full tech
 ## Key Features
 
 - **Real browser testing** — Playwright + Browserbase cloud browsers, not simulated clicks
+- **Computer Use navigation** — Sonnet 4.5 drives browsers via coordinate-based clicks (no CSS selectors), just like a real user
 - **AI think-aloud narration** — first-person inner monologue reflecting the persona's experience
 - **20+ persona templates** — from tech-savvy developers to elderly first-time users
 - **Custom persona generation** — describe a user in plain English, get a full behavioral profile
@@ -67,8 +68,8 @@ See [docs/ai-and-llm-pipeline.md](docs/ai-and-llm-pipeline.md) for the full tech
 | Backend | FastAPI, Python 3.12, async everywhere |
 | Database | PostgreSQL 16 + SQLAlchemy 2.0 (async) |
 | Cache/PubSub | Redis 7 |
-| Browser Automation | Playwright via Browserbase (cloud) |
-| AI/LLM | Claude Opus 4.6 + Haiku 4.5 (model routing) |
+| Browser Automation | Playwright via Browserbase (cloud) + Claude Computer Use |
+| AI/LLM | Claude Opus 4.6 + Sonnet 4.5 (Computer Use navigation) |
 | Real-time | WebSocket + Redis pub/sub |
 | Job Queue | arq (async Redis queue) |
 | Observability | Langfuse (token tracking, cost per study) |
@@ -128,6 +129,7 @@ BROWSERBASE_API_KEY=bb_...          # Required — Cloud browsers
 BROWSERBASE_PROJECT_ID=proj_...     # Required — Browserbase project
 DATABASE_URL=postgresql+asyncpg://mirror:mirror@localhost:5432/mirror
 REDIS_URL=redis://localhost:6379/0
+USE_COMPUTER_USE=true               # Sonnet 4.5 Computer Use navigation (coordinate-based)
 ```
 
 ## Project Structure
