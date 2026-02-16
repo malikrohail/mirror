@@ -1,6 +1,14 @@
-# Mirror
+# Miror
 
 **Our AI testers don't just analyze websites. They become people.**
+
+https://miror.tech
+
+https://www.youtube.com/watch?v=3RGXdXPUGZ4
+
+By Meir Rosenschein and Malik Rohail
+
+---
 
 Usability testing costs $12,000+ and takes weeks to recruit, run, and synthesize. Mirror does it in 5 minutes. Paste a URL, pick some personas, and watch AI navigate your live site in real browsers — thinking aloud the entire time.
 
