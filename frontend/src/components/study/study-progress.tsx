@@ -135,6 +135,7 @@ export function StudyProgress({ studyId, hideLabel, selectedSessionId, onSelectS
                   browserActive={ws?.browser_active ?? polled?.browser_active ?? session.browser_active ?? !sessionComplete}
                   screencastAvailable={ws?.screencast_available ?? false}
                   sessionId={session.id}
+                  uxScore={session.ux_score}
                   selected={selectedSessionId === session.id}
                   onSelect={() => onSelectSession?.(session.id)}
                 />

@@ -207,11 +207,20 @@ class InsightItem(BaseModel):
     reasoning_trace: str = Field(default="", description="Opus extended thinking trace for this insight")
 
 
+class PersonaScore(BaseModel):
+    """Per-persona UX score from synthesis."""
+
+    persona_name: str
+    score: int = Field(..., ge=0, le=100)
+    reasoning: str = Field(default="")
+
+
 class StudySynthesis(BaseModel):
     """Output of the cross-persona synthesis LLM call (Stage 4)."""
 
     executive_summary: str
     overall_ux_score: int = Field(default=50, ge=0, le=100)
+    persona_scores: list[PersonaScore] = Field(default_factory=list)
     reasoning_trace: str = Field(default="", description="Full Opus extended thinking trace for synthesis")
     universal_issues: list[InsightItem] = Field(default_factory=list)
     persona_specific_issues: list[InsightItem] = Field(default_factory=list)

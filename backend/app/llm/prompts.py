@@ -329,6 +329,13 @@ OUTPUT FORMAT: Return a JSON object:
 {
   "executive_summary": "3-5 sentence overview of key findings",
   "overall_ux_score": int (0-100),
+  "persona_scores": [
+    {
+      "persona_name": "exact persona name from session summaries",
+      "score": int (0-100),
+      "reasoning": "1-2 sentence explanation of this persona's individual score"
+    }
+  ],
   "universal_issues": [
     {
       "type": "universal",
@@ -370,6 +377,12 @@ SCORING GUIDE:
 - 30-49: Poor — major usability problems, many personas struggle
 - 10-29: Critical — fundamental usability failures, most personas cannot complete tasks
 - 0-9: ONLY if the website does not load at all, or every page is broken/blank
+
+PER-PERSONA SCORING:
+Provide a SEPARATE score for each persona in the "persona_scores" array based on \
+their individual experience. A persona who completed the task easily should score \
+70-90+. A persona who gave up or struggled heavily should score 20-45. The \
+overall_ux_score should be a weighted synthesis of all persona scores.
 
 CRITICAL SCORING RULES:
 1. NEVER assign a score of 0 unless the website literally failed to load or every \

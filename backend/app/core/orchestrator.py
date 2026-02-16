@@ -279,6 +279,31 @@ class StudyOrchestrator:
 
             synthesis, _ = await asyncio.gather(synthesis_coro, heatmap_coro)
 
+            # Persist per-persona scores from synthesis to session records
+            if synthesis.persona_scores:
+                # Build lookup: persona_name → session_id from summaries
+                name_to_session_id: dict[str, str] = {}
+                for s in session_summaries:
+                    pname = s.get("persona_name", "")
+                    sid = s.get("session_id", "")
+                    if pname and sid:
+                        name_to_session_id[pname] = sid
+
+                for ps in synthesis.persona_scores:
+                    sid = name_to_session_id.get(ps.persona_name)
+                    if sid:
+                        try:
+                            from app.models.session import Session
+                            db_sess = await self.db.get(Session, uuid.UUID(sid))
+                            if db_sess:
+                                db_sess.ux_score = float(ps.score)
+                        except Exception as e:
+                            logger.warning(
+                                "Failed to persist ux_score for persona %s: %s",
+                                ps.persona_name, e,
+                            )
+                await self.db.flush()
+
             await self._publish_progress(study_id, 85, "synthesis_complete")
 
             # --- Phase 6: Report + Insights + Dedup (parallel) ---
@@ -574,6 +599,12 @@ class StudyOrchestrator:
             "minimal_distractions": "cognitive",
             "clear_structure": "cognitive",
             "no_images": "low_vision",
+            # AI agent / semantic HTML needs map to screen_reader (semantic structure)
+            "semantic_html": "screen_reader",
+            "structured_data": "screen_reader",
+            "clear_headings": "screen_reader",
+            "labeled_inputs": "screen_reader",
+            "standard_form_controls": "screen_reader",
         }
         acc_raw = t.get("accessibility_needs", {})
         if isinstance(acc_raw, list):

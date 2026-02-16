@@ -1,7 +1,7 @@
 import enum
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Text
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, Text
 from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,6 +37,7 @@ class Session(Base, UUIDMixin, TimestampMixin):
     task_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     emotional_arc: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    ux_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Relationships
     study: Mapped["Study"] = relationship("Study", back_populates="sessions")  # noqa: F821

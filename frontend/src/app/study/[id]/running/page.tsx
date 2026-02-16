@@ -391,7 +391,12 @@ export default function StudyRunningPage({
   }, []);
 
   const activeStudy = useStudyStore((s) => s.activeStudy);
-  const logs = useStudyStore((s) => s.logs);
+  const allLogs = useStudyStore((s) => s.logs);
+
+  // Filter logs: show global events (no session_id) + events matching selected persona
+  const logs = selectedSessionId
+    ? allLogs.filter((l) => !l.session_id || l.session_id === selectedSessionId)
+    : allLogs;
 
   const { data: study } = useQuery({
     queryKey: ['study-header', id],
@@ -495,7 +500,7 @@ export default function StudyRunningPage({
       setRunningTab('log');
       const errorMsg = study?.error_message || activeStudy?.error || 'The test encountered an error and could not complete.';
       // Only add if not already present in logs
-      const alreadyLogged = logs.some((l) => l.level === 'error' && l.message.includes(errorMsg));
+      const alreadyLogged = allLogs.some((l) => l.level === 'error' && l.message.includes(errorMsg));
       if (!alreadyLogged) {
         addLog('error', errorMsg);
       }

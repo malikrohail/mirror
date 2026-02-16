@@ -33,6 +33,7 @@ export interface LogEntry {
   timestamp: number;
   level: 'info' | 'warn' | 'error';
   message: string;
+  session_id?: string;
 }
 
 export interface StepHistoryEntry {
@@ -87,7 +88,7 @@ interface StudyProgress {
 interface StudyStore {
   activeStudy: StudyProgress | null;
   logs: LogEntry[];
-  addLog: (level: LogEntry['level'], message: string) => void;
+  addLog: (level: LogEntry['level'], message: string, sessionId?: string) => void;
   initStudy: (studyId: string) => void;
   handleWsMessage: (msg: WsServerMessage) => void;
   reset: () => void;
@@ -106,9 +107,9 @@ export const useStudyStore = create<StudyStore>()(
   activeStudy: null,
   logs: [],
 
-  addLog: (level, message) => {
+  addLog: (level, message, sessionId?) => {
     set((state) => ({
-      logs: [...state.logs.slice(-199), { timestamp: Date.now(), level, message }],
+      logs: [...state.logs.slice(-199), { timestamp: Date.now(), level, message, session_id: sessionId }],
     }));
   },
 
@@ -185,7 +186,7 @@ export const useStudyStore = create<StudyStore>()(
       case 'session:step': {
         const step = msg as WsSessionStep;
         const actionStr = normalizeAction(step.action);
-        log('info', `[${step.persona_name}] Step ${step.step_number}: ${actionStr} — ${step.think_aloud?.slice(0, 80)}…`);
+        log('info', `[${step.persona_name}] Step ${step.step_number}: ${actionStr} — ${step.think_aloud?.slice(0, 80)}…`, step.session_id);
         const existing = current.personas[step.session_id];
 
         // Build step history — inject synthetic "start" on first step
@@ -236,7 +237,7 @@ export const useStudyStore = create<StudyStore>()(
 
       case 'session:complete': {
         const completedPersona = current.personas[msg.session_id]?.persona_name ?? msg.session_id.slice(0, 8);
-        log('info', `[${completedPersona}] Session complete — ${msg.total_steps} steps`);
+        log('info', `[${completedPersona}] Session complete — ${msg.total_steps} steps`, msg.session_id);
         if (current.personas[msg.session_id]) {
           const prevHistory = current.personas[msg.session_id].step_history ?? [];
           const completeEntry: StepHistoryEntry = {
@@ -265,7 +266,7 @@ export const useStudyStore = create<StudyStore>()(
       }
 
       case 'session:live_view': {
-        log('info', `[${msg.persona_name}] Browser live view connected`);
+        log('info', `[${msg.persona_name}] Browser live view connected`, msg.session_id);
         const existing = current.personas[msg.session_id];
         const persona: PersonaProgress = {
           persona_name: msg.persona_name,
@@ -294,7 +295,7 @@ export const useStudyStore = create<StudyStore>()(
 
       case 'session:browser_closed': {
         const closedPersona = current.personas[msg.session_id]?.persona_name ?? msg.session_id.slice(0, 8);
-        log('warn', `[${closedPersona}] Browser closed`);
+        log('warn', `[${closedPersona}] Browser closed`, msg.session_id);
         if (current.personas[msg.session_id]) {
           set({
             activeStudy: {
@@ -313,7 +314,7 @@ export const useStudyStore = create<StudyStore>()(
       }
 
       case 'session:screencast_started': {
-        log('info', `[${msg.persona_name}] Screencast started`);
+        log('info', `[${msg.persona_name}] Screencast started`, msg.session_id);
         const existing = current.personas[msg.session_id];
         set({
           activeStudy: {
@@ -384,7 +385,7 @@ export const useStudyStore = create<StudyStore>()(
 
       case 'session:browser_failover': {
         const failoverMsg = msg as { session_id: string; persona_name: string; message: string };
-        log('warn', `[${failoverMsg.persona_name}] Browser failover: ${failoverMsg.message}`);
+        log('warn', `[${failoverMsg.persona_name}] Browser failover: ${failoverMsg.message}`, failoverMsg.session_id);
         break;
       }
 

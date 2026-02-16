@@ -83,6 +83,7 @@ interface PersonaProgressCardProps {
   sessionId?: string;
   confidence?: number | null;
   sessionStatus?: string;
+  uxScore?: number | null;
   selected?: boolean;
   onSelect?: () => void;
 }
@@ -99,6 +100,7 @@ export function PersonaProgressCard({
   taskProgress,
   completed,
   sessionStatus,
+  uxScore,
   selected,
   onSelect,
 }: PersonaProgressCardProps) {
@@ -149,6 +151,19 @@ export function PersonaProgressCard({
                 {completed ? (
                   <span className="text-[13px] text-foreground/70">
                     {STATUS_LABELS[sessionStatus ?? 'complete']?.text ?? 'Completed'}
+                    {uxScore != null && (
+                      <>
+                        {' · '}
+                        <span className={cn(
+                          'font-semibold tabular-nums',
+                          uxScore >= 70 ? 'text-green-600 dark:text-green-400' :
+                          uxScore >= 40 ? 'text-amber-600 dark:text-amber-400' :
+                          'text-red-600 dark:text-red-400'
+                        )}>
+                          {Math.round(uxScore)}/100
+                        </span>
+                      </>
+                    )}
                     {' · '}
                     {EMOTION_ICONS[emotionalState as EmotionalState] ?? '🤔'}{' '}
                     {MOOD_LABELS[emotionalState] ?? capitalize(emotionalState)}

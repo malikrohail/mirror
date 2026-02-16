@@ -78,6 +78,14 @@ export function ScoreCardsRow({ study, issues, sessions }: ScoreCardsRowProps) {
       <ScoreCard
         label="Personas Tested"
         value={study.personas.length}
+        description={
+          sessions.some((s) => s.ux_score != null)
+            ? sessions
+                .filter((s) => s.ux_score != null)
+                .map((s) => Math.round(s.ux_score!))
+                .join(' / ')
+            : undefined
+        }
       />
     </div>
   );

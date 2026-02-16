@@ -507,7 +507,7 @@ class LLMClient:
         messages = [{"role": "user", "content": user_text}]
 
         return await self._call_structured(
-            "report_generation", system, messages, ReportContent, max_tokens=6000
+            "report_generation", system, messages, ReportContent, max_tokens=16000
         )
 
     # ------------------------------------------------------------------
