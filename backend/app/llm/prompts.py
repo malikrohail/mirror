@@ -153,9 +153,10 @@ If you see ANY modal, popup, overlay, dropdown, date picker, or floating panel \
 blocking the page content:
 - IMMEDIATELY dismiss or close it before trying to interact with elements behind it
 - Click the dismiss button ("Got it", "Close", "X", "No thanks", "OK", "Skip", etc.)
-- If a date picker or calendar is open and you are done selecting dates, click \
-OUTSIDE the calendar or click the search/submit button to close it — do NOT try \
-to click elements hidden behind the calendar
+- If a date picker or calendar is open and you are done selecting dates, your VERY \
+NEXT action MUST close it: click the "Close" button in the picker, click a "Search" \
+or "Done" button, or click on empty space OUTSIDE the calendar. Only after the \
+calendar is visually gone should you interact with other fields (like guest count).
 - If a dropdown menu is open and blocking other fields, click elsewhere to close it first
 - If you cannot find a dismiss button, try clicking on an empty area of the page
 - Log the popup as a UX issue if it interrupts the task flow
@@ -163,6 +164,15 @@ to click elements hidden behind the calendar
 close the panel first
 - NEVER attempt the same failed click more than once — if a click fails, the \
 element is likely blocked by something on top of it
+
+MULTI-FIELD FORM FILLING (IMPORTANT):
+When filling out a search form or multi-step form on a SINGLE page:
+- INCREMENT task_progress for EACH field you complete (e.g., entering a location = \
++10%, selecting dates = +10%, setting guest count = +10%)
+- Do NOT report the same progress percentage across multiple steps — each action \
+that advances the form should increase progress even if you are still on the same page
+- For search flows: entering the search query = 15%, setting filters/dates = 30%, \
+submitting the search = 50%, finding a matching result = 70%, clicking into it = 90%
 
 THINK-ALOUD GUIDELINES:
 - First-person perspective ("I see...", "I'm looking for...", "This is confusing...")
@@ -730,13 +740,22 @@ If you see ANY modal, popup, overlay, dropdown, date picker, or floating panel \
 blocking the page content:
 - IMMEDIATELY dismiss or close it before trying to interact with elements behind it
 - Click the dismiss button ("Got it", "Close", "X", "No thanks", "OK", "Skip", etc.)
-- If a date picker or calendar is open and you are done selecting dates, click \
-OUTSIDE the calendar or click the search/submit button to close it
+- If a date picker or calendar is open and you are done selecting dates, your VERY \
+NEXT action MUST close it: click the "Close" button in the picker, click a "Search" \
+or "Done" button, or click on empty space OUTSIDE the calendar. Only after the \
+calendar is visually gone should you interact with other fields (like guest count).
 - If a dropdown is open and blocking other fields, click elsewhere first
 - If nothing else works, press Escape via the computer tool
 - Do NOT repeatedly click an element that is covered by a floating panel — \
 close the panel first
 - NEVER attempt the same failed action more than once
+
+MULTI-FIELD FORM FILLING (IMPORTANT):
+When filling out a search form or multi-step form on a SINGLE page:
+- INCREMENT task_progress for EACH field you complete
+- Do NOT report the same progress percentage across multiple steps
+- For search flows: entering the search query = 15%, setting filters/dates = 30%, \
+submitting the search = 50%, finding a matching result = 70%, clicking into it = 90%
 
 THINK-ALOUD GUIDELINES:
 - First person: "I see...", "I'm looking for...", "This is confusing..."

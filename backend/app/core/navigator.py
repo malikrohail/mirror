@@ -32,7 +32,7 @@ from app.llm.schemas import ActionType, ComputerUseResult, NavigationDecision
 logger = logging.getLogger(__name__)
 
 MAX_STEPS_DEFAULT = 25
-STUCK_THRESHOLD = 3  # same URL N times in a row → suggest give_up
+STUCK_THRESHOLD = 4  # same URL N times in a row → suggest give_up
 STEP_EXTENSION = 10  # extra steps granted when persona is making good progress
 
 
@@ -176,6 +176,10 @@ class Navigator:
             persona_name, task_description[:50], start_url, timeout_secs,
         )
 
+        # Shared mutable container so the timeout handler can access steps
+        # that were completed before the timeout fired.
+        shared_steps: list[StepRecord] = []
+
         try:
             return await asyncio.wait_for(
                 self._navigate_session_inner(
@@ -188,21 +192,27 @@ class Navigator:
                     browser_context=browser_context,
                     recorder=recorder,
                     screencast=screencast,
+                    shared_steps=shared_steps,
                 ),
                 timeout=timeout_secs,
             )
         except asyncio.TimeoutError:
             logger.warning(
-                "Session timeout (%ds) for persona %s on %s",
-                timeout_secs, persona_name, start_url,
+                "Session timeout (%ds) for persona %s on %s — preserving %d steps",
+                timeout_secs, persona_name, start_url, len(shared_steps),
+            )
+            # Compute peak progress from the steps we DID complete
+            peak_progress = max(
+                (s.task_progress for s in shared_steps), default=0
             )
             return NavigationResult(
                 session_id=session_id,
                 persona_name=persona_name,
-                task_completed=False,
-                total_steps=0,
+                task_completed=peak_progress >= 95,
+                total_steps=len(shared_steps),
                 gave_up=True,
                 error=f"Session timed out after {timeout_secs}s",
+                steps=list(shared_steps),
             )
 
     async def _navigate_session_inner(
@@ -216,10 +226,12 @@ class Navigator:
         browser_context: BrowserContext,
         recorder: StepRecorder | None = None,
         screencast: CDPScreencastManager | None = None,
+        shared_steps: list[StepRecord] | None = None,
     ) -> NavigationResult:
         """Inner navigation loop (wrapped by per-session timeout)."""
         page = await browser_context.new_page()
-        steps: list[StepRecord] = []
+        # Use the shared list from the caller so steps survive a timeout
+        steps: list[StepRecord] = shared_steps if shared_steps is not None else []
         pending_record_tasks: list[asyncio.Task[None]] = []
         gave_up = False
         task_completed = False
@@ -594,6 +606,19 @@ class Navigator:
                 # dropdowns, popovers, menus, and modals alike.
                 await try_escape_key(page)
 
+                # Retry the action ONCE after clearing overlays.
+                # This handles the common case where a date picker or
+                # dropdown was blocking the target element.
+                retry_result = await self._actions.execute(
+                    page, decision.action.type.value, **action_kwargs
+                )
+                if retry_result.success:
+                    action_error = None
+                    logger.info(
+                        "Step %d action succeeded on retry after overlay dismissal",
+                        step_number,
+                    )
+
         # 5. RECORD (fire as background task so next step's PERCEIVE starts immediately)
         record_task: asyncio.Task[None] | None = None
         if recorder:
@@ -718,6 +743,26 @@ class Navigator:
                 dismissed = await dismiss_overlays(page)
                 if not dismissed:
                     await try_escape_key(page)
+
+                # Retry the action ONCE after clearing overlays
+                try:
+                    retry_result = await self._actions.execute_computer_use(
+                        page,
+                        result.computer_action,
+                        coordinate=result.coordinate,
+                        text=result.text,
+                        key=result.key,
+                        direction=result.scroll_direction,
+                        amount=result.scroll_amount,
+                    )
+                    if retry_result.success:
+                        action_error = None
+                        logger.info(
+                            "CU step %d action succeeded on retry after overlay dismissal",
+                            step_number,
+                        )
+                except Exception:
+                    pass
 
         # Build a synthetic NavigationDecision for the recorder
         # (the recorder/publisher expects NavigationDecision)
@@ -879,7 +924,13 @@ class Navigator:
     @staticmethod
     def _is_stuck(history: list[StepRecord]) -> bool:
         """Detect if the persona is stuck (same URL N consecutive times with no progress,
-        or consecutive action failures)."""
+        or consecutive action failures).
+
+        Avoids false positives on single-page apps (e.g., Airbnb search) where
+        the persona fills multiple form fields on the same URL. If the recent
+        actions are of different types (click vs type vs scroll), the persona
+        is likely still exploring rather than stuck.
+        """
         if len(history) < STUCK_THRESHOLD:
             return False
         recent = history[-STUCK_THRESHOLD:]
@@ -893,4 +944,15 @@ class Navigator:
         no_progress = all(
             s.task_progress == recent[0].task_progress for s in recent
         )
-        return same_url and no_progress
+
+        if not (same_url and no_progress):
+            return False
+
+        # If the persona is using diverse action types on the same page,
+        # they're likely filling out a multi-field form (search with
+        # location, dates, guests) — not truly stuck.
+        action_types = {s.action_type for s in recent}
+        if len(action_types) > 1:
+            return False
+
+        return True

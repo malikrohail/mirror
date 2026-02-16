@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     SCREENCAST_RECORD_TO_DISK: bool = False
 
     # Browser robustness (Iteration 2)
-    SESSION_TIMEOUT_SECONDS: int = 180  # Per-session timeout in local mode
+    SESSION_TIMEOUT_SECONDS: int = 300  # Per-session timeout (increased for complex tasks)
     MAX_PAGES_PER_CONTEXT: int = 50  # Pages before context recreation
     BROWSER_WARMUP_CONTEXTS: int = 0  # Pre-create contexts at pool init
     BROWSER_ACTION_RETRIES: int = 1  # Retries for Playwright action failures
