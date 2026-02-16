@@ -69,13 +69,31 @@ class BrowserActions:
     async def type_text(
         self, page: Page, selector: str, value: str
     ) -> ActionResult:
-        """Type text into an input with realistic keystroke delays."""
+        """Type text into an input with realistic keystroke delays.
+
+        Uses Ctrl+A to select existing text (instead of fill("") which
+        bypasses keyboard events) so that autocomplete/typeahead fields
+        on sites like Airbnb receive proper input events.
+
+        After typing, waits 1.5s for autocomplete/AJAX suggestions to load.
+        """
         for attempt in range(2):
             try:
-                # Clear existing value first
+                # Click to focus the input
                 await page.click(selector, timeout=self.timeout_ms)
-                await page.fill(selector, "")
+                # Select all existing text via keyboard (Ctrl+A) then
+                # delete — this triggers proper input events for React/
+                # autocomplete fields, unlike fill("") which sets the
+                # value programmatically.
+                await page.keyboard.press("ControlOrMeta+a")
+                await page.keyboard.press("Backspace")
+                await asyncio.sleep(0.1)
+                # Type with realistic delays to trigger autocomplete
                 await page.type(selector, value, delay=REALISTIC_TYPE_DELAY_MS)
+                # Wait for autocomplete/AJAX suggestions to load.
+                # Many sites (Airbnb, Google, Amazon) need 1-2s after
+                # typing for dropdown suggestions to appear.
+                await asyncio.sleep(1.5)
                 return ActionResult(
                     success=True,
                     action_type="type",
@@ -278,9 +296,14 @@ class BrowserActions:
             )
 
     async def type_text_raw(self, page: Page, text: str) -> ActionResult:
-        """Type text via keyboard (no selector needed — Computer Use mode)."""
+        """Type text via keyboard (no selector needed — Computer Use mode).
+
+        Waits 1.5s after typing for autocomplete suggestions to load.
+        """
         try:
             await page.keyboard.type(text, delay=REALISTIC_TYPE_DELAY_MS)
+            # Wait for autocomplete/AJAX suggestions to load
+            await asyncio.sleep(1.5)
             return ActionResult(
                 success=True,
                 action_type="type",

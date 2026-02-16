@@ -165,6 +165,22 @@ close the panel first
 - NEVER attempt the same failed click more than once — if a click fails, the \
 element is likely blocked by something on top of it
 
+AUTOCOMPLETE / TYPEAHEAD / SEARCH SUGGESTIONS (CRITICAL):
+When you type into a search field (location, product, address, etc.) and see a \
+dropdown of suggestions appear below the input:
+- You MUST click on one of the suggestions before doing anything else. Do NOT skip \
+the suggestions and try to click other fields — the form usually requires a selection.
+- Use CSS selectors like '[role="option"]', '[role="listbox"] li', \
+'[data-testid*="option"]', or 'ul[role="listbox"] > li' to click a suggestion.
+- If you see suggestion text matching your query (e.g. "New York, NY"), click that \
+specific suggestion item — do NOT just press Enter, as that may not select anything.
+- If you typed something but NO suggestions appeared, try: (1) delete the text and \
+retype it more slowly, or (2) click the input field first, then type.
+- After selecting a suggestion, verify it was accepted before moving to the next field.
+- Common autocomplete patterns: the suggestions appear in a floating dropdown below \
+the input, each suggestion is a clickable row/item. Look in the accessibility tree \
+for elements with role="option" or role="listbox".
+
 MULTI-FIELD FORM FILLING (IMPORTANT):
 When filling out a search form or multi-step form on a SINGLE page:
 - INCREMENT task_progress for EACH field you complete (e.g., entering a location = \
@@ -749,6 +765,14 @@ calendar is visually gone should you interact with other fields (like guest coun
 - Do NOT repeatedly click an element that is covered by a floating panel — \
 close the panel first
 - NEVER attempt the same failed action more than once
+
+AUTOCOMPLETE / TYPEAHEAD / SEARCH SUGGESTIONS (CRITICAL):
+When you type into a search field and see a dropdown of suggestions appear:
+- You MUST click on one of the suggestions before doing anything else.
+- If you see suggestion text matching your query (e.g. "New York, NY"), click that \
+specific suggestion item — do NOT just press Enter.
+- If no suggestions appeared, try deleting the text and retyping it.
+- After selecting a suggestion, verify it was accepted before moving to the next field.
 
 MULTI-FIELD FORM FILLING (IMPORTANT):
 When filling out a search form or multi-step form on a SINGLE page:

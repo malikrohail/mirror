@@ -220,12 +220,24 @@ async def smart_dismiss_overlay(page: Page) -> int:
                 }
             }
 
-            // 4. Within each container, find close/dismiss buttons
+            // 4. Within each container, find close/dismiss buttons.
+            //    SKIP containers that are interactive elements (autocomplete
+            //    dropdowns, select menus, comboboxes) — the persona needs these.
             const closeTextRe = /^\\s*(close|×|✕|✖|x|dismiss|got it|no thanks|not now|maybe later|skip|continue|ok|cancel|done|no,?\\s*thanks|stay on web|continue to website|continue in browser|continue shopping|continue on web)\\s*$/i;
             const closeLabelRe = /close|dismiss|cancel|hide/i;
             const closeClassRe = /close|dismiss|cancel/i;
 
+            const interactiveRoles = new Set([
+                'listbox', 'menu', 'menubar', 'combobox', 'tree',
+            ]);
+
             for (const container of containers) {
+                // Skip interactive elements (autocomplete, select menus)
+                const role = (container.getAttribute('role') || '').toLowerCase();
+                if (interactiveRoles.has(role)) continue;
+                // Skip if container holds option/menuitem children (autocomplete)
+                if (container.querySelector('[role="option"], [role="menuitem"]'))
+                    continue;
                 const clickables = container.querySelectorAll(
                     'button, a, [role="button"], [tabindex="0"], ' +
                     'input[type="button"], input[type="submit"]'
@@ -302,17 +314,24 @@ async def click_outside_overlay(page: Page) -> bool:
             let topOverlay = null;
             let topZ = 0;
 
+            // Only target actual overlays — NOT interactive dropdowns
+            // (autocomplete, select menus) that the user needs.
             const selectors = [
                 '[role="dialog"]', '[aria-modal="true"]',
                 '[class*="popup" i]', '[class*="popover" i]',
-                '[class*="dropdown" i]', '[class*="calendar" i]',
-                '[class*="datepicker" i]', '[class*="picker" i]',
-                '[class*="menu" i]', '[class*="tooltip" i]',
             ];
+
+            const skipRoles = new Set([
+                'listbox', 'menu', 'combobox', 'tree',
+            ]);
 
             for (const sel of selectors) {
                 try {
                     for (const el of document.querySelectorAll(sel)) {
+                        const role = (el.getAttribute('role') || '');
+                        if (skipRoles.has(role.toLowerCase())) continue;
+                        // Skip autocomplete containers
+                        if (el.querySelector('[role="option"]')) continue;
                         const s = getComputedStyle(el);
                         const z = parseInt(s.zIndex) || 0;
                         if (s.display !== 'none' && s.visibility !== 'hidden'
@@ -455,9 +474,12 @@ async def detect_blocking_overlay(page: Page) -> bool:
     """Check if a modal, popover, dropdown, or overlay is blocking the page."""
     try:
         return await page.evaluate("""() => {
-            // Check for role="dialog" or aria-modal elements that are visible
+            // Check for role="dialog" or aria-modal elements that are visible.
+            // NOTE: Do NOT include [role="listbox"] or [role="menu"] here —
+            // those are interactive elements (autocomplete dropdowns, select
+            // menus) that the persona NEEDS to interact with.
             const dialogs = document.querySelectorAll(
-                '[role="dialog"], [aria-modal="true"], [role="listbox"], [role="menu"]'
+                '[role="dialog"], [aria-modal="true"], [role="alertdialog"]'
             );
             for (const d of dialogs) {
                 const style = window.getComputedStyle(d);
