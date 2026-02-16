@@ -154,7 +154,8 @@ function loadDocs() {
   const docsDir = path.join(process.cwd(), '..', 'docs');
 
   return DOC_MANIFEST.map((config) => {
-    const filePath = path.join(docsDir, config.file);
+    const dir = config.section === 'internal' ? path.join(docsDir, 'Archive') : docsDir;
+    const filePath = path.join(dir, config.file);
     let content = '';
     try {
       content = fs.readFileSync(filePath, 'utf-8');

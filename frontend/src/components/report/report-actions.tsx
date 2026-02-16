@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Download, FileText, Check, Monitor, MoreVertical, ChevronDown, Sparkles, Send, Copy } from 'lucide-react';
+import { Download, FileText, Check, Monitor, MoreVertical, ChevronDown, Sparkles, Code, Copy } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import {
@@ -208,7 +208,7 @@ export function ReportActions({ studyId, markdownContent }: ReportActionsProps) 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="text-[14px] font-normal text-foreground/70 gap-1.5">
-            <Send className="h-3.5 w-3.5 text-foreground/50" />
+            <Code className="h-3.5 w-3.5 text-foreground/50" />
             Share with dev
             <ChevronDown className="h-3 w-3 text-foreground/40" />
           </Button>
@@ -266,17 +266,6 @@ export function ReportActions({ studyId, markdownContent }: ReportActionsProps) 
           </div>
         </DropdownMenuContent>
       </DropdownMenu>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span>
-            <Button variant="outline" size="sm" className="text-[14px] font-normal text-foreground/70 gap-1.5" disabled>
-              <LinearIcon className="h-3.5 w-3.5 text-foreground/50" />
-              Open Linear ticket
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>Coming soon</TooltipContent>
-      </Tooltip>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="px-2">
@@ -293,6 +282,11 @@ export function ReportActions({ studyId, markdownContent }: ReportActionsProps) 
           <DropdownMenuItem onClick={copyMarkdown} disabled={copiedMd}>
             {copiedMd ? <Check className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
             {copiedMd ? 'Copied' : 'Copy Markdown'}
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled>
+            <LinearIcon className="h-4 w-4" />
+            Open Linear ticket
+            <span className="ml-auto text-[10px] text-muted-foreground">Soon</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

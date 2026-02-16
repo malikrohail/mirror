@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowRight, ChevronRight, Loader2, Plus, Users, Play, MoreVertical, UserMinus, X, HelpCircle, RefreshCw, Code2, Mouse, Presentation, Home } from 'lucide-react';
+import { ArrowRight, ChevronRight, Loader2, Plus, Users, Play, MoreVertical, UserMinus, X, HelpCircle, RefreshCw, Code2, Mouse, Home } from 'lucide-react';
 import { TestsIllustration, TeamIllustration } from '@/components/common/empty-illustrations';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -382,13 +382,6 @@ export default function HomePage() {
         chips={headerChips}
         right={
           <>
-            <button
-              onClick={() => router.push('/study/showcase')}
-              className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
-            >
-              <Presentation className="h-3.5 w-3.5" />
-              Case study
-            </button>
             <button
               onClick={() => router.push('/how-it-works')}
               className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"

@@ -452,6 +452,30 @@ export default function StudyRunningPage({
     enabled: !!id && study?.status === 'complete',
   });
 
+  // Fetch persona templates so we can map template_id → template name
+  const { data: personaTemplates } = useQuery({
+    queryKey: ['persona-templates'],
+    queryFn: () => api.listPersonaTemplates(),
+  });
+
+  // Build a session-id → persona-name map from all available sources
+  const sessionNameMap: Record<string, string> = {};
+  // From WebSocket store (live data)
+  for (const [sid, p] of Object.entries(activeStudy?.personas ?? {})) {
+    if (p.persona_name) sessionNameMap[sid] = p.persona_name;
+  }
+  // From completed sessions + study personas + templates (for completed studies)
+  if (completeSessions && study?.personas) {
+    for (const s of completeSessions) {
+      if (sessionNameMap[s.id]) continue;
+      const persona = study.personas.find((p) => p.id === s.persona_id);
+      const template = persona?.template_id
+        ? personaTemplates?.find((t) => t.id === persona.template_id)
+        : undefined;
+      if (template?.name) sessionNameMap[s.id] = template.name;
+    }
+  }
+
   // Fetch all studies to compute test name (e.g. "Claude4")
   const { data: allStudies } = useQuery({
     queryKey: ['studies-all'],
@@ -886,23 +910,44 @@ export default function StudyRunningPage({
           <div className="overflow-hidden rounded-lg border border-border bg-background">
           {isComplete ? (
             <Tabs value={completeTab} onValueChange={(v) => setCompleteTab(v as CompleteTab)}>
-              <div className="border-b border-border bg-muted/30">
+              <div className="flex items-center border-b border-border bg-muted/30">
                 <TabsList variant="line" className="px-3">
                   <TabsTrigger value="findings">Findings</TabsTrigger>
                   <TabsTrigger value="replay">Replay</TabsTrigger>
                   <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
                 </TabsList>
+                <div className="flex-1" />
+                <button
+                  onClick={() => setFindingsView(findingsView === 'report' ? 'issues' : 'report')}
+                  className="mr-3 text-[13px] text-foreground/50 transition-colors hover:text-foreground/70"
+                >
+                  {findingsView === 'report' ? 'See findings' : 'See full report'}
+                </button>
               </div>
               <div style={{ height: '460px' }}>
                 <TabsContent value="findings" className="h-full m-0">
                   <div className="flex h-full flex-col">
                     <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border shrink-0">
-                      <button
-                        onClick={() => setFindingsView(findingsView === 'report' ? 'issues' : 'report')}
-                        className="text-[14px] text-foreground/70 transition-colors hover:text-foreground/90"
-                      >
-                        {findingsView === 'report' ? 'See Issues' : 'See Full Report'}
-                      </button>
+                      {findingsView === 'issues' && <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="text-[14px] font-normal text-foreground/70 gap-1.5">
+                            {selectedSessionId
+                              ? (sessionNameMap[selectedSessionId] ?? 'Tester')
+                              : 'All testers'}
+                            <ChevronDown className="h-3 w-3 text-foreground/40" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onClick={() => setSelectedSessionId(null)}>
+                            <span className={cn(!selectedSessionId && 'font-medium')}>All testers</span>
+                          </DropdownMenuItem>
+                          {Object.entries(sessionNameMap).map(([sid, name]) => (
+                            <DropdownMenuItem key={sid} onClick={() => setSelectedSessionId(sid)}>
+                              <span className={cn(selectedSessionId === sid && 'font-medium')}>{name}</span>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>}
                       <div className="flex-1" />
                       {/* Share actions */}
                       <div className="shrink-0">
