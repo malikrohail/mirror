@@ -19,6 +19,7 @@ from app.browser.actions import BrowserActions
 from app.browser.cookie_consent import dismiss_cookie_consent
 from app.browser.detection import PageDetection
 from app.browser.overlay_dismiss import (
+    aggressive_dismiss,
     detect_blocking_overlay,
     dismiss_overlays,
     try_escape_key,
@@ -255,9 +256,9 @@ class Navigator:
             except Exception as e:
                 logger.debug("Cookie consent dismissal failed: %s", e)
 
-            # Auto-dismiss common overlays (newsletter popups, "Got it" modals, etc.)
+            # Auto-dismiss common overlays (newsletter popups, app banners, etc.)
             try:
-                dismissed = await dismiss_overlays(page)
+                dismissed = await aggressive_dismiss(page)
                 if dismissed:
                     logger.info("Auto-dismissed %d overlay(s) on page load", dismissed)
             except Exception as e:
@@ -329,20 +330,18 @@ class Navigator:
 
                     # Stuck detection (same URL + no progress for last 3 steps)
                     if self._is_stuck(steps):
-                        # Before giving up, try to dismiss any blocking overlay
+                        # Before giving up, try aggressive overlay dismissal
                         if await detect_blocking_overlay(page):
                             logger.info(
                                 "Persona %s stuck but overlay detected — "
-                                "attempting escape before give_up",
+                                "attempting aggressive dismissal before give_up",
                                 persona_name,
                             )
-                            dismissed = await dismiss_overlays(page)
-                            if not dismissed:
-                                await try_escape_key(page)
+                            dismissed = await aggressive_dismiss(page)
                             # Don't give up yet — let the next step try again
-                            # after overlay dismissal. Reset stuck counter by
-                            # only breaking if we couldn't dismiss anything.
-                            if dismissed or await detect_blocking_overlay(page) is False:
+                            # after overlay dismissal. Only continue if we
+                            # actually cleared something.
+                            if dismissed or not await detect_blocking_overlay(page):
                                 continue
 
                         logger.warning(
@@ -491,14 +490,11 @@ class Navigator:
         if step_number > 1:
             try:
                 if await detect_blocking_overlay(page):
-                    dismissed = await dismiss_overlays(page)
-                    if dismissed:
-                        logger.info(
-                            "Pre-step %d: dismissed %d overlay(s)", step_number, dismissed,
-                        )
-                    else:
-                        await try_escape_key(page)
-                        logger.info("Pre-step %d: pressed Escape to clear overlay", step_number)
+                    dismissed = await aggressive_dismiss(page)
+                    logger.info(
+                        "Pre-step %d: aggressive_dismiss cleared %d overlay(s)",
+                        step_number, dismissed,
+                    )
             except Exception:
                 pass
 
@@ -611,18 +607,18 @@ class Navigator:
 
                 # Fallback: ANY failed click/type could be blocked by a
                 # popover, dropdown, calendar, or modal — not just
-                # [role="dialog"]. Always try to clear the way.
+                # [role="dialog"]. Use aggressive multi-strategy dismissal.
                 logger.info(
-                    "Action failed at step %d — attempting overlay dismiss "
-                    "and Escape key fallback",
+                    "Action failed at step %d — attempting aggressive "
+                    "overlay dismissal",
                     step_number,
                 )
-                dismissed = await dismiss_overlays(page)
+                dismissed = await aggressive_dismiss(page)
                 if dismissed:
-                    logger.info("Auto-dismissed %d blocking overlay(s)", dismissed)
-                # Always try Escape regardless — closes date pickers,
-                # dropdowns, popovers, menus, and modals alike.
-                await try_escape_key(page)
+                    logger.info(
+                        "Aggressive dismiss cleared %d overlay(s) at step %d",
+                        dismissed, step_number,
+                    )
 
                 # Retry the action ONCE after clearing overlays.
                 # This handles the common case where a date picker or
@@ -755,12 +751,10 @@ class Navigator:
             if action_error and await detect_blocking_overlay(page):
                 logger.info(
                     "CU: Overlay detected after failed action at step %d — "
-                    "attempting auto-dismiss",
+                    "attempting aggressive dismissal",
                     step_number,
                 )
-                dismissed = await dismiss_overlays(page)
-                if not dismissed:
-                    await try_escape_key(page)
+                dismissed = await aggressive_dismiss(page)
 
                 # Retry the action ONCE after clearing overlays
                 try:
