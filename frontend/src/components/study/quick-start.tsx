@@ -434,7 +434,7 @@ export function QuickStart({
                   </div>
                   <span>
                     <span className="text-foreground/40">~</span>{' '}
-                    {selectedPersonaIds.size * 2} min &middot; ${(selectedPersonaIds.size * 0.5).toFixed(2)}
+                    2 min &middot; ${(selectedPersonaIds.size * 0.5).toFixed(2)}
                   </span>
                 </div>
               )}
@@ -804,7 +804,7 @@ export function QuickStart({
                   </div>
                   <span>
                     <span className="text-foreground/40">~</span>{' '}
-                    {selectedPersonaIds.size * 2} min &middot; ${(selectedPersonaIds.size * 0.5).toFixed(2)}
+                    2 min &middot; ${(selectedPersonaIds.size * 0.5).toFixed(2)}
                   </span>
                 </div>
               )}

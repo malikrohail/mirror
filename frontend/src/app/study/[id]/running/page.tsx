@@ -33,12 +33,25 @@ import { LiveBrowserView } from '@/components/study/live-browser-view';
 import { ReportPreview } from '@/components/report/report-preview';
 import { ReportActions } from '@/components/report/report-actions';
 import { IssuesTab } from '@/components/results/issues-tab';
-import type { IssueOut } from '@/types';
+import type { IssueOut, StepOut } from '@/types';
 import { useSessionDetail } from '@/hooks/use-session-replay';
+import type { StepHistoryEntry } from '@/stores/study-store';
 import { ClickHeatmap } from '@/components/heatmap/click-heatmap';
 import { BrowserIllustration, LogIllustration, StepsIllustration } from '@/components/common/empty-illustrations';
 import { PageHeaderBar } from '@/components/layout/page-header-bar';
 import type { HeaderChip } from '@/components/layout/page-header-bar';
+
+function stepsToHistory(steps: StepOut[]): StepHistoryEntry[] {
+  return steps.map((s) => ({
+    step_number: s.step_number,
+    think_aloud: s.think_aloud ?? '',
+    screenshot_url: s.screenshot_path ? api.getScreenshotUrl(s.screenshot_path) : '',
+    emotional_state: s.emotional_state ?? 'neutral',
+    action: s.action_type ?? 'navigate',
+    task_progress: s.task_progress ?? 0,
+    timestamp: new Date(s.created_at).getTime(),
+  }));
+}
 
 function formatDuration(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
@@ -400,6 +413,19 @@ export default function StudyRunningPage({
     queryFn: () => api.getLiveState(id),
     refetchInterval: 1500,
     enabled: !!id && study?.status === 'running',
+  });
+
+  // Polling fallback: fetch steps from API when WS step_history is empty
+  // but polling indicates steps have been recorded
+  const wsStepCount = selectedSessionId ? (activeStudy?.personas[selectedSessionId]?.step_history?.length ?? 0) : 0;
+  const polledStepNumber = selectedSessionId ? (liveState?.[selectedSessionId]?.step_number ?? 0) : 0;
+  const needsStepFallback = wsStepCount === 0 && polledStepNumber > 0 && !!selectedSessionId;
+
+  const { data: fallbackSteps } = useQuery({
+    queryKey: ['fallback-steps', selectedSessionId],
+    queryFn: () => api.listSteps(selectedSessionId!),
+    refetchInterval: needsStepFallback ? 2000 : false,
+    enabled: needsStepFallback,
   });
 
   // Fetch sessions and issues once complete
@@ -916,7 +942,13 @@ export default function StudyRunningPage({
               </div>
               <div style={{ height: '460px' }}>
                 <TabsContent value="steps" className="h-full m-0">
-                  <LiveStepTimeline steps={selectedPersona?.step_history ?? []} />
+                  <LiveStepTimeline steps={
+                    (selectedPersona?.step_history?.length ?? 0) > 0
+                      ? selectedPersona!.step_history
+                      : fallbackSteps && fallbackSteps.length > 0
+                        ? stepsToHistory(fallbackSteps)
+                        : []
+                  } />
                 </TabsContent>
                 <TabsContent value="browser" className="h-full m-0">
                   <BrowserWithSteps

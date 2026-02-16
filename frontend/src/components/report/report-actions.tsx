@@ -40,6 +40,123 @@ const HUMAN_EXAMPLE = `3 critical issues on the pricing page:
 
 Score: 12/100. Needs immediate fixes.`;
 
+/**
+ * Generate a condensed, task-oriented summary from the full markdown report.
+ * Extracts key issues and recommendations into a short bullet-point format
+ * suitable for sharing with human team members.
+ */
+function generateHumanSummary(markdown: string): string {
+  const lines = markdown.split('\n');
+  const issues: string[] = [];
+  const recommendations: string[] = [];
+  let score: string | null = null;
+  let executiveSummary: string | null = null;
+
+  // Extract overall score
+  const scoreMatch = markdown.match(/(?:overall\s+(?:usability\s+)?score|score)[:\s]*(\d+)\s*(?:\/\s*100)?/i);
+  if (scoreMatch) score = scoreMatch[1];
+
+  // Extract executive summary (first paragraph after "Executive Summary" heading)
+  const execIdx = lines.findIndex((l) => /^#{1,3}\s+executive\s+summary/i.test(l));
+  if (execIdx >= 0) {
+    for (let i = execIdx + 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.length === 0) continue;
+      if (/^#/.test(line)) break;
+      executiveSummary = line;
+      break;
+    }
+  }
+
+  // Extract issues from markdown table rows or bullet points under issue-related headings
+  let inIssueSection = false;
+  let inRecommendationSection = false;
+
+  for (const line of lines) {
+    if (/^#{1,3}\s+.*(?:critical|issue|problem|finding)/i.test(line)) {
+      inIssueSection = true;
+      inRecommendationSection = false;
+      continue;
+    }
+    if (/^#{1,3}\s+.*(?:recommend|action|fix|suggestion|next\s+step)/i.test(line)) {
+      inRecommendationSection = true;
+      inIssueSection = false;
+      continue;
+    }
+    if (/^#{1,3}\s+/.test(line)) {
+      inIssueSection = false;
+      inRecommendationSection = false;
+      continue;
+    }
+
+    // Table row: | number | description | severity |
+    const tableMatch = line.match(/^\|\s*\d+\s*\|\s*(.+?)\s*\|\s*(\w+)\s*\|/);
+    if (tableMatch && inIssueSection) {
+      issues.push(`${tableMatch[1].trim()} (${tableMatch[2].trim()})`);
+      continue;
+    }
+
+    // Bullet points
+    const bulletMatch = line.match(/^[-*]\s+(.+)/);
+    if (bulletMatch) {
+      if (inIssueSection && issues.length < 5) {
+        issues.push(bulletMatch[1].trim());
+      } else if (inRecommendationSection && recommendations.length < 3) {
+        recommendations.push(bulletMatch[1].trim());
+      }
+    }
+
+    // Numbered items
+    const numberedMatch = line.match(/^\d+\.\s+(.+)/);
+    if (numberedMatch) {
+      if (inRecommendationSection && recommendations.length < 3) {
+        recommendations.push(numberedMatch[1].trim());
+      } else if (inIssueSection && issues.length < 5) {
+        issues.push(numberedMatch[1].trim());
+      }
+    }
+  }
+
+  // Build the human summary
+  const parts: string[] = [];
+
+  if (executiveSummary) {
+    parts.push(executiveSummary);
+    parts.push('');
+  }
+
+  if (issues.length > 0) {
+    const criticalCount = issues.filter((i) => /critical/i.test(i)).length;
+    const label = criticalCount > 0
+      ? `${issues.length} issues found (${criticalCount} critical):`
+      : `${issues.length} issues found:`;
+    parts.push(label);
+    for (const issue of issues.slice(0, 5)) {
+      parts.push(`- ${issue}`);
+    }
+    parts.push('');
+  }
+
+  if (recommendations.length > 0) {
+    parts.push('Top recommendations:');
+    for (const rec of recommendations.slice(0, 3)) {
+      parts.push(`- ${rec}`);
+    }
+    parts.push('');
+  }
+
+  if (score) {
+    parts.push(`Score: ${score}/100.`);
+  }
+
+  // Fallback: if we couldn't extract anything useful, return first ~500 chars
+  if (parts.filter((p) => p.length > 0).length === 0) {
+    return markdown.slice(0, 500).trim() + (markdown.length > 500 ? '...' : '');
+  }
+
+  return parts.join('\n').trim();
+}
+
 interface ReportActionsProps {
   studyId: string;
   markdownContent?: string;
@@ -76,9 +193,10 @@ export function ReportActions({ studyId, markdownContent }: ReportActionsProps) 
 
   const shareWithHumanDev = () => {
     if (!markdownContent) return;
-    navigator.clipboard.writeText(markdownContent).then(() => {
+    const humanSummary = generateHumanSummary(markdownContent);
+    navigator.clipboard.writeText(humanSummary).then(() => {
       setCopiedHuman(true);
-      toast.success('Report copied — share it with your team');
+      toast.success('Summary copied — share it with your team');
       setTimeout(() => setCopiedHuman(false), 2000);
     }).catch(() => {
       toast.error('Failed to copy');
