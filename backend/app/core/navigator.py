@@ -22,7 +22,7 @@ from app.browser.screencast import CDPScreencastManager
 from app.browser.screenshots import ScreenshotService
 from app.config import settings
 from app.llm.client import LLMClient
-from app.llm.schemas import ActionType, NavigationDecision
+from app.llm.schemas import ActionType, ComputerUseResult, NavigationDecision
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +132,7 @@ class Navigator:
         browser_actions: BrowserActions | None = None,
         screenshot_service: ScreenshotService | None = None,
         max_steps: int = MAX_STEPS_DEFAULT,
+        use_computer_use: bool = False,
     ) -> None:
         self._llm = llm_client
         self._actions = browser_actions or BrowserActions()
@@ -139,6 +140,7 @@ class Navigator:
         self._max_steps = max_steps
         self._action_retries = getattr(settings, "BROWSER_ACTION_RETRIES", 1)
         self._diff_enabled = getattr(settings, "SCREENSHOT_DIFF_ENABLED", False)
+        self._use_computer_use = use_computer_use
 
     async def navigate_session(
         self,
@@ -256,7 +258,12 @@ class Navigator:
 
             for step_number in range(1, self._max_steps + 1):
                 try:
-                    step_result, curr_screenshot, record_task = await self._execute_step(
+                    step_fn = (
+                        self._execute_step_computer_use
+                        if self._use_computer_use
+                        else self._execute_step
+                    )
+                    step_result, curr_screenshot, record_task = await step_fn(
                         page=page,
                         session_id=session_id,
                         persona=persona,
@@ -528,6 +535,146 @@ class Navigator:
             think_aloud=decision.think_aloud,
             task_progress=decision.task_progress,
             emotional_state=decision.emotional_state.value,
+            action_error=action_error,
+        ), screenshot, record_task
+
+    async def _execute_step_computer_use(
+        self,
+        page: Any,
+        session_id: str,
+        persona: dict[str, Any],
+        persona_name: str,
+        task_description: str,
+        behavioral_notes: str,
+        step_number: int,
+        history: list[StepRecord],
+        recorder: StepRecorder | None,
+        prev_screenshot: bytes | None = None,
+    ) -> tuple[StepRecord, bytes, asyncio.Task[None] | None]:
+        """Execute a single step using Claude's Computer Use tool.
+
+        Same PERCEIVE → THINK → ACT → RECORD cycle but with coordinate-based
+        actions instead of CSS selectors. Click coordinates come directly from
+        Claude's vision — no DOM lookup required.
+        """
+        # 1. PERCEIVE
+        screenshot = await self._screenshots.capture_screenshot(page)
+        metadata = await self._screenshots.get_page_metadata(page)
+        viewport = page.viewport_size or {"width": 1280, "height": 800}
+
+        # 2. THINK (Computer Use LLM call)
+        history_summary = self._build_history_summary(history)
+        result: ComputerUseResult = await self._llm.navigate_step_computer_use(
+            persona=persona,
+            task_description=task_description,
+            behavioral_notes=behavioral_notes,
+            screenshot=screenshot,
+            page_url=metadata.url,
+            page_title=metadata.title,
+            step_number=step_number,
+            history_summary=history_summary,
+            display_width=viewport["width"],
+            display_height=viewport["height"],
+        )
+
+        logger.debug(
+            "CU Step %d [%s]: %s → %s at %s (progress=%d%%, emotion=%s)",
+            step_number, persona_name, result.think_aloud[:60],
+            result.computer_action, result.coordinate,
+            result.task_progress, result.emotional_state,
+        )
+
+        # Map action_intent to action_type for StepRecord compatibility
+        if result.action_intent == "done":
+            action_type = "done"
+        elif result.action_intent == "give_up":
+            action_type = "give_up"
+        else:
+            action_type = result.computer_action
+
+        # 3. GET CLICK POSITION (directly from Computer Use coordinates)
+        click_x: int | None = None
+        click_y: int | None = None
+        if result.coordinate and len(result.coordinate) >= 2:
+            click_x = result.coordinate[0]
+            click_y = result.coordinate[1]
+
+        # 4. ACT (coordinate-based — no selector resolution needed)
+        action_error: str | None = None
+        if result.action_intent == "continue" and result.computer_action not in ("screenshot",):
+            try:
+                action_result = await self._actions.execute_computer_use(
+                    page,
+                    result.computer_action,
+                    coordinate=result.coordinate,
+                    text=result.text,
+                    key=result.key,
+                    direction=result.scroll_direction,
+                    amount=result.scroll_amount,
+                )
+                if not action_result.success:
+                    action_error = action_result.error
+                    logger.warning(
+                        "CU action failed at step %d: %s", step_number, action_error,
+                    )
+            except Exception as e:
+                action_error = str(e)
+                logger.warning("CU action exception at step %d: %s", step_number, e)
+
+        # Build a synthetic NavigationDecision for the recorder
+        # (the recorder/publisher expects NavigationDecision)
+        from app.llm.schemas import NavigationAction, EmotionalState as EmotState
+        synthetic_decision = NavigationDecision(
+            think_aloud=result.think_aloud,
+            action=NavigationAction(
+                type=ActionType.click if action_type in ("left_click", "double_click", "right_click", "triple_click") else
+                      ActionType.type_text if action_type == "type" else
+                      ActionType.scroll if action_type == "scroll" else
+                      ActionType.navigate if action_type == "navigate" else
+                      ActionType.wait if action_type in ("wait", "screenshot") else
+                      ActionType.done if action_type == "done" else
+                      ActionType.give_up if action_type == "give_up" else
+                      ActionType.click,
+                selector=None,
+                value=result.text or result.key or None,
+                description=f"Computer Use: {result.computer_action} at {result.coordinate}",
+            ),
+            ux_issues=result.ux_issues,
+            confidence=result.confidence,
+            task_progress=result.task_progress,
+            emotional_state=EmotState(result.emotional_state) if result.emotional_state in [e.value for e in EmotState] else EmotState.neutral,
+        )
+
+        # 5. RECORD (background task)
+        record_task: asyncio.Task[None] | None = None
+        if recorder:
+            record_task = asyncio.create_task(
+                self._record_step_background(
+                    recorder=recorder,
+                    session_id=session_id,
+                    persona_name=persona_name,
+                    step_number=step_number,
+                    screenshot=screenshot,
+                    decision=synthetic_decision,
+                    page_url=metadata.url,
+                    page_title=metadata.title,
+                    viewport_width=viewport["width"],
+                    viewport_height=viewport["height"],
+                    click_x=click_x,
+                    click_y=click_y,
+                ),
+                name=f"record-cu-step-{session_id}-{step_number}",
+            )
+
+        return StepRecord(
+            step_number=step_number,
+            page_url=metadata.url,
+            action_type=action_type,
+            think_aloud=result.think_aloud,
+            task_progress=result.task_progress,
+            emotional_state=result.emotional_state,
+            click_x=click_x,
+            click_y=click_y,
             action_error=action_error,
         ), screenshot, record_task
 

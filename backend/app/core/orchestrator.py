@@ -76,9 +76,11 @@ class StudyOrchestrator:
         # AI engine components
         self._llm = LLMClient()
         self._persona_engine = PersonaEngine(self._llm)
+        self._use_computer_use = getattr(settings, "USE_COMPUTER_USE", False)
         self._navigator = Navigator(
             self._llm,
             max_steps=int(os.getenv("MAX_STEPS_PER_SESSION", "30")),
+            use_computer_use=self._use_computer_use,
         )
         self._analyzer = Analyzer(self._llm)
         self._synthesizer = Synthesizer(self._llm)
@@ -745,6 +747,7 @@ class StudyOrchestrator:
                     persona_navigator = Navigator(
                         persona_llm,
                         max_steps=int(os.getenv("MAX_STEPS_PER_SESSION", "30")),
+                        use_computer_use=self._use_computer_use,
                     )
                     self._persona_llm_clients.append(persona_llm)
                 else:

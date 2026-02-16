@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     # Screenshot diff (Iteration 3)
     SCREENSHOT_DIFF_ENABLED: bool = False
 
+    # Computer Use navigation (coordinate-based, no CSS selectors)
+    USE_COMPUTER_USE: bool = False
+
     # Performance & cost (Iteration 4)
     PARALLEL_BROWSER_INSTANCES: int = 1  # Separate Chromium processes (local mode)
     SCREENSHOT_FORMAT: str = "png"  # "png" or "jpeg"

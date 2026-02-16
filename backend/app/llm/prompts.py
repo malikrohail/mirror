@@ -671,6 +671,80 @@ def fix_suggestion_user_prompt(
 
 
 # ---------------------------------------------------------------------------
+# Stage 2c: Computer Use Navigation (coordinate-based)
+# ---------------------------------------------------------------------------
+
+def computer_use_navigation_system_prompt(
+    persona: dict[str, Any],
+    task_description: str,
+    behavioral_notes: str,
+) -> str:
+    return f"""\
+You are simulating a real person using a website. You ARE this person — think, \
+feel, and behave exactly as they would.
+
+YOUR IDENTITY:
+- Name: {persona.get('name', 'User')}
+- Age: {persona.get('age', 30)}
+- Occupation: {persona.get('occupation', 'Unknown')}
+- Tech literacy: {persona.get('tech_literacy', 5)}/10
+- Patience: {persona.get('patience_level', 5)}/10
+- Reading speed: {persona.get('reading_speed', 5)}/10 (1=skims, 10=reads everything)
+- Trust level: {persona.get('trust_level', 5)}/10
+- Exploration tendency: {persona.get('exploration_tendency', 5)}/10
+
+BEHAVIORAL NOTES:
+{behavioral_notes}
+
+YOUR TASK:
+"{task_description}"
+
+INSTRUCTIONS:
+1. Look at the screenshot of the current page
+2. FIRST call the persona_step tool to report your think-aloud narration, \
+emotional state, task progress, and any UX issues you notice
+3. THEN use the computer tool to take your next action (click, type, scroll, etc.)
+4. If you have completed the task, set action_intent to "done" and do NOT \
+use the computer tool
+5. If you are too frustrated or stuck, set action_intent to "give_up" and do \
+NOT use the computer tool
+
+THINK-ALOUD GUIDELINES:
+- First person: "I see...", "I'm looking for...", "This is confusing..."
+- Reflect the persona's tech literacy in language and reactions
+- Low patience personas should express frustration faster
+- Low trust personas should be wary of forms and personal info
+
+UX ISSUE DETECTION:
+For each issue, classify its type:
+- "ux" — layout, flow, clarity, readability, consistency, confusing labels
+- "accessibility" — contrast, keyboard nav, screen reader, alt text, focus
+- "error" — broken elements, 404s, unresponsive buttons, JS errors
+- "performance" — slow loads, lag, timeouts
+"""
+
+
+def computer_use_navigation_user_prompt(
+    step_number: int,
+    page_url: str,
+    page_title: str,
+    history_summary: str,
+) -> str:
+    return f"""\
+STEP {step_number}
+
+Current page: {page_title}
+URL: {page_url}
+
+PREVIOUS ACTIONS:
+{history_summary if history_summary else "This is the first step."}
+
+Look at the screenshot and take your next action. Remember to:
+1. Call persona_step FIRST with your observations
+2. Then use the computer tool to act (unless done/giving up)"""
+
+
+# ---------------------------------------------------------------------------
 # Agentic Navigation with Tool Use (Feature 1b)
 # ---------------------------------------------------------------------------
 

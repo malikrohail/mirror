@@ -307,6 +307,28 @@ class FixSuggestion(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Stage 2c: Computer Use Navigation (coordinate-based)
+# ---------------------------------------------------------------------------
+
+class ComputerUseResult(BaseModel):
+    """Parsed result from a Computer Use navigation step."""
+
+    think_aloud: str = ""
+    emotional_state: EmotionalState = EmotionalState.neutral
+    task_progress: int = Field(default=0, ge=0, le=100)
+    confidence: float = Field(default=0.5, ge=0, le=1)
+    ux_issues: list[UXIssue] = Field(default_factory=list)
+    action_intent: str = Field(default="continue", description="continue, done, or give_up")
+    # Computer tool action fields
+    computer_action: str = Field(default="screenshot", description="left_click, type, scroll, key, etc.")
+    coordinate: list[int] = Field(default_factory=list, description="[x, y] for click/scroll")
+    text: str = Field(default="", description="Text for type action")
+    key: str = Field(default="", description="Key name for key action")
+    scroll_direction: str = Field(default="down", description="up, down, left, right")
+    scroll_amount: int = Field(default=3, description="Scroll clicks")
+
+
+# ---------------------------------------------------------------------------
 # Stage 2b: Agentic Navigation with Tool Use (Feature 1b)
 # ---------------------------------------------------------------------------
 

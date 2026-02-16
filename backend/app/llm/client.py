@@ -16,6 +16,8 @@ from pydantic import BaseModel
 from app.llm.prompts import (
     accessibility_audit_system_prompt,
     accessibility_audit_user_prompt,
+    computer_use_navigation_system_prompt,
+    computer_use_navigation_user_prompt,
     fix_suggestion_system_prompt,
     fix_suggestion_user_prompt,
     flow_analysis_system_prompt,
@@ -40,6 +42,7 @@ from app.llm.prompts import (
 from app.llm.schemas import (
     AccessibilityAudit,
     AgenticNavigationDecision,
+    ComputerUseResult,
     FixSuggestion,
     FlowAnalysis,
     NavigationDecision,
@@ -428,6 +431,220 @@ class LLMClient:
         return await self._call_structured(
             "navigation", system, messages, NavigationDecision, max_tokens=1024,
         )
+
+    # ------------------------------------------------------------------
+    # Stage 2c: Computer Use Navigation
+    # ------------------------------------------------------------------
+
+    async def navigate_step_computer_use(
+        self,
+        persona: dict[str, Any],
+        task_description: str,
+        behavioral_notes: str,
+        screenshot: bytes,
+        page_url: str,
+        page_title: str,
+        step_number: int,
+        history_summary: str,
+        display_width: int = 1280,
+        display_height: int = 800,
+    ) -> ComputerUseResult:
+        """Navigate using Claude's Computer Use tool (coordinate-based actions).
+
+        Instead of outputting CSS selectors, Claude sees the screenshot and
+        returns pixel coordinates for clicks. This eliminates selector
+        hallucination failures entirely.
+        """
+        system = computer_use_navigation_system_prompt(
+            persona, task_description, behavioral_notes
+        )
+        user_text = computer_use_navigation_user_prompt(
+            step_number=step_number,
+            page_url=page_url,
+            page_title=page_title,
+            history_summary=history_summary,
+        )
+
+        # Compress screenshot for vision
+        compressed, media_type = _compress_screenshot_for_llm(screenshot)
+        screenshot_b64 = base64.b64encode(compressed).decode("utf-8")
+
+        # Define tools: computer (built-in) + persona_step (custom)
+        computer_tool = {
+            "type": "computer_20250124",
+            "name": "computer",
+            "display_width_px": display_width,
+            "display_height_px": display_height,
+        }
+
+        persona_step_tool = {
+            "name": "persona_step",
+            "description": (
+                "Report your persona's think-aloud narration, emotional state, "
+                "task progress, and any UX issues detected at this step. "
+                "Call this BEFORE using the computer tool."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "think_aloud": {
+                        "type": "string",
+                        "description": "Persona's inner monologue for this step",
+                    },
+                    "emotional_state": {
+                        "type": "string",
+                        "enum": [
+                            "confident", "curious", "neutral", "hesitant",
+                            "confused", "frustrated", "satisfied", "anxious",
+                        ],
+                    },
+                    "task_progress": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100,
+                        "description": "Estimated task completion percentage",
+                    },
+                    "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                    },
+                    "ux_issues": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "element": {"type": "string"},
+                                "description": {"type": "string"},
+                                "severity": {
+                                    "type": "string",
+                                    "enum": ["critical", "major", "minor", "enhancement"],
+                                },
+                                "heuristic": {"type": "string"},
+                                "wcag_criterion": {"type": "string"},
+                                "recommendation": {"type": "string"},
+                                "issue_type": {
+                                    "type": "string",
+                                    "enum": ["ux", "accessibility", "error", "performance"],
+                                },
+                            },
+                            "required": ["element", "description", "severity", "heuristic"],
+                        },
+                    },
+                    "action_intent": {
+                        "type": "string",
+                        "enum": ["continue", "done", "give_up"],
+                        "description": "Whether to continue, mark task done, or give up",
+                    },
+                },
+                "required": ["think_aloud", "emotional_state", "task_progress", "action_intent"],
+            },
+        }
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": screenshot_b64,
+                        },
+                    },
+                    {"type": "text", "text": user_text},
+                ],
+            }
+        ]
+
+        model = self._get_model("navigation")
+        # Computer Use requires specific models — upgrade Haiku to Sonnet
+        if "haiku" in model.lower():
+            model = SONNET_MODEL
+
+        last_error: Exception | None = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = await self._client.messages.create(
+                    model=model,
+                    max_tokens=1024,
+                    system=system,
+                    messages=messages,
+                    tools=[computer_tool, persona_step_tool],
+                    betas=["computer-use-2025-01-24"],
+                )
+
+                self.usage.record(
+                    response.usage.input_tokens,
+                    response.usage.output_tokens,
+                )
+
+                # Parse response blocks
+                result = ComputerUseResult()
+
+                for block in response.content:
+                    if block.type == "text":
+                        # Fallback: use text as think-aloud if persona_step wasn't called
+                        if not result.think_aloud:
+                            result.think_aloud = block.text
+                    elif block.type == "tool_use":
+                        if block.name == "persona_step":
+                            inp = block.input
+                            result.think_aloud = inp.get("think_aloud", result.think_aloud)
+                            result.emotional_state = inp.get("emotional_state", "neutral")
+                            result.task_progress = inp.get("task_progress", 0)
+                            result.confidence = inp.get("confidence", 0.5)
+                            result.action_intent = inp.get("action_intent", "continue")
+                            # Parse UX issues
+                            raw_issues = inp.get("ux_issues", [])
+                            if raw_issues:
+                                from app.llm.schemas import UXIssue, Severity, IssueType
+                                for ri in raw_issues:
+                                    try:
+                                        result.ux_issues.append(UXIssue(
+                                            element=ri.get("element", "Unknown"),
+                                            description=ri.get("description", ""),
+                                            severity=ri.get("severity", "minor"),
+                                            heuristic=ri.get("heuristic", ""),
+                                            wcag_criterion=ri.get("wcag_criterion"),
+                                            recommendation=ri.get("recommendation", ""),
+                                            issue_type=ri.get("issue_type", "ux"),
+                                        ))
+                                    except Exception:
+                                        pass
+                        elif block.name == "computer":
+                            inp = block.input
+                            result.computer_action = inp.get("action", "screenshot")
+                            result.coordinate = inp.get("coordinate", [])
+                            result.text = inp.get("text", "")
+                            result.key = inp.get("key", "")
+                            # Scroll fields
+                            result.scroll_direction = inp.get("direction", "down")
+                            result.scroll_amount = inp.get("amount", 3)
+
+                logger.debug(
+                    "Computer Use step %d: intent=%s, action=%s, coord=%s, emotion=%s",
+                    step_number, result.action_intent, result.computer_action,
+                    result.coordinate, result.emotional_state,
+                )
+                return result
+
+            except anthropic.RateLimitError:
+                wait = BASE_RETRY_DELAY * (2 ** attempt)
+                logger.warning("Rate limited on computer use nav, retry %d in %.1fs", attempt + 1, wait)
+                await asyncio.sleep(wait)
+                last_error = anthropic.RateLimitError("Rate limited")
+            except anthropic.APIError as e:
+                if attempt < MAX_RETRIES - 1 and e.status_code and e.status_code >= 500:
+                    wait = BASE_RETRY_DELAY * (2 ** attempt)
+                    logger.warning("API error %s on computer use nav, retry %d", e.status_code, attempt + 1)
+                    await asyncio.sleep(wait)
+                    last_error = e
+                else:
+                    raise
+
+        raise last_error or RuntimeError("Computer use navigation failed after retries")
 
     # ------------------------------------------------------------------
     # Stage 3: Screenshot Analysis

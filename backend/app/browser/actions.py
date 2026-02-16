@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeout
 
@@ -235,6 +236,175 @@ class BrowserActions:
                 description="Failed to press Enter",
                 error=str(e),
             )
+
+    # ------------------------------------------------------------------
+    # Coordinate-based actions (Computer Use)
+    # ------------------------------------------------------------------
+
+    async def click_at(self, page: Page, x: int, y: int) -> ActionResult:
+        """Click at pixel coordinates (Computer Use mode)."""
+        try:
+            await page.mouse.click(x, y)
+            await self._wait_for_stable(page)
+            return ActionResult(
+                success=True,
+                action_type="left_click",
+                description=f"Clicked at ({x}, {y})",
+            )
+        except Exception as e:
+            return ActionResult(
+                success=False,
+                action_type="left_click",
+                description=f"Failed to click at ({x}, {y})",
+                error=str(e),
+            )
+
+    async def double_click_at(self, page: Page, x: int, y: int) -> ActionResult:
+        """Double-click at pixel coordinates."""
+        try:
+            await page.mouse.dblclick(x, y)
+            await self._wait_for_stable(page)
+            return ActionResult(
+                success=True,
+                action_type="double_click",
+                description=f"Double-clicked at ({x}, {y})",
+            )
+        except Exception as e:
+            return ActionResult(
+                success=False,
+                action_type="double_click",
+                description=f"Failed to double-click at ({x}, {y})",
+                error=str(e),
+            )
+
+    async def type_text_raw(self, page: Page, text: str) -> ActionResult:
+        """Type text via keyboard (no selector needed — Computer Use mode)."""
+        try:
+            await page.keyboard.type(text, delay=REALISTIC_TYPE_DELAY_MS)
+            return ActionResult(
+                success=True,
+                action_type="type",
+                description=f"Typed '{text[:30]}...'",
+            )
+        except Exception as e:
+            return ActionResult(
+                success=False,
+                action_type="type",
+                description=f"Failed to type text",
+                error=str(e),
+            )
+
+    async def key_press(self, page: Page, key: str) -> ActionResult:
+        """Press a key by name (Computer Use mode)."""
+        try:
+            await page.keyboard.press(key)
+            await asyncio.sleep(0.3)
+            return ActionResult(
+                success=True,
+                action_type="key",
+                description=f"Pressed key '{key}'",
+            )
+        except Exception as e:
+            return ActionResult(
+                success=False,
+                action_type="key",
+                description=f"Failed to press key '{key}'",
+                error=str(e),
+            )
+
+    async def scroll_at(
+        self, page: Page, x: int, y: int, direction: str = "down", amount: int = 3
+    ) -> ActionResult:
+        """Scroll at pixel coordinates (Computer Use mode)."""
+        try:
+            # Move mouse to position first
+            await page.mouse.move(x, y)
+            delta_map = {"down": 100, "up": -100, "right": 100, "left": -100}
+            per_click = delta_map.get(direction, 100)
+            total = per_click * amount
+            if direction in ("left", "right"):
+                await page.mouse.wheel(total, 0)
+            else:
+                await page.mouse.wheel(0, total)
+            await asyncio.sleep(0.3)
+            return ActionResult(
+                success=True,
+                action_type="scroll",
+                description=f"Scrolled {direction} by {amount} clicks at ({x}, {y})",
+            )
+        except Exception as e:
+            return ActionResult(
+                success=False,
+                action_type="scroll",
+                description=f"Failed to scroll at ({x}, {y})",
+                error=str(e),
+            )
+
+    async def execute_computer_use(
+        self, page: Page, action: str, **kwargs: Any
+    ) -> ActionResult:
+        """Dispatch a Computer Use action by type string.
+
+        Handles all actions from Claude's computer_20250124 tool.
+        """
+        coord = kwargs.get("coordinate", [])
+        x = coord[0] if len(coord) >= 2 else 0
+        y = coord[1] if len(coord) >= 2 else 0
+
+        if action == "left_click":
+            return await self.click_at(page, x, y)
+        elif action == "double_click":
+            return await self.double_click_at(page, x, y)
+        elif action == "right_click":
+            try:
+                await page.mouse.click(x, y, button="right")
+                return ActionResult(success=True, action_type="right_click", description=f"Right-clicked at ({x}, {y})")
+            except Exception as e:
+                return ActionResult(success=False, action_type="right_click", description=f"Failed", error=str(e))
+        elif action == "type":
+            text = kwargs.get("text", "")
+            return await self.type_text_raw(page, text)
+        elif action == "key":
+            key = kwargs.get("key", "Return")
+            return await self.key_press(page, key)
+        elif action == "scroll":
+            direction = kwargs.get("direction", "down")
+            amount = kwargs.get("amount", 3)
+            return await self.scroll_at(page, x, y, direction, amount)
+        elif action == "mouse_move":
+            try:
+                await page.mouse.move(x, y)
+                return ActionResult(success=True, action_type="mouse_move", description=f"Moved to ({x}, {y})")
+            except Exception as e:
+                return ActionResult(success=False, action_type="mouse_move", description=f"Failed", error=str(e))
+        elif action == "left_click_drag":
+            end = kwargs.get("end_coordinate", coord)
+            ex = end[0] if len(end) >= 2 else x
+            ey = end[1] if len(end) >= 2 else y
+            try:
+                await page.mouse.move(x, y)
+                await page.mouse.down()
+                await page.mouse.move(ex, ey)
+                await page.mouse.up()
+                return ActionResult(success=True, action_type="drag", description=f"Dragged ({x},{y})→({ex},{ey})")
+            except Exception as e:
+                return ActionResult(success=False, action_type="drag", description="Failed", error=str(e))
+        elif action == "triple_click":
+            try:
+                await page.mouse.click(x, y, click_count=3)
+                return ActionResult(success=True, action_type="triple_click", description=f"Triple-clicked at ({x}, {y})")
+            except Exception as e:
+                return ActionResult(success=False, action_type="triple_click", description="Failed", error=str(e))
+        elif action == "wait":
+            ms = kwargs.get("duration", 2000)
+            await asyncio.sleep(ms / 1000)
+            return ActionResult(success=True, action_type="wait", description=f"Waited {ms}ms")
+        elif action == "screenshot":
+            # No-op — the navigator captures screenshots externally
+            return ActionResult(success=True, action_type="screenshot", description="Screenshot requested")
+        else:
+            logger.warning("Unknown computer use action: %s", action)
+            return ActionResult(success=False, action_type=action, description=f"Unknown action: {action}", error=f"Unsupported: {action}")
 
     async def execute(self, page: Page, action_type: str, **kwargs: str | int) -> ActionResult:
         """Dispatch an action by type string.
