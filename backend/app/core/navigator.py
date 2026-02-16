@@ -484,6 +484,24 @@ class Navigator:
         step's PERCEIVE phase. The caller must await it before the session ends.
         """
 
+        # 0. PRE-STEP CLEANUP: dismiss any lingering overlay/popup so
+        #    the LLM sees a clean page.  Skip step 1 (page-load overlays
+        #    are already handled) — only clean up leftovers from previous actions
+        #    like date pickers that stayed open or app-install banners.
+        if step_number > 1:
+            try:
+                if await detect_blocking_overlay(page):
+                    dismissed = await dismiss_overlays(page)
+                    if dismissed:
+                        logger.info(
+                            "Pre-step %d: dismissed %d overlay(s)", step_number, dismissed,
+                        )
+                    else:
+                        await try_escape_key(page)
+                        logger.info("Pre-step %d: pressed Escape to clear overlay", step_number)
+            except Exception:
+                pass
+
         # 1. PERCEIVE
         screenshot = await self._screenshots.capture_screenshot(page)
         a11y_tree = await self._screenshots.get_accessibility_tree(page)

@@ -46,9 +46,28 @@ OVERLAY_DISMISS_SELECTORS = [
     # --- App download banners ---
     'button:has-text("Continue to website")',
     'button:has-text("Continue in browser")',
+    'button:has-text("Continue shopping")',
     'button:has-text("Stay on web")',
+    'button:has-text("Continue on mobile site")',
+    'a:has-text("Continue to website")',
+    'a:has-text("Continue in browser")',
+    'a:has-text("Continue shopping")',
     '[id*="smartbanner"] .js-close',
     '.smartbanner-close',
+
+    # --- Walmart / Target / retail-specific banners ---
+    '[data-automation-id="modalClose"]',
+    '[data-automation-id="close-button"]',
+    'button[aria-label="close modal"]',
+    'button[aria-label="Close dialog"]',
+    '.bottom-sheet button[aria-label="close"]',
+    '.bottom-sheet button[aria-label="Close"]',
+    '[class*="BottomSheet"] button[aria-label="close"]',
+    '[class*="app-banner"] button',
+    '[class*="AppBanner"] button',
+    '[id*="app-banner"] button',
+    '[data-testid="sticky-banner-close"]',
+    '[data-testid="banner-close"]',
 
     # --- Notification permission prompts (custom site ones, not browser) ---
     'button:has-text("Block")',
