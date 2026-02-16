@@ -12,6 +12,7 @@ export interface StudyCreate {
   starting_path?: string;
   tasks: TaskCreate[];
   persona_template_ids: string[];
+  persona_models?: Record<string, string>;
 }
 
 export interface TaskOut {
@@ -28,6 +29,7 @@ export interface PersonaOut {
   template_id: string | null;
   profile: Record<string, unknown>;
   is_custom: boolean;
+  model: string | null;
   created_at: string;
 }
 
@@ -527,6 +529,85 @@ export interface FixPreviewResponse {
   after_base64: string | null;
   diff_base64: string | null;
   error: string | null;
+}
+
+// ── Estimate ────────────────────────────────────────
+
+export interface EstimateRequest {
+  persona_count: number;
+  task_count: number;
+  model?: string;
+}
+
+export interface EstimateBreakdown {
+  navigation_cost: number;
+  analysis_cost: number;
+  synthesis_cost: number;
+}
+
+export interface EstimateResponse {
+  estimated_cost_usd: number;
+  estimated_duration_seconds: number;
+  estimated_sessions: number;
+  estimated_total_steps: number;
+  breakdown: EstimateBreakdown;
+  model: string;
+  persona_count: number;
+  task_count: number;
+}
+
+// ── Teams ───────────────────────────────────────────
+
+export interface TeamMemberOut {
+  id: string;
+  persona_template_id: string;
+  order_index: number;
+  persona_template: Record<string, unknown> | null;
+}
+
+export interface TeamListResponse {
+  items: TeamMemberOut[];
+  total: number;
+}
+
+// ── Preferences ─────────────────────────────────────
+
+export interface PreferencesData {
+  browser_mode?: string;
+  theme?: string;
+  default_model?: string;
+}
+
+export interface PreferencesResponse {
+  user_id: string;
+  preferences: Record<string, unknown>;
+}
+
+// ── Favorites ───────────────────────────────────────
+
+export interface FavoriteCreate {
+  url: string;
+  label?: string;
+  notes?: string;
+}
+
+export interface FavoriteUpdate {
+  url?: string;
+  label?: string;
+  notes?: string;
+}
+
+export interface FavoriteOut {
+  id: string;
+  url: string;
+  label: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface FavoriteListResponse {
+  items: FavoriteOut[];
+  total: number;
 }
 
 // ── Showcase ────────────────────────────────────────

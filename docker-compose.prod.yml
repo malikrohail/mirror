@@ -95,8 +95,6 @@ services:
     ports:
       - "80:80"
       - "443:443"
-    environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data

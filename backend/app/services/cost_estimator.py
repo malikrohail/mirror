@@ -123,13 +123,28 @@ class CostEstimator:
         total_steps = num_sessions * AVG_STEPS_PER_SESSION
         unique_pages = num_sessions * AVG_UNIQUE_PAGES_PER_SESSION
 
-        # Calculate costs per stage
+        # Calculate costs per stage, using actual per-persona models for navigation
         persona_cost = self._calc_stage_cost(
             "persona_generation", num_personas
         )
-        nav_cost = self._calc_stage_cost(
-            "navigation_step", total_steps
-        )
+
+        # Navigation cost: use each persona's assigned model
+        nav_cost = 0.0
+        for persona in study.personas:
+            persona_model = persona.model or "opus-4.6"
+            # Map short model names to full Anthropic model IDs
+            model_map = {
+                "opus-4.6": "claude-opus-4-6",
+                "sonnet-4.5": "claude-sonnet-4-5-20250929",
+                "haiku-4.5": "claude-sonnet-4-5-20250929",  # Use sonnet pricing as floor
+            }
+            full_model = model_map.get(persona_model, "claude-sonnet-4-5-20250929")
+            pricing = PRICING.get(full_model, PRICING["claude-sonnet-4-5-20250929"])
+            steps_per_persona = num_tasks * AVG_STEPS_PER_SESSION
+            est = STAGE_ESTIMATES["navigation_step"]
+            per_step = (est["input_tokens"] / 1_000_000) * pricing["input"] + (est["output_tokens"] / 1_000_000) * pricing["output"]
+            nav_cost += per_step * steps_per_persona
+
         analysis_cost = self._calc_stage_cost(
             "screenshot_analysis", unique_pages
         )
@@ -273,14 +288,21 @@ class CostTracker:
         self._browser_total_seconds = 0.0
         self._screenshot_count = 0
         self._storage_bytes = 0
+        # Per-model token tracking for accurate cost calculation
+        self._model_input_tokens: dict[str, int] = {}
+        self._model_output_tokens: dict[str, int] = {}
 
     def record_llm_usage(
         self, input_tokens: int, output_tokens: int, *, api_calls: int = 1,
+        model: str | None = None,
     ) -> None:
         """Record token usage from LLM call(s)."""
         self._llm_input_tokens += input_tokens
         self._llm_output_tokens += output_tokens
         self._llm_api_calls += api_calls
+        if model:
+            self._model_input_tokens[model] = self._model_input_tokens.get(model, 0) + input_tokens
+            self._model_output_tokens[model] = self._model_output_tokens.get(model, 0) + output_tokens
 
     def set_browser_mode(self, mode: str) -> None:
         """Set the browser mode used for this study."""
@@ -308,26 +330,28 @@ class CostTracker:
 
     def get_breakdown(self) -> ActualCostBreakdown:
         """Calculate the final cost breakdown."""
-        # LLM costs
         llm_cost = 0.0
-        # Use Opus pricing for a conservative estimate
-        # (in practice, different stages use different models)
-        opus_pricing = PRICING.get("claude-opus-4-6", {"input": 15.0, "output": 75.0})
-        sonnet_pricing = PRICING.get("claude-sonnet-4-5-20250929", {"input": 3.0, "output": 15.0})
 
-        # Rough split: ~70% of calls are navigation (Sonnet), ~30% are analysis/synthesis (Opus)
-        nav_ratio = 0.7
-        opus_ratio = 0.3
-
-        input_cost = (
-            (self._llm_input_tokens * nav_ratio / 1_000_000) * sonnet_pricing["input"]
-            + (self._llm_input_tokens * opus_ratio / 1_000_000) * opus_pricing["input"]
-        )
-        output_cost = (
-            (self._llm_output_tokens * nav_ratio / 1_000_000) * sonnet_pricing["output"]
-            + (self._llm_output_tokens * opus_ratio / 1_000_000) * opus_pricing["output"]
-        )
-        llm_cost = input_cost + output_cost
+        if self._model_input_tokens:
+            # Use actual per-model token data for accurate cost
+            for model_id, input_toks in self._model_input_tokens.items():
+                pricing = PRICING.get(model_id, PRICING["claude-sonnet-4-5-20250929"])
+                llm_cost += (input_toks / 1_000_000) * pricing["input"]
+            for model_id, output_toks in self._model_output_tokens.items():
+                pricing = PRICING.get(model_id, PRICING["claude-sonnet-4-5-20250929"])
+                llm_cost += (output_toks / 1_000_000) * pricing["output"]
+        else:
+            # Fallback: use 70/30 Sonnet/Opus split for legacy callers
+            opus_pricing = PRICING.get("claude-opus-4-6", {"input": 15.0, "output": 75.0})
+            sonnet_pricing = PRICING.get("claude-sonnet-4-5-20250929", {"input": 3.0, "output": 15.0})
+            nav_ratio = 0.7
+            opus_ratio = 0.3
+            llm_cost = (
+                (self._llm_input_tokens * nav_ratio / 1_000_000) * sonnet_pricing["input"]
+                + (self._llm_input_tokens * opus_ratio / 1_000_000) * opus_pricing["input"]
+                + (self._llm_output_tokens * nav_ratio / 1_000_000) * sonnet_pricing["output"]
+                + (self._llm_output_tokens * opus_ratio / 1_000_000) * opus_pricing["output"]
+            )
 
         # Browser costs (only Browserbase has a cost)
         browser_cost = 0.0

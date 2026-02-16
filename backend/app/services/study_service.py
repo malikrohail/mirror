@@ -84,10 +84,15 @@ class StudyService:
             template = await self.persona_repo.get_template(template_id)
             if not template:
                 raise HTTPException(status_code=400, detail=f"Template {template_id} not found")
+            # Use per-persona model from request, fall back to template default
+            persona_model = data.persona_models.get(
+                str(template_id), template.model or "opus-4.6"
+            )
             await self.persona_repo.create_persona(
                 study_id=study.id,
                 template_id=template.id,
                 profile=template.default_profile,
+                model=persona_model,
             )
 
         await self.db.flush()

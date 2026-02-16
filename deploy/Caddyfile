@@ -1,4 +1,17 @@
-{$SITE_ADDRESS:80} {
+miror.tech, www.miror.tech {
+	# API + WebSocket → backend
+	handle /api/v1/* {
+		reverse_proxy backend:8000
+	}
+
+	# Everything else → frontend
+	handle {
+		reverse_proxy frontend:3000
+	}
+}
+
+# Local dev fallback (http-only, no TLS)
+:80 {
 	# API + WebSocket → backend
 	handle /api/v1/* {
 		reverse_proxy backend:8000

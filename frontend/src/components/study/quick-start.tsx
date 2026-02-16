@@ -42,6 +42,8 @@ import { useCreateStudy, useRunStudy } from '@/hooks/use-study';
 import { usePersonaTemplates } from '@/hooks/use-personas';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TERMS } from '@/lib/constants';
+import { estimateCost } from '@/lib/api-client';
+import type { EstimateResponse } from '@/types';
 
 type QuickStartPhase = 'input' | 'select-personas';
 
@@ -125,6 +127,7 @@ export function QuickStart({
   const [filterTech, setFilterTech] = useState<LevelRange | null>(null);
   const [filterPatience, setFilterPatience] = useState<LevelRange | null>(null);
   const [filterAccessibility, setFilterAccessibility] = useState(false);
+  const [costEstimate, setCostEstimate] = useState<EstimateResponse | null>(null);
 
   const hasFilters = filterCategory !== null || filterDevice !== null || filterTech !== null || filterPatience !== null || filterAccessibility;
   const clearAllFilters = () => {
@@ -165,6 +168,31 @@ export function QuickStart({
     window.dispatchEvent(new StorageEvent('storage', { key: 'miror-browser-mode', newValue: next }));
     toast.success(`Browser mode: ${next === 'local' ? 'Local' : 'Cloud'}`);
   };
+
+  // Fetch cost estimate when persona count changes
+  useEffect(() => {
+    if (selectedPersonaIds.size === 0) {
+      setCostEstimate(null);
+      return;
+    }
+    // Determine the dominant model for the estimate
+    const models = Array.from(selectedPersonaIds).map((id) => personaModels[id] ?? 'opus-4.6');
+    const modelCounts: Record<string, number> = {};
+    for (const m of models) modelCounts[m] = (modelCounts[m] ?? 0) + 1;
+    const dominantModel = Object.entries(modelCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'opus-4.6';
+
+    let cancelled = false;
+    estimateCost({
+      persona_count: selectedPersonaIds.size,
+      task_count: 1,
+      model: dominantModel,
+    }).then((est) => {
+      if (!cancelled) setCostEstimate(est);
+    }).catch(() => {
+      // Silently fail — show fallback
+    });
+    return () => { cancelled = true; };
+  }, [selectedPersonaIds.size, personaModels]);
 
   const canGenerate = description.trim().length > 2 && url.trim().length > 0;
   const isValidInput = canGenerate && url.trim().includes('.');
@@ -292,6 +320,7 @@ export function QuickStart({
         url: normalizedUrl,
         tasks,
         persona_template_ids: personaIds,
+        persona_models: Object.keys(personaModels).length > 0 ? personaModels : undefined,
       });
       const bm = localStorage.getItem('miror-browser-mode') || 'cloud';
       await runStudy.mutateAsync({ studyId: study.id, browserMode: bm });
@@ -446,7 +475,13 @@ export function QuickStart({
                   </div>
                   <span>
                     <span className="text-foreground/40">~</span>{' '}
-                    2 min &middot; ${(selectedPersonaIds.size * 0.5).toFixed(2)}
+                    {costEstimate
+                      ? `${Math.ceil(costEstimate.estimated_duration_seconds / 60)} min`
+                      : `${selectedPersonaIds.size} min`}
+                    {' '}&middot;{' '}
+                    ${costEstimate
+                      ? costEstimate.estimated_cost_usd.toFixed(2)
+                      : (selectedPersonaIds.size * 0.5).toFixed(2)}
                   </span>
                 </div>
               )}
@@ -782,7 +817,13 @@ export function QuickStart({
                   </div>
                   <span>
                     <span className="text-foreground/40">~</span>{' '}
-                    2 min &middot; ${(selectedPersonaIds.size * 0.5).toFixed(2)}
+                    {costEstimate
+                      ? `${Math.ceil(costEstimate.estimated_duration_seconds / 60)} min`
+                      : `${selectedPersonaIds.size} min`}
+                    {' '}&middot;{' '}
+                    ${costEstimate
+                      ? costEstimate.estimated_cost_usd.toFixed(2)
+                      : (selectedPersonaIds.size * 0.5).toFixed(2)}
                   </span>
                 </div>
               )}

@@ -20,6 +20,7 @@ class StudyCreate(BaseModel):
     starting_path: str = "/"
     tasks: list[TaskCreate] = Field(..., min_length=1, max_length=10)
     persona_template_ids: list[uuid.UUID] = Field(..., min_length=1, max_length=10)
+    persona_models: dict[str, str] = Field(default_factory=dict)
 
 
 # --- Response schemas ---
@@ -40,6 +41,7 @@ class PersonaOut(BaseModel):
     template_id: uuid.UUID | None = None
     profile: dict = {}
     is_custom: bool = False
+    model: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

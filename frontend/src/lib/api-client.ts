@@ -39,6 +39,16 @@ import type {
   AccessibilityAuditResult,
   FixPreviewResponse,
   ShowcaseStudy,
+  EstimateRequest,
+  EstimateResponse,
+  TeamMemberOut,
+  TeamListResponse,
+  PreferencesData,
+  PreferencesResponse,
+  FavoriteCreate,
+  FavoriteUpdate,
+  FavoriteOut,
+  FavoriteListResponse,
 } from '@/types';
 
 class ApiError extends Error {
@@ -392,6 +402,80 @@ export function runAccessibilityAudit(studyId: string): Promise<AccessibilityAud
 
 export function previewFix(studyId: string, issueId: string): Promise<FixPreviewResponse> {
   return request(`/studies/${studyId}/issues/${issueId}/preview-fix`, { method: 'POST' });
+}
+
+// ── Estimate ────────────────────────────────────────
+
+export function estimateCost(data: EstimateRequest): Promise<EstimateResponse> {
+  return request('/estimate', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+// ── Teams ───────────────────────────────────────────
+
+export function listTeamMembers(): Promise<TeamListResponse> {
+  return request('/teams');
+}
+
+export function addToTeam(personaTemplateId: string): Promise<TeamMemberOut> {
+  return request('/teams', {
+    method: 'POST',
+    body: JSON.stringify({ persona_template_id: personaTemplateId }),
+  });
+}
+
+export function removeFromTeam(personaTemplateId: string): Promise<void> {
+  return request(`/teams/${personaTemplateId}`, { method: 'DELETE' });
+}
+
+export function reorderTeam(personaTemplateIds: string[]): Promise<TeamListResponse> {
+  return request('/teams/reorder', {
+    method: 'PUT',
+    body: JSON.stringify({ persona_template_ids: personaTemplateIds }),
+  });
+}
+
+// ── Preferences ─────────────────────────────────────
+
+export function getPreferences(): Promise<PreferencesResponse> {
+  return request('/preferences');
+}
+
+export function updatePreferences(prefs: Partial<PreferencesData>): Promise<PreferencesResponse> {
+  return request('/preferences', {
+    method: 'PUT',
+    body: JSON.stringify(prefs),
+  });
+}
+
+// ── Favorites ───────────────────────────────────────
+
+export function listFavorites(): Promise<FavoriteListResponse> {
+  return request('/favorites');
+}
+
+export function createFavorite(data: FavoriteCreate): Promise<FavoriteOut> {
+  return request('/favorites', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function getFavorite(id: string): Promise<FavoriteOut> {
+  return request(`/favorites/${id}`);
+}
+
+export function updateFavorite(id: string, data: Partial<FavoriteUpdate>): Promise<FavoriteOut> {
+  return request(`/favorites/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteFavorite(id: string): Promise<void> {
+  return request(`/favorites/${id}`, { method: 'DELETE' });
 }
 
 // ── Showcase ────────────────────────────────────────
