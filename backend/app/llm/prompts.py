@@ -149,14 +149,20 @@ their confusion or confidence, react to the UI as someone with their background
 6. Report your emotional state
 
 POPUP / MODAL / OVERLAY HANDLING (CRITICAL):
-If you see ANY modal, popup, overlay, or dialog blocking the page content:
-- IMMEDIATELY dismiss it before continuing your task
+If you see ANY modal, popup, overlay, dropdown, date picker, or floating panel \
+blocking the page content:
+- IMMEDIATELY dismiss or close it before trying to interact with elements behind it
 - Click the dismiss button ("Got it", "Close", "X", "No thanks", "OK", "Skip", etc.)
-- If you cannot find a dismiss button, try clicking outside the modal
+- If a date picker or calendar is open and you are done selecting dates, click \
+OUTSIDE the calendar or click the search/submit button to close it — do NOT try \
+to click elements hidden behind the calendar
+- If a dropdown menu is open and blocking other fields, click elsewhere to close it first
+- If you cannot find a dismiss button, try clicking on an empty area of the page
 - Log the popup as a UX issue if it interrupts the task flow
-- Do NOT get stuck repeatedly trying to interact with elements behind a modal
-- Common overlays: cookie banners, newsletter signups, app download prompts, \
-price/fee disclosures, notification permission requests, welcome modals
+- Do NOT repeatedly try to click an element that is covered by a floating panel — \
+close the panel first
+- NEVER attempt the same failed click more than once — if a click fails, the \
+element is likely blocked by something on top of it
 
 THINK-ALOUD GUIDELINES:
 - First-person perspective ("I see...", "I'm looking for...", "This is confusing...")
@@ -720,12 +726,17 @@ use the computer tool
 NOT use the computer tool
 
 POPUP / MODAL / OVERLAY HANDLING (CRITICAL):
-If you see ANY modal, popup, overlay, or dialog blocking the page content:
-- IMMEDIATELY dismiss it before continuing your task
+If you see ANY modal, popup, overlay, dropdown, date picker, or floating panel \
+blocking the page content:
+- IMMEDIATELY dismiss or close it before trying to interact with elements behind it
 - Click the dismiss button ("Got it", "Close", "X", "No thanks", "OK", "Skip", etc.)
-- If no dismiss button is visible, try pressing Escape via the computer tool
-- Log the popup as a UX issue if it interrupts the task flow
-- Do NOT get stuck trying to interact with elements behind a modal
+- If a date picker or calendar is open and you are done selecting dates, click \
+OUTSIDE the calendar or click the search/submit button to close it
+- If a dropdown is open and blocking other fields, click elsewhere first
+- If nothing else works, press Escape via the computer tool
+- Do NOT repeatedly click an element that is covered by a floating panel — \
+close the panel first
+- NEVER attempt the same failed action more than once
 
 THINK-ALOUD GUIDELINES:
 - First person: "I see...", "I'm looking for...", "This is confusing..."

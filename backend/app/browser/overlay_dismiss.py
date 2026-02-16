@@ -104,50 +104,29 @@ async def dismiss_overlays(page: Page, timeout_ms: int = 2000) -> int:
 
 
 async def try_escape_key(page: Page) -> bool:
-    """Press Escape to dismiss any open modal/overlay.
+    """Press Escape to dismiss any blocking element.
 
-    Returns True if the page changed (modal likely dismissed).
+    Works on modals, dropdowns, date pickers, popovers, menus,
+    and any other floating UI that responds to Escape. We don't
+    try to verify what closed — just press and move on.
     """
     try:
-        # Snapshot visible dialogs before pressing Escape
-        dialogs_before = await page.evaluate("""() => {
-            const dialogs = document.querySelectorAll(
-                '[role="dialog"], [aria-modal="true"], .modal.show, .modal.is-open, .overlay.active'
-            );
-            return dialogs.length;
-        }""")
-
         await page.keyboard.press("Escape")
         await page.wait_for_timeout(500)
-
-        # Check if any dialogs closed
-        dialogs_after = await page.evaluate("""() => {
-            const dialogs = document.querySelectorAll(
-                '[role="dialog"], [aria-modal="true"], .modal.show, .modal.is-open, .overlay.active'
-            );
-            return dialogs.length;
-        }""")
-
-        if dialogs_after < dialogs_before:
-            logger.info(
-                "Escape key dismissed overlay (%d -> %d dialogs)",
-                dialogs_before, dialogs_after,
-            )
-            return True
-
-        return False
+        logger.info("Pressed Escape key (dismiss attempt)")
+        return True
     except Exception as e:
         logger.debug("Escape key attempt failed: %s", e)
         return False
 
 
 async def detect_blocking_overlay(page: Page) -> bool:
-    """Check if a modal/overlay is currently blocking the page."""
+    """Check if a modal, popover, dropdown, or overlay is blocking the page."""
     try:
         return await page.evaluate("""() => {
             // Check for role="dialog" or aria-modal elements that are visible
             const dialogs = document.querySelectorAll(
-                '[role="dialog"], [aria-modal="true"]'
+                '[role="dialog"], [aria-modal="true"], [role="listbox"], [role="menu"]'
             );
             for (const d of dialogs) {
                 const style = window.getComputedStyle(d);
@@ -165,6 +144,24 @@ async def detect_blocking_overlay(page: Page) -> bool:
                 const style = window.getComputedStyle(b);
                 if (style.display !== 'none' && style.visibility !== 'hidden') {
                     return true;
+                }
+            }
+
+            // Check for floating elements with high z-index that cover
+            // a significant portion of the viewport (date pickers, popovers)
+            const allEls = document.querySelectorAll('*');
+            for (const el of allEls) {
+                const style = window.getComputedStyle(el);
+                const z = parseInt(style.zIndex, 10);
+                if (z > 100 && style.position !== 'static'
+                    && style.display !== 'none' && style.visibility !== 'hidden') {
+                    const rect = el.getBoundingClientRect();
+                    const area = rect.width * rect.height;
+                    const vpArea = window.innerWidth * window.innerHeight;
+                    // If floating element covers >15% of viewport, it's blocking
+                    if (area / vpArea > 0.15) {
+                        return true;
+                    }
                 }
             }
 

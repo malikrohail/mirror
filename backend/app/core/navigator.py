@@ -579,21 +579,20 @@ class Navigator:
                     "Action failed at step %d: %s", step_number, action_error,
                 )
 
-                # Fallback: if action failed and an overlay might be blocking,
-                # try dismissing it with known selectors or Escape key.
-                if await detect_blocking_overlay(page):
-                    logger.info(
-                        "Overlay detected after failed action at step %d — "
-                        "attempting auto-dismiss",
-                        step_number,
-                    )
-                    dismissed = await dismiss_overlays(page)
-                    if not dismissed:
-                        escaped = await try_escape_key(page)
-                        if escaped:
-                            logger.info("Escape key dismissed blocking overlay")
-                    else:
-                        logger.info("Auto-dismissed %d blocking overlay(s)", dismissed)
+                # Fallback: ANY failed click/type could be blocked by a
+                # popover, dropdown, calendar, or modal — not just
+                # [role="dialog"]. Always try to clear the way.
+                logger.info(
+                    "Action failed at step %d — attempting overlay dismiss "
+                    "and Escape key fallback",
+                    step_number,
+                )
+                dismissed = await dismiss_overlays(page)
+                if dismissed:
+                    logger.info("Auto-dismissed %d blocking overlay(s)", dismissed)
+                # Always try Escape regardless — closes date pickers,
+                # dropdowns, popovers, menus, and modals alike.
+                await try_escape_key(page)
 
         # 5. RECORD (fire as background task so next step's PERCEIVE starts immediately)
         record_task: asyncio.Task[None] | None = None
