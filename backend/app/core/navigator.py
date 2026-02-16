@@ -26,8 +26,9 @@ from app.llm.schemas import ActionType, ComputerUseResult, NavigationDecision
 
 logger = logging.getLogger(__name__)
 
-MAX_STEPS_DEFAULT = 30
+MAX_STEPS_DEFAULT = 25
 STUCK_THRESHOLD = 3  # same URL N times in a row → suggest give_up
+STEP_EXTENSION = 10  # extra steps granted when persona is making good progress
 
 
 class StepRecorder(Protocol):
@@ -256,7 +257,14 @@ class Navigator:
                             error=error,
                         )
 
-            for step_number in range(1, self._max_steps + 1):
+            # Adaptive step budget: start with max_steps, extend once if
+            # the persona is making good progress, or terminate early if stuck.
+            effective_max_steps = self._max_steps
+            extension_granted = False
+            step_number = 0
+
+            while step_number < effective_max_steps:
+                step_number += 1
                 try:
                     step_fn = (
                         self._execute_step_computer_use
@@ -294,7 +302,7 @@ class Navigator:
                         task_completed = True
                         break
 
-                    # Stuck detection
+                    # Stuck detection (same URL + no progress for last 3 steps)
                     if self._is_stuck(steps):
                         logger.warning(
                             "Persona %s appears stuck on %s, suggesting give_up",
@@ -302,6 +310,41 @@ class Navigator:
                         )
                         gave_up = True
                         break
+
+                    # --- Adaptive budget: early termination ---
+                    # If halfway through the initial budget with < 20% progress,
+                    # the persona is unlikely to complete — terminate early.
+                    halfway = self._max_steps // 2
+                    if (
+                        step_number >= halfway
+                        and step_result.task_progress < 20
+                        and not extension_granted
+                    ):
+                        logger.warning(
+                            "Persona %s has only %d%% progress at step %d/%d "
+                            "(halfway) — terminating early",
+                            persona_name, step_result.task_progress,
+                            step_number, self._max_steps,
+                        )
+                        gave_up = True
+                        break
+
+                    # --- Adaptive budget: step extension ---
+                    # When reaching the initial budget with >= 50% progress and
+                    # no extension yet, grant STEP_EXTENSION extra steps.
+                    if (
+                        step_number >= self._max_steps
+                        and not extension_granted
+                        and step_result.task_progress >= 50
+                    ):
+                        extension_granted = True
+                        effective_max_steps = self._max_steps + STEP_EXTENSION
+                        logger.info(
+                            "Persona %s at %d%% progress — granting %d extra "
+                            "steps (new limit: %d)",
+                            persona_name, step_result.task_progress,
+                            STEP_EXTENSION, effective_max_steps,
+                        )
 
                 except Exception as e:
                     logger.error(

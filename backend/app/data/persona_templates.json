@@ -27,7 +27,7 @@
         "neuroticism": 0.3
       }
     },
-    "avatar_url": "/images/personas/humans/tech-savvy-college-student.png"
+    "avatar_url": "https://randomuser.me/api/portraits/men/19.jpg"
   },
   {
     "name": "Busy Working Parent",
@@ -57,7 +57,7 @@
         "neuroticism": 0.5
       }
     },
-    "avatar_url": "/images/personas/humans/busy-working-parent.png"
+    "avatar_url": "https://randomuser.me/api/portraits/women/44.jpg"
   },
   {
     "name": "Retired Grandparent",
@@ -91,7 +91,7 @@
         "neuroticism": 0.6
       }
     },
-    "avatar_url": "/images/personas/humans/retired-grandparent.png"
+    "avatar_url": "https://randomuser.me/api/portraits/men/78.jpg"
   },
   {
     "name": "Non-Native English Speaker",
@@ -121,7 +121,7 @@
         "neuroticism": 0.4
       }
     },
-    "avatar_url": "/images/personas/humans/non-native-english-speaker.png"
+    "avatar_url": "https://randomuser.me/api/portraits/men/34.jpg"
   },
   {
     "name": "Impatient Executive",
@@ -152,7 +152,7 @@
         "neuroticism": 0.5
       }
     },
-    "avatar_url": "/images/personas/humans/impatient-executive.png"
+    "avatar_url": "https://randomuser.me/api/portraits/men/46.jpg"
   },
   {
     "name": "First-Time Internet User",
@@ -185,7 +185,7 @@
         "neuroticism": 0.7
       }
     },
-    "avatar_url": "/images/personas/humans/first-time-internet-user.png"
+    "avatar_url": "https://randomuser.me/api/portraits/women/65.jpg"
   },
   {
     "name": "Power User Developer",
@@ -216,7 +216,7 @@
         "neuroticism": 0.3
       }
     },
-    "avatar_url": "/images/personas/humans/power-user-developer.png"
+    "avatar_url": "https://randomuser.me/api/portraits/men/29.jpg"
   },
   {
     "name": "Anxious First-Time Buyer",
@@ -247,7 +247,7 @@
         "neuroticism": 0.8
       }
     },
-    "avatar_url": "/images/personas/humans/anxious-first-time-buyer.png"
+    "avatar_url": "https://randomuser.me/api/portraits/women/21.jpg"
   },
   {
     "name": "Screen Reader User",
@@ -283,7 +283,7 @@
         "neuroticism": 0.4
       }
     },
-    "avatar_url": "/images/personas/humans/screen-reader-user.png"
+    "avatar_url": "https://randomuser.me/api/portraits/men/43.jpg"
   },
   {
     "name": "Low Vision User",
@@ -318,7 +318,7 @@
         "neuroticism": 0.5
       }
     },
-    "avatar_url": "/images/personas/humans/low-vision-user.png"
+    "avatar_url": "https://randomuser.me/api/portraits/women/79.jpg"
   },
   {
     "name": "Color Blind User",
@@ -350,7 +350,7 @@
         "neuroticism": 0.4
       }
     },
-    "avatar_url": "/images/personas/humans/color-blind-user.png"
+    "avatar_url": "https://randomuser.me/api/portraits/men/41.jpg"
   },
   {
     "name": "Motor Impairment User",
@@ -385,7 +385,7 @@
         "neuroticism": 0.5
       }
     },
-    "avatar_url": "/images/personas/humans/motor-impairment-user.png"
+    "avatar_url": "https://randomuser.me/api/portraits/women/58.jpg"
   },
   {
     "name": "Cognitive Disability User",
@@ -421,7 +421,7 @@
         "neuroticism": 0.6
       }
     },
-    "avatar_url": "/images/personas/humans/cognitive-disability-user.png"
+    "avatar_url": "https://randomuser.me/api/portraits/men/25.jpg"
   },
   {
     "name": "E-commerce Power Shopper",
@@ -452,7 +452,7 @@
         "neuroticism": 0.4
       }
     },
-    "avatar_url": "/images/personas/humans/e-commerce-power-shopper.png"
+    "avatar_url": "https://randomuser.me/api/portraits/women/32.jpg"
   },
   {
     "name": "SaaS Evaluator",
@@ -483,7 +483,7 @@
         "neuroticism": 0.3
       }
     },
-    "avatar_url": "/images/personas/humans/saas-evaluator.png"
+    "avatar_url": "https://randomuser.me/api/portraits/men/36.jpg"
   },
   {
     "name": "Healthcare Patient",
@@ -516,7 +516,7 @@
         "neuroticism": 0.6
       }
     },
-    "avatar_url": "/images/personas/humans/healthcare-patient.png"
+    "avatar_url": "https://randomuser.me/api/portraits/women/81.jpg"
   },
   {
     "name": "Fintech First-Timer",
@@ -547,7 +547,7 @@
         "neuroticism": 0.7
       }
     },
-    "avatar_url": "/images/personas/humans/fintech-first-timer.png"
+    "avatar_url": "https://randomuser.me/api/portraits/women/18.jpg"
   },
   {
     "name": "Mobile-Only User",
@@ -578,7 +578,7 @@
         "neuroticism": 0.3
       }
     },
-    "avatar_url": "/images/personas/humans/mobile-only-user.png"
+    "avatar_url": "https://randomuser.me/api/portraits/men/22.jpg"
   },
   {
     "name": "Privacy-Conscious User",
@@ -609,7 +609,7 @@
         "neuroticism": 0.5
       }
     },
-    "avatar_url": "/images/personas/humans/privacy-conscious-user.png"
+    "avatar_url": "https://randomuser.me/api/portraits/men/33.jpg"
   },
   {
     "name": "Distracted Commuter",
@@ -640,7 +640,7 @@
         "neuroticism": 0.4
       }
     },
-    "avatar_url": "/images/personas/humans/distracted-commuter.png"
+    "avatar_url": "https://randomuser.me/api/portraits/women/26.jpg"
   },
   {
     "name": "AI Shopping Assistant",
