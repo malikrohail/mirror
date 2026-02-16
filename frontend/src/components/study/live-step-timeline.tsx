@@ -16,8 +16,21 @@ import {
   Eye,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { StepsIllustration } from '@/components/common/empty-illustrations';
+import { TypewriterStatus } from '@/components/common/typewriter-status';
 import type { StepHistoryEntry } from '@/stores/study-store';
+
+const PREPARING_MESSAGES = [
+  'Launching browser sessions',
+  'Loading persona configurations',
+  'Navigating to target URL',
+  'Initializing test environment',
+  'Preparing AI observers',
+  'Warming up headless browsers',
+  'Assigning tasks to personas',
+  'Capturing initial screenshots',
+  'Calibrating behavioral models',
+  'Connecting to analysis engine',
+];
 
 const ACTION_CONFIG: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   start:    { icon: Play,            color: 'bg-green-500',  label: 'Session started' },
@@ -130,9 +143,18 @@ export function LiveStepTimeline({ steps }: LiveStepTimelineProps) {
 
   if (steps.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 p-4">
-        <StepsIllustration />
-        <p className="text-[14px] text-muted-foreground/40">Preparing test sessions</p>
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-4">
+        <svg className="h-10 w-10 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10" className="opacity-20" />
+          <path d="M12 2a10 10 0 0 1 10 10" className="text-foreground/70" strokeLinecap="round" />
+        </svg>
+        <div className="text-center">
+          <p className="text-sm font-medium">Preparing test sessions</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Setting up browser environments for each persona.
+          </p>
+        </div>
+        <TypewriterStatus messages={PREPARING_MESSAGES} intervalMs={3000} />
       </div>
     );
   }

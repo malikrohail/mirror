@@ -588,7 +588,10 @@ export function PersonaBuilderForm({ embedded = false, onSuccess }: PersonaBuild
         {step === 'describe' ? (
           generatePersonaDraft.isPending ? (
             <div className="flex flex-col items-center gap-4 py-10">
-              <Loader2 className="h-10 w-10 animate-spin text-foreground/60 [animation-duration:1.6s]" />
+              <svg className="h-10 w-10 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" className="opacity-20" />
+                <path d="M12 2a10 10 0 0 1 10 10" className="text-foreground/70" strokeLinecap="round" />
+              </svg>
               <div className="text-center">
                 <p className="text-sm font-medium">Generating tester configuration</p>
                 <p className="mt-1 text-xs text-muted-foreground">
