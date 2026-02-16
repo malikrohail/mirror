@@ -7,15 +7,16 @@ import type { SessionDetail, PersonaTemplateOut } from '@/types';
 interface PersonaInfoPanelProps {
   session: SessionDetail;
   template?: PersonaTemplateOut | null;
+  personaName?: string | null;
 }
 
-export function PersonaInfoPanel({ session, template }: PersonaInfoPanelProps) {
+export function PersonaInfoPanel({ session, template, personaName }: PersonaInfoPanelProps) {
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-sm">
           <span className="text-lg">{template?.emoji ?? '👤'}</span>
-          {template?.name ?? 'Persona'}
+          {personaName ?? template?.name ?? 'Persona'}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2 text-xs">

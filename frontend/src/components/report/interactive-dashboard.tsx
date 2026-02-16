@@ -600,7 +600,7 @@ export function InteractiveDashboard({ studyId }: InteractiveDashboardProps) {
                           <span className="text-2xl">{template?.emoji ?? '👤'}</span>
                           <div>
                             <p className="text-sm font-semibold">
-                              {template?.name ?? 'Persona'}
+                              {(persona?.profile?.name as string) ?? template?.name ?? 'Persona'}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {template?.short_description ?? ''}
@@ -679,7 +679,7 @@ export function InteractiveDashboard({ studyId }: InteractiveDashboardProps) {
                       <EmotionalArc
                         key={session.id}
                         arc={session.emotional_arc as Record<string, EmotionalState>}
-                        personaName={`${template?.emoji ?? '👤'} ${template?.name ?? 'Persona'}`}
+                        personaName={`${template?.emoji ?? '👤'} ${(persona?.profile?.name as string) ?? template?.name ?? 'Persona'}`}
                       />
                     );
                   })}

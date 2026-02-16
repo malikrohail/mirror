@@ -469,7 +469,8 @@ export default function StudyRunningPage({
       const template = persona?.template_id
         ? personaTemplates?.find((t) => t.id === persona.template_id)
         : undefined;
-      if (template?.name) sessionNameMap[s.id] = template.name;
+      const profileName = persona?.profile?.name as string | undefined;
+      sessionNameMap[s.id] = profileName ?? template?.name ?? 'Tester';
     }
   }
 

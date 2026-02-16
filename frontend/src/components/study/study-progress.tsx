@@ -97,7 +97,7 @@ export function StudyProgress({ studyId, hideLabel, selectedSessionId, onSelectS
             {sessions.map((session) => {
               const persona = study?.personas.find((p) => p.id === session.persona_id);
               const template = persona?.template_id ? templateMap.get(persona.template_id) : null;
-              const personaName = template?.name ?? 'Tester';
+              const personaName = (persona?.profile?.name as string) ?? template?.name ?? 'Tester';
               const personaAvatarUrl = template?.avatar_url ?? null;
               const personaDescription = template?.short_description ?? null;
               const personaProfile = template?.default_profile ?? null;
