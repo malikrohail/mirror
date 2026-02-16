@@ -182,6 +182,60 @@ class BrowserActions:
             description=f"Waited {ms}ms",
         )
 
+    async def tab(self, page: Page) -> ActionResult:
+        """Press Tab to move focus to the next interactive element."""
+        try:
+            await page.keyboard.press("Tab")
+            await asyncio.sleep(0.3)
+            return ActionResult(
+                success=True,
+                action_type="tab",
+                description="Pressed Tab to move focus forward",
+            )
+        except Exception as e:
+            return ActionResult(
+                success=False,
+                action_type="tab",
+                description="Failed to press Tab",
+                error=str(e),
+            )
+
+    async def shift_tab(self, page: Page) -> ActionResult:
+        """Press Shift+Tab to move focus to the previous interactive element."""
+        try:
+            await page.keyboard.press("Shift+Tab")
+            await asyncio.sleep(0.3)
+            return ActionResult(
+                success=True,
+                action_type="shift_tab",
+                description="Pressed Shift+Tab to move focus backward",
+            )
+        except Exception as e:
+            return ActionResult(
+                success=False,
+                action_type="shift_tab",
+                description="Failed to press Shift+Tab",
+                error=str(e),
+            )
+
+    async def enter(self, page: Page) -> ActionResult:
+        """Press Enter to activate the currently focused element."""
+        try:
+            await page.keyboard.press("Enter")
+            await self._wait_for_stable(page)
+            return ActionResult(
+                success=True,
+                action_type="enter",
+                description="Pressed Enter to activate focused element",
+            )
+        except Exception as e:
+            return ActionResult(
+                success=False,
+                action_type="enter",
+                description="Failed to press Enter",
+                error=str(e),
+            )
+
     async def execute(self, page: Page, action_type: str, **kwargs: str | int) -> ActionResult:
         """Dispatch an action by type string.
 
@@ -200,6 +254,9 @@ class BrowserActions:
             "navigate": lambda: self.navigate(page, str(kwargs.get("value", ""))),
             "go_back": lambda: self.go_back(page),
             "wait": lambda: self.wait(page, int(kwargs.get("value", 1000))),
+            "tab": lambda: self.tab(page),
+            "shift_tab": lambda: self.shift_tab(page),
+            "enter": lambda: self.enter(page),
             "done": lambda: self._noop("done", "Task completed"),
             "give_up": lambda: self._noop("give_up", "Persona gave up"),
         }

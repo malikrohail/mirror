@@ -188,6 +188,59 @@ class HeatmapGenerator:
 
         return (min(r, 255), min(g, 255), min(b, 255))
 
+    def aggregate_clicks_by_persona(
+        self,
+        steps: list[dict[str, Any]],
+    ) -> dict[str, dict[str, HeatmapData]]:
+        """Aggregate click data grouped by persona, then by page URL.
+
+        Returns:
+            Dict mapping persona_name → {page_url → HeatmapData}.
+        """
+        persona_pages: dict[str, dict[str, HeatmapData]] = {}
+
+        for step in steps:
+            page_url = step.get("page_url", "")
+            click_x = step.get("click_x")
+            click_y = step.get("click_y")
+            persona_name = step.get("persona_name", "Unknown")
+
+            if click_x is None or click_y is None:
+                continue
+            if step.get("action_type") != "click":
+                continue
+
+            if persona_name not in persona_pages:
+                persona_pages[persona_name] = {}
+
+            pages = persona_pages[persona_name]
+            if page_url not in pages:
+                pages[page_url] = HeatmapData(
+                    page_url=page_url,
+                    viewport_width=step.get("viewport_width", HEATMAP_WIDTH),
+                    viewport_height=step.get("viewport_height", HEATMAP_HEIGHT),
+                )
+
+            heatmap = pages[page_url]
+            heatmap.clicks.append(ClickPoint(
+                x=int(click_x),
+                y=int(click_y),
+                page_url=page_url,
+                persona_name=persona_name,
+            ))
+            heatmap.total_clicks += 1
+
+        logger.info(
+            "Aggregated clicks by persona: %d personas, %d total clicks",
+            len(persona_pages),
+            sum(
+                h.total_clicks
+                for pages in persona_pages.values()
+                for h in pages.values()
+            ),
+        )
+        return persona_pages
+
     @staticmethod
     def _image_to_bytes(img: Image.Image) -> bytes:
         """Convert PIL Image to PNG bytes."""

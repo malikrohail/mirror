@@ -22,16 +22,27 @@ jobs:
           rm: false
           strip_components: 0
 
-      - name: Rebuild and restart containers
+      - name: Rebuild all services (backend + frontend + worker)
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: root
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 10m
+          command_timeout: 15m
           script: |
             cd /opt/mirror
-            docker compose -f docker-compose.prod.yml up -d --build
+
+            # Force rebuild all services with no cache to avoid stale frontend/backend images
+            docker compose -f docker-compose.prod.yml build --no-cache backend worker frontend
+
+            # Recreate containers with the freshly built images
+            docker compose -f docker-compose.prod.yml up -d --force-recreate
+
+            # Run database migrations
             docker compose -f docker-compose.prod.yml exec -T backend bash -c 'cd /app && PYTHONPATH=/app alembic upgrade head'
+
+            # Prune dangling images to save disk space
+            docker image prune -f
+
             echo "Deploy complete. Container status:"
             docker compose -f docker-compose.prod.yml ps

@@ -165,9 +165,35 @@ class PersonaEngine:
                 "Focus order matters greatly."
             )
         if acc.color_blind:
+            # Provide specific color confusion pairs based on the type noted in
+            # the accessibility_needs description (from template data).
+            cb_detail = ""
+            desc = (acc.description or "").lower()
+            if "deuteranopia" in desc:
+                cb_detail = (
+                    " You have deuteranopia (red-green, green-deficient). "
+                    "You confuse: red↔green, green↔brown, orange↔green, "
+                    "and light green↔yellow. Red and green look like muddy "
+                    "yellow/brown to you."
+                )
+            elif "protanopia" in desc:
+                cb_detail = (
+                    " You have protanopia (red-green, red-deficient). "
+                    "You confuse: red↔dark brown/black, red↔green, "
+                    "orange↔dark yellow, and purple↔blue. Red appears very "
+                    "dark or nearly black to you."
+                )
+            elif "tritanopia" in desc:
+                cb_detail = (
+                    " You have tritanopia (blue-yellow). "
+                    "You confuse: blue↔green, yellow↔violet, "
+                    "orange↔pink, and light blue↔grey. Blues and greens "
+                    "look very similar to you."
+                )
             rules.append(
                 "COLOR BLIND: Color-only indicators (red for error, green for "
                 "success) don't work for you. You need text or icon alternatives."
+                + cb_detail
             )
         if acc.motor_impairment:
             rules.append(

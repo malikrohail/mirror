@@ -235,7 +235,7 @@ class StudyOrchestrator:
 
             # Run analysis + a11y audit + heatmap prep in parallel
             analysis_task = asyncio.create_task(
-                self._run_analysis_pipeline(study_id, nav_results)
+                self._run_analysis_pipeline(study_id, nav_results, persona_profiles)
             )
             a11y_task = asyncio.create_task(
                 self._run_accessibility_audit(study_id, nav_results)
@@ -353,6 +353,22 @@ class StudyOrchestrator:
                     db_issue_count, total_steps, peak_progress,
                 )
                 synthesis.overall_ux_score = max(synthesis.overall_ux_score, floor)
+
+            # Blend accessibility compliance into overall score (10% weight).
+            # If the a11y audit ran, slightly penalize low compliance.
+            if a11y_report and "overall_compliance_percentage" in a11y_report:
+                compliance_pct = a11y_report["overall_compliance_percentage"]
+                # Weighted blend: 90% UX score + 10% accessibility compliance
+                blended = round(
+                    synthesis.overall_ux_score * 0.9
+                    + compliance_pct * 0.1
+                )
+                if blended != synthesis.overall_ux_score:
+                    logger.info(
+                        "Blended a11y compliance into score: UX=%d, a11y=%.0f%%, final=%d",
+                        synthesis.overall_ux_score, compliance_pct, blended,
+                    )
+                synthesis.overall_ux_score = blended
 
             study.overall_score = synthesis.overall_ux_score
             study.executive_summary = synthesis.executive_summary
@@ -537,9 +553,39 @@ class StudyOrchestrator:
             return default
 
         # Convert accessibility_needs from list/dict/etc to AccessibilityNeeds
+        # Templates store needs as string lists like ["screen_reader", "keyboard_only"].
+        # Map known strings to AccessibilityNeeds boolean fields.
+        _NEEDS_TO_FIELD: dict[str, str] = {
+            "screen_reader": "screen_reader",
+            "keyboard_only": "screen_reader",  # keyboard-only implies screen reader usage
+            "low_vision": "low_vision",
+            "large_text": "low_vision",
+            "high_contrast": "low_vision",
+            "zoom_200": "low_vision",
+            "color_blind": "color_blind",
+            "color_blind_deuteranopia": "color_blind",
+            "color_blind_protanopia": "color_blind",
+            "color_blind_tritanopia": "color_blind",
+            "motor_impairment": "motor_impairment",
+            "large_click_targets": "motor_impairment",
+            "no_drag_drop": "motor_impairment",
+            "cognitive": "cognitive",
+            "reduced_motion": "cognitive",
+            "minimal_distractions": "cognitive",
+            "clear_structure": "cognitive",
+            "no_images": "low_vision",
+        }
         acc_raw = t.get("accessibility_needs", {})
         if isinstance(acc_raw, list):
-            acc = AccessibilityNeeds()
+            acc_kwargs: dict[str, bool] = {}
+            for need in acc_raw:
+                field = _NEEDS_TO_FIELD.get(need)
+                if field:
+                    acc_kwargs[field] = True
+            # Preserve the raw list as description for richer context
+            if acc_raw:
+                acc_kwargs["description"] = ", ".join(acc_raw)
+            acc = AccessibilityNeeds(**acc_kwargs)
         elif isinstance(acc_raw, dict):
             acc = AccessibilityNeeds(**acc_raw)
         else:
@@ -863,10 +909,17 @@ class StudyOrchestrator:
         self,
         study_id: uuid.UUID,
         nav_results: list[NavigationResult],
+        persona_profiles: list[dict[str, Any]] | None = None,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Run screenshot analysis on all session results."""
         all_issues: list[dict[str, Any]] = []
         all_steps: list[dict[str, Any]] = []
+
+        # Build persona lookup by name for richer analysis context
+        _persona_by_name: dict[str, dict[str, Any]] = {}
+        if persona_profiles:
+            for p in persona_profiles:
+                _persona_by_name[p.get("name", "")] = p
 
         for result in nav_results:
             if not result.steps:
@@ -888,11 +941,27 @@ class StudyOrchestrator:
 
             all_steps.extend(step_data)
 
+            # Build rich persona context for the analyzer including accessibility traits
+            persona_context = result.persona_name
+            profile = _persona_by_name.get(result.persona_name)
+            if profile:
+                parts = [result.persona_name]
+                if profile.get("occupation"):
+                    parts.append(f"({profile['occupation']}, age {profile.get('age', '?')})")
+                if profile.get("behavioral_notes"):
+                    parts.append(f"Behavioral traits: {profile['behavioral_notes']}")
+                acc = profile.get("accessibility_needs")
+                if acc and isinstance(acc, dict):
+                    active = [k for k, v in acc.items() if v is True]
+                    if active:
+                        parts.append(f"Accessibility needs: {', '.join(active)}")
+                persona_context = " | ".join(parts)
+
             try:
                 analysis = await self._analyzer.analyze_session(
                     session_id=result.session_id,
                     steps=step_data,
-                    persona_context=result.persona_name,
+                    persona_context=persona_context,
                 )
                 all_issues.extend(
                     Analyzer.issues_to_dicts(analysis.deduplicated_issues)
