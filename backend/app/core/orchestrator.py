@@ -87,7 +87,8 @@ class StudyOrchestrator:
         self._accessibility_auditor = AccessibilityAuditor(self._llm)
         self._heatmap_gen = HeatmapGenerator()
         self._report_builder = ReportBuilder(self._llm)
-        self._firecrawl = FirecrawlClient()
+        # Firecrawl disabled: sitemap was never wired into navigation prompts.
+        # self._firecrawl = FirecrawlClient()
 
         # Fast LLM client for small studies (uses Sonnet for synthesis + reports)
         self._fast_llm = LLMClient(stage_model_overrides={
@@ -167,18 +168,20 @@ class StudyOrchestrator:
             study_url = study.url
             starting_path = study.starting_path or ""
 
-            # --- Phase 1b: Parallel setup (browser + personas + sitemap) ---
-            # Run browser init, persona generation, and Firecrawl concurrently
-            # to eliminate sequential delays (saves 10-25 seconds)
+            # --- Phase 1b: Parallel setup (browser + personas) ---
+            # Run browser init and persona generation concurrently
             await self._publish_progress(study_id, 6, "provisioning_browser")
 
             pool_task = asyncio.create_task(self._ensure_browser_pool())
             persona_task = asyncio.create_task(
                 self._generate_persona_profiles(study)
             )
-            sitemap_task = asyncio.create_task(
-                self._precrawl_site_cached(study_url)
-            )
+            # Firecrawl pre-crawl disabled: sitemap was never wired into
+            # navigation prompts, and blind navigation produces better UX
+            # testing signals (real users don't have sitemaps).
+            # sitemap_task = asyncio.create_task(
+            #     self._precrawl_site_cached(study_url)
+            # )
 
             # Wait for browser + personas (required for navigation)
             pool, persona_profiles = await asyncio.gather(
@@ -187,18 +190,6 @@ class StudyOrchestrator:
             # Track browser mode for cost calculation
             self._cost_tracker.set_browser_mode("cloud" if pool.is_cloud else "local")
             await self._publish_progress(study_id, 12, "personas_ready")
-
-            # Sitemap is optional — don't block navigation on it.
-            # If it's already done, great; otherwise navigation starts without it
-            # and we inject the sitemap context later.
-            sitemap: SiteMap | None = None
-            if sitemap_task.done():
-                sitemap = sitemap_task.result()
-                await self._publish_progress(study_id, 15, "sitemap_ready")
-            else:
-                logger.info(
-                    "Firecrawl still running — starting navigation without sitemap"
-                )
 
             # --- Phase 3: Parallel navigation ---
             await self._publish_progress(study_id, 15, "navigating")
@@ -211,10 +202,6 @@ class StudyOrchestrator:
                 pool=pool,
             )
 
-            # Cancel sitemap task if still running (navigation is done)
-            if not sitemap_task.done():
-                sitemap_task.cancel()
-                logger.info("Cancelled pending Firecrawl task (navigation complete)")
             if not nav_results:
                 raise RuntimeError(
                     "No navigation sessions completed. Browserbase may be rate-limited."
@@ -649,61 +636,56 @@ class StudyOrchestrator:
         )
 
     # ------------------------------------------------------------------
-    # Site Pre-Crawling
+    # Site Pre-Crawling (DISABLED)
+    # Firecrawl was integrated but the sitemap was never wired into
+    # navigation prompts. Blind navigation is also better for UX testing
+    # since real users don't have sitemaps. Kept for reference.
     # ------------------------------------------------------------------
 
-    async def _precrawl_site(self, url: str) -> SiteMap:
-        """Pre-crawl the target site to discover pages and build a sitemap."""
-        if not self._firecrawl.is_configured:
-            logger.info("Firecrawl not configured, skipping pre-crawl")
-            return SiteMap(base_url=url, total_pages=0)
+    # async def _precrawl_site(self, url: str) -> SiteMap:
+    #     """Pre-crawl the target site to discover pages and build a sitemap."""
+    #     if not self._firecrawl.is_configured:
+    #         logger.info("Firecrawl not configured, skipping pre-crawl")
+    #         return SiteMap(base_url=url, total_pages=0)
+    #
+    #     try:
+    #         sitemap = await self._firecrawl.crawl_site(url)
+    #         logger.info(
+    #             "Pre-crawl complete: %d pages discovered for %s",
+    #             sitemap.total_pages, url,
+    #         )
+    #         return sitemap
+    #     except Exception as e:
+    #         logger.warning("Pre-crawl failed (non-fatal): %s", e)
+    #         return SiteMap(base_url=url, total_pages=0)
 
-        try:
-            sitemap = await self._firecrawl.crawl_site(url)
-            logger.info(
-                "Pre-crawl complete: %d pages discovered for %s",
-                sitemap.total_pages, url,
-            )
-            return sitemap
-        except Exception as e:
-            logger.warning("Pre-crawl failed (non-fatal): %s", e)
-            return SiteMap(base_url=url, total_pages=0)
-
-    async def _precrawl_site_cached(self, url: str) -> SiteMap:
-        """Pre-crawl with Redis cache (24h TTL per domain).
-
-        Avoids re-crawling the same domain on repeat tests, saving 5-15s.
-        """
-        from urllib.parse import urlparse
-
-        domain = urlparse(url).netloc
-        cache_key = f"firecrawl:sitemap:{domain}"
-
-        # Check cache first
-        try:
-            cached = await self.redis.get(cache_key)
-            if cached:
-                logger.info("Firecrawl cache hit for %s", domain)
-                return SiteMap.model_validate_json(cached)
-        except Exception as e:
-            logger.debug("Cache read failed (non-fatal): %s", e)
-
-        # Cache miss — crawl
-        sitemap = await self._precrawl_site(url)
-
-        # Store in cache with 24h TTL
-        if sitemap.total_pages > 0:
-            try:
-                await self.redis.setex(
-                    cache_key,
-                    86400,  # 24 hours
-                    sitemap.model_dump_json(),
-                )
-                logger.info("Cached Firecrawl sitemap for %s (%d pages)", domain, sitemap.total_pages)
-            except Exception as e:
-                logger.debug("Cache write failed (non-fatal): %s", e)
-
-        return sitemap
+    # async def _precrawl_site_cached(self, url: str) -> SiteMap:
+    #     """Pre-crawl with Redis cache (24h TTL per domain)."""
+    #     from urllib.parse import urlparse
+    #
+    #     domain = urlparse(url).netloc
+    #     cache_key = f"firecrawl:sitemap:{domain}"
+    #
+    #     try:
+    #         cached = await self.redis.get(cache_key)
+    #         if cached:
+    #             logger.info("Firecrawl cache hit for %s", domain)
+    #             return SiteMap.model_validate_json(cached)
+    #     except Exception as e:
+    #         logger.debug("Cache read failed (non-fatal): %s", e)
+    #
+    #     sitemap = await self._precrawl_site(url)
+    #
+    #     if sitemap.total_pages > 0:
+    #         try:
+    #             await self.redis.setex(
+    #                 cache_key, 86400, sitemap.model_dump_json(),
+    #             )
+    #             logger.info("Cached Firecrawl sitemap for %s (%d pages)", domain, sitemap.total_pages)
+    #         except Exception as e:
+    #             logger.debug("Cache write failed (non-fatal): %s", e)
+    #
+    #     return sitemap
 
     # ------------------------------------------------------------------
     # AI Engine: Navigation
@@ -857,11 +839,62 @@ class StudyOrchestrator:
                                 "message": "Switched to cloud browser due to local crashes",
                             })
 
+                        # --- DB recovery: if NavigationResult lost steps
+                        # (timeout, exception, cancellation), recover from DB.
+                        # Steps are saved by background recorder tasks and may
+                        # exist in the DB even when the result says 0. ---
+                        if result.total_steps == 0 or len(result.steps) == 0:
+                            try:
+                                from sqlalchemy import select
+                                from app.models.step import Step as StepModel
+                                db_steps_q = await persona_db.execute(
+                                    select(StepModel)
+                                    .where(StepModel.session_id == session.id)
+                                    .order_by(StepModel.step_number)
+                                )
+                                db_steps = db_steps_q.scalars().all()
+                                if db_steps:
+                                    from app.core.navigator import StepRecord
+                                    recovered = [
+                                        StepRecord(
+                                            step_number=s.step_number,
+                                            page_url=s.page_url or "",
+                                            action_type=s.action_type or "unknown",
+                                            think_aloud=s.think_aloud or "",
+                                            task_progress=int(s.task_progress or 0),
+                                            emotional_state=s.emotional_state or "neutral",
+                                            click_x=s.click_x,
+                                            click_y=s.click_y,
+                                            page_title=s.page_title or "",
+                                        )
+                                        for s in db_steps
+                                    ]
+                                    peak = max(
+                                        (s.task_progress for s in recovered),
+                                        default=0,
+                                    )
+                                    logger.warning(
+                                        "DB recovery: NavigationResult had %d steps "
+                                        "but DB has %d — using DB data (peak %d%%)",
+                                        result.total_steps, len(recovered), peak,
+                                    )
+                                    result = NavigationResult(
+                                        session_id=result.session_id,
+                                        persona_name=result.persona_name,
+                                        task_completed=peak >= 95,
+                                        total_steps=len(recovered),
+                                        gave_up=result.gave_up,
+                                        error=result.error,
+                                        steps=recovered,
+                                    )
+                            except Exception as e:
+                                logger.warning("DB step recovery failed: %s", e)
+
                         # Update session with results
                         db_session = await persona_db.get(
                             type(session), session.id
                         )
-                        if result.error:
+                        if result.error and result.total_steps == 0:
                             db_session.status = SessionStatus.FAILED
                         elif result.gave_up:
                             db_session.status = SessionStatus.GAVE_UP
