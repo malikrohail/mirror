@@ -29,7 +29,7 @@ Each persona has behavioral traits (tech literacy, patience, trust level, access
 
 ## How We Use Opus 4.6
 
-This isn't a wrapper around one API call. It's a 5-stage pipeline with 200+ LLM calls per study:
+It's a 5-stage pipeline with 200+ LLM calls per study:
 
 | Stage | Model | What Happens |
 |-------|-------|-------------|
