@@ -727,7 +727,7 @@ export default function StudyRunningPage({
               const templateIds = study.personas.map((p) => p.template_id).filter(Boolean) as string[];
               if (templateIds.length > 0) params.set('personas', templateIds.join(','));
             }
-            router.push(`/study/new?${params.toString()}`);
+            router.push(`/?${params.toString()}`);
           }}
         >
           <RotateCcw />

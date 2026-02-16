@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  Plus, Search, ChevronRight, ListFilter, ClipboardList,
+  Plus, Search, ChevronRight, ListFilter, TabletSmartphone,
   CircleDot, X, Calendar, Play, Pause, Trash2, Copy,
   ExternalLink, Clock, Globe, Zap, RefreshCw,
   GitCompare, CheckCircle, AlertCircle, MinusCircle,
@@ -642,7 +642,7 @@ export default function DashboardPage() {
 
   const headerChips = allStudies.length > 0
     ? [
-        { label: 'Tests', value: data?.total ?? allStudies.length, tooltip: 'Total number of usability tests run' },
+        { label: 'My tests', value: data?.total ?? allStudies.length, tooltip: 'Total number of usability tests run' },
         { label: 'Websites', value: uniqueUrls, tooltip: 'Unique websites tested' },
         ...(latestStudy
           ? [{ label: 'Last run', value: formatDistanceToNow(latestStudy.created_at), tooltip: 'Time since your most recent test' }]
@@ -688,8 +688,8 @@ export default function DashboardPage() {
     <div>
       {headerChips.length > 0 && (
         <PageHeaderBar
-          icon={ClipboardList}
-          title="My tests"
+          icon={TabletSmartphone}
+          title="Tests"
           chips={headerChips}
           right={
             <DropdownMenu>

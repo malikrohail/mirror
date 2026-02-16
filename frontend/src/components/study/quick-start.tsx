@@ -40,6 +40,7 @@ import {
 import { PersonaBuilderForm } from '@/components/persona/persona-builder-form';
 import { useCreateStudy, useRunStudy } from '@/hooks/use-study';
 import { usePersonaTemplates } from '@/hooks/use-personas';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TERMS } from '@/lib/constants';
 
 type QuickStartPhase = 'input' | 'select-personas';
@@ -337,12 +338,12 @@ export function QuickStart({
             {(['Describe test plan', 'Select testers'] as const).map((label, i) => {
               const isCurrent = (i === 0 && phase === 'input') || (i === 1 && phase === 'select-personas');
 
-              return (
+              const btn = (
                 <button
                   key={label}
                   onClick={() => {
                     if (i === 0) setPhase('input');
-                    else handleContinue(true);
+                    else handleContinue();
                   }}
                   className={cn(
                     'relative flex-1 py-2.5 text-[14px] text-center transition-colors',
@@ -353,6 +354,17 @@ export function QuickStart({
                   {isCurrent && <div className="absolute bottom-0 left-3 right-3 h-[2px] bg-foreground rounded-t-full" />}
                 </button>
               );
+
+              if (label === 'Select testers') {
+                return (
+                  <Tooltip key={label}>
+                    <TooltipTrigger asChild>{btn}</TooltipTrigger>
+                    <TooltipContent className="max-w-[200px] text-center">Check out our testers. They have personalities.</TooltipContent>
+                  </Tooltip>
+                );
+              }
+
+              return btn;
             })}
           </div>
         </div>
@@ -576,7 +588,7 @@ export function QuickStart({
                   </span>
                   <div className="flex-1 min-w-0 text-left">
                     <p className="text-[14px] font-medium">Add your own</p>
-                    <p className="text-xs text-muted-foreground truncate">Create a custom AI tester</p>
+                    <p className="text-xs text-muted-foreground truncate">Create an AI tester with a distinct personality</p>
                   </div>
                 </button>
 
@@ -637,40 +649,6 @@ export function QuickStart({
                           ) : (
                             <p className="text-xs text-muted-foreground truncate">{persona.short_description}</p>
                           )}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                onClick={(e) => e.stopPropagation()}
-                                className="flex items-center gap-1 text-[11px] text-foreground/30 hover:text-foreground/50 transition-colors mt-0.5"
-                              >
-                                {MODEL_OPTIONS.find((m) => m.value === (personaModels[persona.id] ?? 'opus-4.6'))?.label ?? 'Opus 4.6'}
-                                <ChevronDown className="h-2.5 w-2.5" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="min-w-[140px]" onClick={(e) => e.stopPropagation()}>
-                              {MODEL_OPTIONS.map((m) => (
-                                <DropdownMenuItem
-                                  key={m.value}
-                                  disabled={'comingSoon' in m && m.comingSoon}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (!('comingSoon' in m && m.comingSoon)) {
-                                      setPersonaModels((prev) => ({ ...prev, [persona.id]: m.value }));
-                                    }
-                                  }}
-                                >
-                                  <span className={cn(
-                                    (personaModels[persona.id] ?? 'opus-4.6') === m.value && 'font-medium',
-                                  )}>
-                                    {m.label}
-                                  </span>
-                                  {'comingSoon' in m && m.comingSoon && (
-                                    <span className="ml-auto text-[10px] text-muted-foreground">Soon</span>
-                                  )}
-                                </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
                         </div>
                         <div className="flex items-center gap-1">
                           {isSelected && <Check className="h-4 w-4 text-primary" />}

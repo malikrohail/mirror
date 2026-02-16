@@ -49,7 +49,7 @@ export function TaglineH2() {
           {isAI ? <><Code2 className="inline h-4 w-4 mr-1 -translate-y-[1px]" />AI testers</> : <><Mouse className="inline h-4 w-4 mr-1 -translate-y-[1px]" />QA</>}
         </motion.span>
       </AnimatePresence>
-      {' '}find{' '}
+      {isAI ? ' with personalities find ' : ' with a personality finds '}
       <AnimatePresence mode="wait">
         <motion.span
           key={isAI ? 'every' : 'most'}

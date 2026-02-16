@@ -10,7 +10,6 @@ import {
   Sun,
   BookOpen,
   TabletSmartphone,
-  ClipboardList,
   Home,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -19,8 +18,7 @@ import { MirorLogo } from '@/components/common/miror-logo';
 
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/study/new', label: `New ${TERMS.singular}`, icon: TabletSmartphone },
-  { href: '/tests', label: `My ${TERMS.plural}`, icon: ClipboardList },
+  { href: '/tests', label: TERMS.pluralCap, icon: TabletSmartphone },
   { href: '/personas', label: 'Testers', icon: Users },
 ];
 
