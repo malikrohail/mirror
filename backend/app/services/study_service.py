@@ -1,13 +1,15 @@
 import uuid
+from urllib.parse import urlparse
 
 import redis.asyncio as aioredis
 from fastapi import HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repositories.persona_repo import PersonaRepository
 from app.db.repositories.session_repo import SessionRepository
 from app.db.repositories.study_repo import StudyRepository
-from app.models.study import StudyStatus
+from app.models.study import Study, StudyStatus
 from app.schemas.study import StudyCreate
 
 
@@ -21,6 +23,35 @@ class StudyService:
         self.persona_repo = PersonaRepository(db)
         self.session_repo = SessionRepository(db)
 
+    async def _generate_study_name(self, url: str) -> str:
+        """Generate a unique study name from the URL hostname.
+
+        Extracts the domain, counts existing studies with the same domain,
+        and produces a name like "google-3".
+        """
+        parsed = urlparse(url)
+        hostname = parsed.hostname or "unknown"
+
+        # Strip common prefixes and TLD for cleaner names
+        domain = hostname.replace("www.", "")
+        # Take just the main domain part (e.g., "google" from "google.com")
+        domain_parts = domain.split(".")
+        if len(domain_parts) > 1:
+            domain_label = domain_parts[0]
+        else:
+            domain_label = domain
+
+        # Count existing studies with the same domain in the URL
+        result = await self.db.execute(
+            select(func.count()).select_from(Study).where(
+                Study.url.ilike(f"%{hostname}%")
+            )
+        )
+        count = result.scalar() or 0
+        next_number = count + 1
+
+        return f"{domain_label}-{next_number}"
+
     async def create_study(self, data: StudyCreate):
         """Create a study with tasks and personas."""
         # Ensure URL has a scheme so Playwright can navigate to it
@@ -28,9 +59,13 @@ class StudyService:
         if not url.startswith(("http://", "https://")):
             url = "https://" + url
 
+        # Auto-generate a name from the URL
+        name = await self._generate_study_name(url)
+
         study = await self.study_repo.create(
             url=url,
             starting_path=data.starting_path,
+            name=name,
         )
 
         # Create tasks

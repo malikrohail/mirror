@@ -14,6 +14,8 @@ import { PersonaInfoPanel } from './persona-info-panel';
 import { ThinkAloudBubble } from '@/components/common/think-aloud-bubble';
 import { PageSkeleton } from '@/components/common/page-skeleton';
 import { ErrorState } from '@/components/common/error-state';
+import { EmptyState } from '@/components/common/empty-state';
+import { StepsIllustration } from '@/components/common/empty-illustrations';
 import { Button } from '@/components/ui/button';
 import { AUTOPLAY_INTERVAL } from '@/lib/constants';
 import type { EmotionalState } from '@/types';
@@ -194,6 +196,16 @@ export function SessionReplay({ sessionId, initialStepNumber }: SessionReplayPro
   if (isLoading) return <PageSkeleton />;
   if (isError || !session) {
     return <ErrorState title="Failed to load session" message={error?.message} />;
+  }
+
+  if (totalSteps === 0) {
+    return (
+      <EmptyState
+        illustration={<StepsIllustration />}
+        title="No steps recorded"
+        description="This session has no navigation steps yet. Steps will appear here once the persona starts navigating."
+      />
+    );
   }
 
   return (

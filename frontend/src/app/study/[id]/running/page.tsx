@@ -417,7 +417,7 @@ export default function StudyRunningPage({
 
   const { data: reportMarkdown } = useQuery({
     queryKey: ['report-md', id],
-    queryFn: () => fetch(api.getReportMdUrl(id)).then((r) => r.ok ? r.text() : ''),
+    queryFn: () => api.getReportMarkdown(id),
     enabled: !!id && study?.status === 'complete',
   });
 

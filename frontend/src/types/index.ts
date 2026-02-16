@@ -183,6 +183,8 @@ export interface InsightOut {
 
 // ── Persona ───────────────────────────────────────────
 
+export type PersonaModel = 'opus-4.6' | 'sonnet-4.5' | 'haiku-4.5';
+
 export interface PersonaTemplateOut {
   id: string;
   name: string;
@@ -191,6 +193,9 @@ export interface PersonaTemplateOut {
   short_description: string;
   default_profile: Record<string, unknown>;
   avatar_url: string;
+  model: PersonaModel;
+  model_display_name: string;
+  estimated_cost_per_run_usd: number;
   created_at: string;
 }
 
@@ -217,6 +222,7 @@ export interface PersonaGenerateRequest {
   description: string;
   options?: PersonaGenerationOptions;
   avatar_url?: string;
+  model?: PersonaModel;
 }
 
 export interface PersonaGenerateDraftResponse extends PersonaGenerationOptions {
@@ -456,4 +462,77 @@ export interface GitHubPRResponse {
   branch_name: string;
   files_created: string[];
   fixes_included: number;
+}
+
+// ── Flow Analysis ───────────────────────────────────
+
+export interface TransitionIssue {
+  from_page: string;
+  to_page: string;
+  description: string;
+  severity: Severity;
+  heuristic: string;
+  recommendation: string;
+}
+
+export interface FlowAnalysisResult {
+  flow_name: string;
+  pages: string[];
+  consistency_score: number;
+  transition_issues: TransitionIssue[];
+  information_loss: string[];
+  strengths: string[];
+  summary: string;
+}
+
+// ── Accessibility Audit ─────────────────────────────
+
+export interface VisualAccessibilityIssue {
+  description: string;
+  wcag_criterion: string;
+  measured_value: string | null;
+  required_value: string | null;
+  element_description: string;
+  severity: Severity;
+  screenshot_region: Record<string, number>;
+}
+
+export interface WCAGCriterionResult {
+  criterion: string;
+  level: string;
+  status: 'pass' | 'fail' | 'not_applicable';
+  evidence: string;
+}
+
+export interface AccessibilityAuditResult {
+  page_url: string;
+  wcag_level: string;
+  pass_count: number;
+  fail_count: number;
+  compliance_percentage: number;
+  criteria: WCAGCriterionResult[];
+  visual_issues: VisualAccessibilityIssue[];
+  summary: string;
+}
+
+// ── Fix Preview ─────────────────────────────────────
+
+export interface FixPreviewResponse {
+  success: boolean;
+  before_url: string | null;
+  after_url: string | null;
+  diff_url: string | null;
+  before_base64: string | null;
+  after_base64: string | null;
+  diff_base64: string | null;
+  error: string | null;
+}
+
+// ── Showcase ────────────────────────────────────────
+
+export interface ShowcaseStudy {
+  study: StudyOut;
+  sessions: SessionOut[];
+  issues: IssueOut[];
+  insights: InsightOut[];
 }

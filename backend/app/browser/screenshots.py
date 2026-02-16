@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -9,6 +10,86 @@ from typing import Any
 from playwright.async_api import Page
 
 logger = logging.getLogger(__name__)
+
+
+def _get_cvd_matrices() -> dict[str, Any]:
+    """Lazily build color vision deficiency simulation matrices.
+
+    Based on Brettel, Viénot & Mollon (1997) model for dichromatic simulation.
+    These 3x3 matrices simulate how a person with each type of color blindness
+    perceives colors, applied in linear RGB space.
+    """
+    import numpy as np
+
+    return {
+        "deuteranopia": np.array([
+            [0.625, 0.375, 0.0],
+            [0.700, 0.300, 0.0],
+            [0.000, 0.300, 0.700],
+        ], dtype=np.float32),
+        "protanopia": np.array([
+            [0.567, 0.433, 0.0],
+            [0.558, 0.442, 0.0],
+            [0.000, 0.242, 0.758],
+        ], dtype=np.float32),
+        "tritanopia": np.array([
+            [0.950, 0.050, 0.000],
+            [0.000, 0.433, 0.567],
+            [0.000, 0.475, 0.525],
+        ], dtype=np.float32),
+    }
+
+
+def apply_cvd_filter(image_bytes: bytes, cvd_type: str) -> bytes:
+    """Apply a color vision deficiency simulation filter to a screenshot.
+
+    Args:
+        image_bytes: PNG/JPEG screenshot bytes.
+        cvd_type: One of 'deuteranopia', 'protanopia', 'tritanopia'.
+
+    Returns:
+        Filtered PNG bytes simulating the given color blindness type.
+    """
+    import numpy as np
+    from PIL import Image
+
+    matrices = _get_cvd_matrices()
+    matrix = matrices.get(cvd_type)
+    if matrix is None:
+        return image_bytes
+
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    arr = np.asarray(img, dtype=np.float32) / 255.0
+
+    # Apply the 3x3 color matrix: each pixel's [R,G,B] is multiplied
+    flat = arr.reshape(-1, 3)
+    transformed = flat @ matrix.T
+    transformed = np.clip(transformed, 0.0, 1.0)
+
+    result = (transformed.reshape(arr.shape) * 255).astype(np.uint8)
+    out_img = Image.fromarray(result, "RGB")
+    buf = io.BytesIO()
+    out_img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def apply_low_vision_blur(image_bytes: bytes, severity: int = 2) -> bytes:
+    """Simulate low vision by applying a slight gaussian blur.
+
+    Args:
+        image_bytes: PNG/JPEG screenshot bytes.
+        severity: Blur radius (1=mild, 3=moderate). Default 2.
+
+    Returns:
+        Blurred PNG bytes.
+    """
+    from PIL import Image, ImageFilter
+
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    blurred = img.filter(ImageFilter.GaussianBlur(radius=severity))
+    buf = io.BytesIO()
+    blurred.save(buf, format="PNG")
+    return buf.getvalue()
 
 
 @dataclass

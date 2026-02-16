@@ -99,7 +99,9 @@ async def generate_persona(
 
     # Save as a custom template so it appears in the template list
     svc = PersonaService(db)
-    template = await svc.create_custom_template(profile, avatar_url=data.avatar_url)
+    template = await svc.create_custom_template(
+        profile, avatar_url=data.avatar_url, model=data.model,
+    )
     await db.commit()
     await db.refresh(template)
     return template

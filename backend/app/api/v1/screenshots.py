@@ -24,9 +24,20 @@ async def serve_screenshot(
     storage: FileStorage = Depends(get_storage),
 ):
     """Serve a screenshot image by its storage path."""
-    full_path = storage.get_screenshot_full_path(path)
+    if not path or not path.strip():
+        raise HTTPException(status_code=400, detail="Empty screenshot path")
+
+    try:
+        full_path = storage.get_screenshot_full_path(path)
+    except Exception as exc:
+        logger.error("Error resolving screenshot path %s: %s", path, exc)
+        raise HTTPException(status_code=404, detail="Screenshot not found")
+
     if full_path is None or not full_path.exists():
         logger.warning("Screenshot not found: %s (resolved to %s)", path, full_path)
+        raise HTTPException(status_code=404, detail="Screenshot not found")
+
+    if not full_path.is_file():
         raise HTTPException(status_code=404, detail="Screenshot not found")
 
     suffix = full_path.suffix.lower()

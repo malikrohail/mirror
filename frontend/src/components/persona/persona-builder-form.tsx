@@ -23,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { PersonaGenerateDraftResponse, PersonaGenerateRequest, PersonaTemplateOut } from '@/types';
+import type { PersonaGenerateDraftResponse, PersonaGenerateRequest, PersonaModel, PersonaTemplateOut } from '@/types';
 
 const DEVICE_ICONS: Record<string, React.ReactNode> = {
   desktop: <Monitor className="h-3 w-3" />,
@@ -381,7 +381,7 @@ export function PersonaBuilderForm({ embedded = false, onSuccess }: PersonaBuild
     cognitive: false,
   });
   const [accessibilityDescription, setAccessibilityDescription] = useState('');
-  const [selectedModel, setSelectedModel] = useState('opus-4.6');
+  const [selectedModel, setSelectedModel] = useState<PersonaModel>('opus-4.6');
   const generatePersonaDraft = useGeneratePersonaDraft();
   const generatePersona = useGeneratePersona();
   const queryClient = useQueryClient();
@@ -477,6 +477,7 @@ export function PersonaBuilderForm({ embedded = false, onSuccess }: PersonaBuild
       const payload: PersonaGenerateRequest = {
         description: description.trim(),
         avatar_url: selectedAvatarUrl,
+        model: selectedModel,
         options: {
           tech_literacy: techLiteracy,
           patience_level: patienceLevel,
@@ -675,7 +676,7 @@ export function PersonaBuilderForm({ embedded = false, onSuccess }: PersonaBuild
                         disabled={'comingSoon' in m && m.comingSoon}
                         onClick={() => {
                           if (!('comingSoon' in m && m.comingSoon)) {
-                            setSelectedModel(m.value);
+                            setSelectedModel(m.value as PersonaModel);
                           }
                         }}
                       >

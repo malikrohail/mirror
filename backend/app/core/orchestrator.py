@@ -38,7 +38,7 @@ from app.core.step_recorder import DatabaseStepRecorder
 from app.core.synthesizer import Synthesizer
 from app.db.repositories.session_repo import SessionRepository
 from app.db.repositories.study_repo import StudyRepository
-from app.llm.client import LLMClient
+from app.llm.client import HAIKU_MODEL, LLMClient, OPUS_MODEL, SONNET_MODEL
 from app.llm.schemas import AccessibilityNeeds, PersonaProfile
 from app.models.insight import Insight, InsightType
 from app.models.issue import Issue
@@ -88,7 +88,6 @@ class StudyOrchestrator:
         self._firecrawl = FirecrawlClient()
 
         # Fast LLM client for small studies (uses Sonnet for synthesis + reports)
-        from app.llm.client import SONNET_MODEL
         self._fast_llm = LLMClient(stage_model_overrides={
             "synthesis": SONNET_MODEL,
             "report_generation": SONNET_MODEL,
@@ -101,6 +100,16 @@ class StudyOrchestrator:
 
         # Cost tracking (Iteration 4)
         self._cost_tracker = CostTracker()
+
+        # Per-persona LLM clients (populated during navigation)
+        self._persona_llm_clients: list[LLMClient] = []
+
+    # Mapping from user-facing model slugs to Anthropic API model IDs
+    PERSONA_MODEL_TO_API: dict[str, str] = {
+        "opus-4.6": OPUS_MODEL,
+        "sonnet-4.5": SONNET_MODEL,
+        "haiku-4.5": HAIKU_MODEL,
+    }
 
     async def _ensure_browser_pool(self) -> BrowserPool:
         """Initialize browser pool if not already done."""
@@ -226,7 +235,7 @@ class StudyOrchestrator:
 
             # Run analysis + a11y audit + heatmap prep in parallel
             analysis_task = asyncio.create_task(
-                self._run_analysis_pipeline(study_id, nav_results)
+                self._run_analysis_pipeline(study_id, nav_results, persona_profiles)
             )
             a11y_task = asyncio.create_task(
                 self._run_accessibility_audit(study_id, nav_results)
@@ -345,6 +354,22 @@ class StudyOrchestrator:
                 )
                 synthesis.overall_ux_score = max(synthesis.overall_ux_score, floor)
 
+            # Blend accessibility compliance into overall score (10% weight).
+            # If the a11y audit ran, slightly penalize low compliance.
+            if a11y_report and "overall_compliance_percentage" in a11y_report:
+                compliance_pct = a11y_report["overall_compliance_percentage"]
+                # Weighted blend: 90% UX score + 10% accessibility compliance
+                blended = round(
+                    synthesis.overall_ux_score * 0.9
+                    + compliance_pct * 0.1
+                )
+                if blended != synthesis.overall_ux_score:
+                    logger.info(
+                        "Blended a11y compliance into score: UX=%d, a11y=%.0f%%, final=%d",
+                        synthesis.overall_ux_score, compliance_pct, blended,
+                    )
+                synthesis.overall_ux_score = blended
+
             study.overall_score = synthesis.overall_ux_score
             study.executive_summary = synthesis.executive_summary
 
@@ -353,7 +378,7 @@ class StudyOrchestrator:
             study.duration_seconds = round(run_duration, 1)
 
             # Transfer LLM token usage from all clients to cost tracker
-            for llm_client in (self._llm, self._fast_llm):
+            for llm_client in (self._llm, self._fast_llm, *self._persona_llm_clients):
                 usage = llm_client.usage
                 if usage.calls > 0:
                     self._cost_tracker.record_llm_usage(
@@ -481,6 +506,8 @@ class StudyOrchestrator:
                 profile_dict = profile.model_dump()
                 profile_dict["id"] = str(persona.id)
                 profile_dict["behavioral_notes"] = PersonaEngine.get_behavioral_modifiers(profile)
+                # Propagate per-persona model selection from DB
+                profile_dict["model"] = getattr(persona, "model", None) or "opus-4.6"
                 profiles.append(profile_dict)
             except Exception as e:
                 logger.error("Failed to generate persona %s: %s", persona.id, e)
@@ -500,31 +527,65 @@ class StudyOrchestrator:
                     "goals": [],
                     "background": "A general user testing the website.",
                     "behavioral_notes": "",
+                    "model": getattr(persona, "model", None) or "opus-4.6",
                 }
                 profiles.append(fallback)
         return profiles
 
     @staticmethod
     def _build_profile_from_template(t: dict[str, Any]) -> PersonaProfile:
-        """Convert a template dict (string values) into a PersonaProfile (int values).
+        """Convert a template dict (string/int values) into a PersonaProfile (int values).
 
-        Templates use strings like 'high'/'low' for behavioral attributes,
-        while PersonaProfile expects 1-10 integers. This avoids an Opus API call.
+        Templates now use integers 1-10 (canonical format). Legacy templates with
+        string labels ('high'/'low') are also handled via LEVEL_MAP for backward
+        compatibility.
         """
-        LEVEL_MAP = {"low": 2, "moderate": 5, "medium": 5, "high": 8}
-        READING_MAP = {"skims": 2, "scans": 3, "moderate": 5, "thorough": 8, "careful": 8}
+        from app.services.persona_service import LEVEL_MAP
 
-        def to_int(val: Any, mapping: dict[str, int], default: int = 5) -> int:
+        READING_MAP = {"skims": 3, "scans": 3, "moderate": 5, "thorough": 8, "careful": 8}
+
+        def to_int(val: Any, mapping: dict[str, int] | None = None, default: int = 5) -> int:
             if isinstance(val, int):
                 return max(1, min(10, val))
             if isinstance(val, str):
-                return mapping.get(val.lower(), default)
+                combined = {**LEVEL_MAP, **(mapping or {})}
+                return combined.get(val.lower(), default)
             return default
 
         # Convert accessibility_needs from list/dict/etc to AccessibilityNeeds
+        # Templates store needs as string lists like ["screen_reader", "keyboard_only"].
+        # Map known strings to AccessibilityNeeds boolean fields.
+        _NEEDS_TO_FIELD: dict[str, str] = {
+            "screen_reader": "screen_reader",
+            "keyboard_only": "screen_reader",  # keyboard-only implies screen reader usage
+            "low_vision": "low_vision",
+            "large_text": "low_vision",
+            "high_contrast": "low_vision",
+            "zoom_200": "low_vision",
+            "color_blind": "color_blind",
+            "color_blind_deuteranopia": "color_blind",
+            "color_blind_protanopia": "color_blind",
+            "color_blind_tritanopia": "color_blind",
+            "motor_impairment": "motor_impairment",
+            "large_click_targets": "motor_impairment",
+            "no_drag_drop": "motor_impairment",
+            "cognitive": "cognitive",
+            "reduced_motion": "cognitive",
+            "minimal_distractions": "cognitive",
+            "clear_structure": "cognitive",
+            "no_images": "low_vision",
+        }
         acc_raw = t.get("accessibility_needs", {})
         if isinstance(acc_raw, list):
-            acc = AccessibilityNeeds()
+            acc_kwargs: dict[str, bool] = {}
+            for need in acc_raw:
+                field = _NEEDS_TO_FIELD.get(need)
+                if field:
+                    acc_kwargs[field] = True
+            # Preserve the raw list as description for richer context
+            if acc_raw:
+                acc_kwargs["description"] = ", ".join(acc_raw)
+            acc = AccessibilityNeeds(**acc_kwargs)
         elif isinstance(acc_raw, dict):
             acc = AccessibilityNeeds(**acc_raw)
         else:
@@ -638,6 +699,27 @@ class StudyOrchestrator:
                 viewport = persona_dict.get("device_preference", "desktop")
                 session_id = str(session.id)
                 persona_name = persona_dict.get("name", "Unknown")
+
+                # Create per-persona navigator with model override if specified
+                persona_model_slug = persona_dict.get("model") or "opus-4.6"
+                api_model = self.PERSONA_MODEL_TO_API.get(persona_model_slug)
+                if api_model and api_model != HAIKU_MODEL:
+                    # Override the navigation model for this persona
+                    persona_llm = LLMClient(stage_model_overrides={"navigation": api_model})
+                    persona_llm.set_langfuse_context(
+                        session_id=str(study_id),
+                        persona_name=persona_name,
+                        tags=["study-run", f"model-{persona_model_slug}"],
+                    )
+                    persona_navigator = Navigator(
+                        persona_llm,
+                        max_steps=int(os.getenv("MAX_STEPS_PER_SESSION", "30")),
+                    )
+                    self._persona_llm_clients.append(persona_llm)
+                else:
+                    persona_llm = self._llm
+                    persona_navigator = self._navigator
+
                 browser_session = await pool.acquire(viewport=viewport)
                 result: NavigationResult | None = None
                 screencast: CDPScreencastManager | None = None
@@ -714,7 +796,7 @@ class StudyOrchestrator:
                         db_session.status = SessionStatus.RUNNING
                         await persona_db.commit()
 
-                        result = await self._navigator.navigate_session(
+                        result = await persona_navigator.navigate_session(
                             session_id=session_id,
                             persona=persona_dict,
                             task_description=task_desc,
@@ -827,10 +909,17 @@ class StudyOrchestrator:
         self,
         study_id: uuid.UUID,
         nav_results: list[NavigationResult],
+        persona_profiles: list[dict[str, Any]] | None = None,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Run screenshot analysis on all session results."""
         all_issues: list[dict[str, Any]] = []
         all_steps: list[dict[str, Any]] = []
+
+        # Build persona lookup by name for richer analysis context
+        _persona_by_name: dict[str, dict[str, Any]] = {}
+        if persona_profiles:
+            for p in persona_profiles:
+                _persona_by_name[p.get("name", "")] = p
 
         for result in nav_results:
             if not result.steps:
@@ -852,11 +941,27 @@ class StudyOrchestrator:
 
             all_steps.extend(step_data)
 
+            # Build rich persona context for the analyzer including accessibility traits
+            persona_context = result.persona_name
+            profile = _persona_by_name.get(result.persona_name)
+            if profile:
+                parts = [result.persona_name]
+                if profile.get("occupation"):
+                    parts.append(f"({profile['occupation']}, age {profile.get('age', '?')})")
+                if profile.get("behavioral_notes"):
+                    parts.append(f"Behavioral traits: {profile['behavioral_notes']}")
+                acc = profile.get("accessibility_needs")
+                if acc and isinstance(acc, dict):
+                    active = [k for k, v in acc.items() if v is True]
+                    if active:
+                        parts.append(f"Accessibility needs: {', '.join(active)}")
+                persona_context = " | ".join(parts)
+
             try:
                 analysis = await self._analyzer.analyze_session(
                     session_id=result.session_id,
                     steps=step_data,
-                    persona_context=result.persona_name,
+                    persona_context=persona_context,
                 )
                 all_issues.extend(
                     Analyzer.issues_to_dicts(analysis.deduplicated_issues)

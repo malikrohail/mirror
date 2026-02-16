@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMutation } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
-import { API_BASE } from '@/lib/constants';
+import { previewFix } from '@/lib/api-client';
+import type { FixPreviewResponse } from '@/types';
 
 interface FixPreviewProps {
   issueId: string;
@@ -14,32 +15,6 @@ interface FixPreviewProps {
   fixCode: string;
   fixLanguage: string;
   pageUrl: string;
-}
-
-interface FixPreviewResponse {
-  success: boolean;
-  before_url: string | null;
-  after_url: string | null;
-  diff_url: string | null;
-  before_base64: string | null;
-  after_base64: string | null;
-  diff_base64: string | null;
-  error: string | null;
-}
-
-async function requestPreviewFix(
-  studyId: string,
-  issueId: string,
-): Promise<FixPreviewResponse> {
-  const res = await fetch(`${API_BASE}/studies/${studyId}/issues/${issueId}/preview-fix`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => 'Unknown error');
-    throw new Error(body);
-  }
-  return res.json();
 }
 
 function BeforeAfterSlider({
@@ -206,7 +181,7 @@ export function FixPreview({
   const [isOpen, setIsOpen] = useState(false);
 
   const preview = useMutation({
-    mutationFn: () => requestPreviewFix(studyId, issueId),
+    mutationFn: () => previewFix(studyId, issueId),
   });
 
   const handlePreview = () => {

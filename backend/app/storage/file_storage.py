@@ -71,19 +71,43 @@ class FileStorage:
 
         Handles both relative paths (studies/...) and tries common
         path variations to be resilient across environments.
+
+        Returns None if the path contains traversal sequences or
+        resolves outside the base storage directory.
         """
         # Strip leading slash if present (e.g., from URL path)
         clean_path = path.lstrip("/")
 
-        full = self.base_path / clean_path
+        # Prevent path traversal attacks
+        if ".." in clean_path:
+            logger.warning("Path traversal attempt blocked: %s", path)
+            return None
+
+        full = (self.base_path / clean_path).resolve()
+
+        # Ensure the resolved path is within the base storage directory
+        try:
+            full.relative_to(self.base_path.resolve())
+        except ValueError:
+            logger.warning(
+                "Path escapes storage directory: %s (resolved to %s)",
+                path, full,
+            )
+            return None
+
         if full.exists():
             return full
 
-        # Try without "studies/" prefix in case it's doubled
-        if clean_path.startswith("studies/"):
-            alt = self.base_path / clean_path
-            if alt.exists():
-                return alt
+        # Try with "studies/" prefix if it was omitted
+        if not clean_path.startswith("studies/"):
+            alt = (self.base_path / "studies" / clean_path).resolve()
+            try:
+                alt.relative_to(self.base_path.resolve())
+            except ValueError:
+                pass
+            else:
+                if alt.exists():
+                    return alt
 
         logger.debug(
             "Screenshot not found at %s (base_path=%s, requested=%s)",
@@ -197,6 +221,12 @@ class R2Storage(FileStorage):
 
     def get_screenshot_full_path(self, path: str) -> Path | None:
         """Try local first, then R2."""
+        # Prevent path traversal before any I/O
+        clean_path = path.lstrip("/")
+        if ".." in clean_path:
+            logger.warning("Path traversal attempt blocked in R2 lookup: %s", path)
+            return None
+
         local = super().get_screenshot_full_path(path)
         if local:
             return local
@@ -205,11 +235,16 @@ class R2Storage(FileStorage):
         client = self._get_client()
         if client:
             try:
-                response = client.get_object(Bucket=self._bucket, Key=path)
+                response = client.get_object(Bucket=self._bucket, Key=clean_path)
                 image_bytes = response["Body"].read()
 
-                # Cache locally
-                local_path = self.base_path / path
+                # Cache locally — use resolved path within base directory
+                local_path = (self.base_path / clean_path).resolve()
+                try:
+                    local_path.relative_to(self.base_path.resolve())
+                except ValueError:
+                    logger.warning("R2 cache path escapes storage: %s", path)
+                    return None
                 local_path.parent.mkdir(parents=True, exist_ok=True)
                 local_path.write_bytes(image_bytes)
                 return local_path

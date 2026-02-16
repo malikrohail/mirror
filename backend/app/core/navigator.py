@@ -435,7 +435,7 @@ class Navigator:
         click_y: int | None = None
 
         if decision.action.type == ActionType.click:
-            # Try the CSS selector first
+            # Strategy 1: Use CSS selector via Playwright locator + JS fallback
             if decision.action.selector:
                 pos = await self._screenshots.get_click_position(
                     page, decision.action.selector
@@ -443,7 +443,37 @@ class Navigator:
                 if pos:
                     click_x, click_y = pos
 
-            # Fallback: use viewport center as approximate click position
+            # Strategy 2: Try to find the element by text content via JS
+            if click_x is None and click_y is None and decision.action.description:
+                try:
+                    pos = await page.evaluate(
+                        """(desc) => {
+                            // Try matching by link/button text
+                            const candidates = [
+                                ...document.querySelectorAll('a, button, [role="button"], input[type="submit"]')
+                            ];
+                            for (const el of candidates) {
+                                const text = (el.textContent || el.value || '').trim().toLowerCase();
+                                if (text && desc.toLowerCase().includes(text.substring(0, 30))) {
+                                    const rect = el.getBoundingClientRect();
+                                    if (rect.width > 0 && rect.height > 0) {
+                                        return {
+                                            x: Math.round(rect.left + rect.width / 2),
+                                            y: Math.round(rect.top + rect.height / 2)
+                                        };
+                                    }
+                                }
+                            }
+                            return null;
+                        }""",
+                        decision.action.description,
+                    )
+                    if pos:
+                        click_x, click_y = pos["x"], pos["y"]
+                except Exception:
+                    pass
+
+            # Strategy 3: Use viewport center as last-resort approximate position
             # so heatmap always has data for click actions
             if click_x is None and click_y is None:
                 viewport = page.viewport_size
